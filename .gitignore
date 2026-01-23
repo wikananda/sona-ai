@@ -1,0 +1,12 @@
+.env
+.DS_Store
+__pycache__
+cp/hf_cache/*
+data/raw/*
+outputs/transcription/*
+outputs/summarization/*
+
+!cp/hf_cache/.gitkeep
+!data/raw/.gitkeep
+!outputs/transcription/.gitkeep
+!outputs/summarization/.gitkeep

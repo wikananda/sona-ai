@@ -1,0 +1,20 @@
+model:
+    whisper_model: "medium"
+    align_model: "Wikidepia/wav2vec2-xls-r-300m-indonesian"
+    language: "id"
+    device: "cpu"
+    compute_type: "float32"
+    batch_size: 8
+
+input:
+    audio_file: "data/raw/audio_indo.mp3"
+    min_speakers: 2
+    max_speakers: 2
+
+outputs:
+    segments: "outputs/transcription/result_segments.json"
+    word_segments: "outputs/transcription/result_word_segments.json"
+    result: "outputs/transcription/result.json"
+
+cp_dir:
+    hf_cache: "cp/hf_cache"
