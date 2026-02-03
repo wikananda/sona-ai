@@ -2,11 +2,15 @@
 .DS_Store
 __pycache__
 cp/hf_cache/*
-data/raw/*
+data/raw/audio/*
+data/raw/mediasum/*
+data/processed/*
 outputs/transcription/*
 outputs/summarization/*
 
 !cp/hf_cache/.gitkeep
-!data/raw/.gitkeep
+!data/raw/audio/.gitkeep
+!data/raw/mediasum/.gitkeep
+!data/processed/.gitkeep
 !outputs/transcription/.gitkeep
 !outputs/summarization/.gitkeep

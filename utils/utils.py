@@ -6,6 +6,13 @@ def setup_logging():
     logging.basicConfig(level=logging.INFO, format=log_format)
     return logging.getLogger(__name__)
 
+def preview_dataset(dataset):
+    """
+    Preview the summarization dataset
+    """
+    for i in range(5):
+        print(dataset[i])
+
 def write_json(path, data):
     """
     Write JSON data to a file

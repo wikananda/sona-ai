@@ -1,0 +1,62 @@
+model:
+    model_name: "google/flan-t5-small"
+    max_input_length: 1024
+    max_target_length: 256
+    language: "en"
+    device: "mps"
+    output_dir: "cp/flan-t5-small-mediasum"
+
+lora:
+    r: 16
+    lora_alpha: 32
+    target_modules: ["q", "k", "v", "o"]
+    lora_dropout: 0.05
+    bias: "none"
+
+seq2seq_args:
+    # TRAINING
+    num_train_epochs: 5
+    learning_rate: 2.0e-5
+    per_device_train_batch_size: 4
+    per_device_eval_batch_size: 4
+    weight_decay: 0.01
+    gradient_accumulation_steps: 4
+
+    # EVALUATION
+    eval_strategy: "epoch"
+    logging_strategy: "epoch"
+    save_strategy: "epoch"
+    # eval_steps: 500
+    # logging_steps: 10
+    # save_steps: 100
+    # save_total_limit: 2
+
+    # SEQ2SEQ specific
+    predict_with_generate: True
+    generation_max_length: 256
+    generation_num_beams: 4
+
+    # PERFORMANCE
+    fp16: False # enable if have gpu supporting this
+    gradient_checkpointing: True # enable if got OOM error (slows down training).
+
+    # MISC
+    report_to: "none"
+    load_best_model_at_end: True
+    metric_for_best_model: "rougeL"
+    greater_is_better: True
+
+
+
+dataset:
+    dataset_source: "local" # 'hf' or 'local'
+    dataset_name: "ccdv/mediasum" # if we pick 'hf' source
+    # if we pick 'local' source
+    dataset_dir: "data/raw/mediasum"
+    tokenized_dir: "data/processed"
+    train_data_file: "train_data.txt"
+    val_data_file: "val_data.txt"
+    test_data_file: "test_data.txt"
+
+cp_dir:
+    hf_cache: "cp/hf_cache"
