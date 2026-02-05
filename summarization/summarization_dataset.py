@@ -102,7 +102,7 @@ class SummarizationDataset:
         )
 
         # Tokenize target summaries
-        with self.tokenizer.text_target():
+        with self.tokenizer.as_target_tokenizer():
             labels = self.tokenizer(
                 batch['summary'],
                 max_length=self.config['model']['max_target_length'],

@@ -1,7 +1,13 @@
 import os
+import sys
 from pathlib import Path
-import yaml
 
+# Add project root to sys.path to allow importing from utils
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.append(str(project_root))
+
+import yaml
 import torch
 from datasets import load_dataset, load_from_disk, Features, Value, Sequence
 from transformers import (
@@ -12,12 +18,16 @@ from transformers import (
     Seq2SeqTrainer
 )
 from peft import LoraConfig, get_peft_model, TaskType
+import numpy as np
+import evaluate
 from utils.utils import load_config, filter_training_args
 from summarization_dataset import SummarizationDataset
 
+print("CUDA available:", torch.cuda.is_available())
+if torch.cuda.is_available():
+    print("CUDA device:", torch.cuda.get_device_name(0))
+
 # Load configuration
-script_dir = Path(__file__).parent
-project_root = script_dir.parent
 config = load_config('flan-t5')
 
 MODEL_NAME = config['model']['model_name']
@@ -89,9 +99,9 @@ dataset = SummarizationDataset(
     name="mediasum",
     source='local',
     seed=42,
-    train_size=5000,
-    val_size=500,
-    test_size=500
+    train_size=config['dataset']['train_size'],
+    val_size=config['dataset']['val_size'],
+    test_size=config['dataset']['test_size']
 )
 tokenized_dataset = dataset.load_and_prepare()
 

@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 import yaml
 from inspect import signature
+from transformers import Seq2SeqTrainingArguments
 import evaluate
 import numpy as np
 
@@ -39,8 +40,8 @@ def load_config(config_name: str):
     """
     if config_name == 'flan-t5':
         config_path = Path(__file__).parent.parent / 'configs' / 'flan-t5.yaml'
-    elif config_name == 'llama':
-        config_path = Path(__file__).parent.parent / 'configs' / 'llama.yaml'
+    elif config_name == 'whisperx':
+        config_path = Path(__file__).parent.parent / 'configs' / 'whisperx.yaml'
     else:
         raise ValueError(f"Unknown config name: {config_name}")
         

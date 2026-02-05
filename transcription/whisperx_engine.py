@@ -3,20 +3,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from pathlib import Path
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.append(str(project_root))
 
 import whisperx
 import torch
 import gc
 from whisperx.diarize import DiarizationPipeline
 
-from pathlib import Path
 import time
 import math
 import json
 import numpy as np
 import yaml
 from utils.Timer import Timer
+from utils.utils import load_config
 import argparse
 import warnings
 import logging
@@ -24,11 +27,7 @@ from utils.utils import write_json, setup_logging
 
 logger = setup_logging()
 
-script_dir = Path(__file__).parent
-config_path = script_dir/".."/"configs"/"whisperx.yaml"
-
-with open(config_path, 'r') as f:
-    config = yaml.safe_load(f)
+config = load_config('whisperx')
 
 # ----------- ENVIRONMENT HELPER -----------
 def setup_environment(quiet=False):

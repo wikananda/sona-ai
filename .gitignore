@@ -1,14 +1,14 @@
 .env
 .DS_Store
 __pycache__
-cp/hf_cache/*
+cp/*
 data/raw/audio/*
 data/raw/mediasum/*
 data/processed/*
 outputs/transcription/*
 outputs/summarization/*
 
-!cp/hf_cache/.gitkeep
+!cp/.gitkeep
 !data/raw/audio/.gitkeep
 !data/raw/mediasum/.gitkeep
 !data/processed/.gitkeep
