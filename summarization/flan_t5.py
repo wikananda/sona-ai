@@ -35,7 +35,7 @@ MAX_INPUT_LENGTH = config['model']['max_input_length']
 MAX_TARGET_LENGTH = config['model']['max_target_length']
 HF_CACHE = project_root / config['cp_dir']['hf_cache']
 DATASET_DIR = project_root / config['dataset']['dataset_dir']
-OUTPUT_DIR = project_root / config['model']['output_dir']
+CP_DIR = project_root / config['model']['cp_dir']
 
 # Load model and tokenizer
 # use_fast=False is more reliable for T5 models to avoid normalization errors
@@ -108,7 +108,7 @@ tokenized_dataset = dataset.load_and_prepare()
 # Training Arguments
 seq2seq_args = filter_training_args(config['seq2seq_args'])
 training_args = Seq2SeqTrainingArguments(
-    output_dir=str(OUTPUT_DIR),
+    output_dir=str(CP_DIR),
     **seq2seq_args
 )
 
@@ -131,6 +131,6 @@ trainer = Seq2SeqTrainer(
 print("Starting LoRA fine-tuning...")
 trainer.train()
 
-print(f"Saving LoRA adapters to {OUTPUT_DIR}")
-model.save_pretrained(str(OUTPUT_DIR))
-tokenizer.save_pretrained(str(OUTPUT_DIR))
+print(f"Saving LoRA adapters to {CP_DIR}")
+model.save_pretrained(str(CP_DIR))
+tokenizer.save_pretrained(str(CP_DIR))

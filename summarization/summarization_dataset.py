@@ -80,7 +80,7 @@ class SummarizationDataset:
                 batched=True,
                 remove_columns=dataset['train'].column_names
             )
-            tokenized_dataset.save_to_disk(str(self.project_root / tokenized_dir))
+            tokenized_dataset.save_to_disk(tokenized_dir)
         return tokenized_dataset
         
     def preprocess(self, batch):
