@@ -17,7 +17,7 @@ from transformers import (
     Seq2SeqTrainingArguments,
     Seq2SeqTrainer
 )
-from peft import LoraConfig, get_peft_model, TaskType
+from peft import LoraConfig, get_peft_model, TaskType, PeftModel
 import numpy as np
 import evaluate
 from utils.utils import load_config, filter_training_args
@@ -32,6 +32,7 @@ class FlanT5Base:
         self.config = load_config(config_name)
         self.device = self._get_device(self.config['model']['device'])
         self.tokenizer = self._load_tokenizer()
+        self.project_root = Path(__file__).parent.parent
         self.model = self._get_lora_model()
 
     def _get_device(self, device):
@@ -54,18 +55,26 @@ class FlanT5Base:
         model.config.pad_token_id = self.tokenizer.pad_token_id
         return model
 
-    def _get_lora_model(self):
-        model = self._load_base_model()
-        print("Applying LoRA configuration...")
-        lora_config = LoraConfig(
-            r=self.config['lora']['r'],
-            lora_alpha=self.config['lora']['lora_alpha'],
-            target_modules=self.config['lora']['target_modules'],
-            lora_dropout=self.config['lora']['lora_dropout'],
-            bias=self.config['lora']['bias'],
-            task_type=TaskType.SEQ_2_SEQ_LM
-        )
-        model = get_peft_model(model, lora_config)
+    def _get_lora_model(self, use_pretrained: bool = False):
+        base_model = self._load_base_model()
+        cp_dir = self.project_root / self.config['model']['cp_dir']
+        
+        # Check if LoRA adapters already exist
+        if use_pretrained and os.path.exists(cp_dir) and os.path.exists(cp_dir / "adapter_config.json"):
+            print(f"Using pretrained LoRA adapters from {cp_dir}...")
+            model = PeftModel.from_pretrained(base_model, str(cp_dir), is_trainable=True)
+        else:
+            print(f"Applying new LoRA configuration...")
+            lora_config = LoraConfig(
+                r=self.config['lora']['r'],
+                lora_alpha=self.config['lora']['lora_alpha'],
+                target_modules=self.config['lora']['target_modules'],
+                lora_dropout=self.config['lora']['lora_dropout'],
+                bias=self.config['lora']['bias'],
+                task_type=TaskType.SEQ_2_SEQ_LM
+            )
+            model = get_peft_model(base_model, lora_config)\
+                
         if self.config['seq2seq_args']['gradient_checkpointing']:
             model.enable_input_require_grads()
         model.print_trainable_parameters()
