@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from datasets import load_dataset, load_from_disk, Features, Value, Sequence
 from transformers import AutoTokenizer
-from prompt import build_prompt
+from .prompt import build_prompt
 
 from utils.utils import load_config
 
@@ -10,6 +10,7 @@ class SummarizationDataset:
     def __init__(
         self,
         tokenizer,
+        config=None,
         name="mediasum",
         source=None,
         seed=42,
@@ -18,7 +19,7 @@ class SummarizationDataset:
         test_size=500,
     ):
         self.project_root = Path(__file__).parent.parent
-        self.config = load_config('flan-t5')
+        self.config = config or load_config('flan-t5')
         self.tokenizer = tokenizer
         self.name = name
         self.source = source or self.config['dataset'].get('dataset_source', 'local')
@@ -28,6 +29,9 @@ class SummarizationDataset:
         self.test_size = test_size
 
     def load_raw(self):
+        """
+        Loads the raw dataset from the specified source.
+        """
         if self.source == "local":
             if self.name == "mediasum":
                 features = Features({
@@ -55,33 +59,48 @@ class SummarizationDataset:
         else:
             # Online data loading from Hugging Face Hub
             dataset = load_dataset(self.config['dataset']['dataset_name'])
-        # Safely select subsets
-        for split, size in [('train', self.train_size), ('val', self.val_size), ('test', self.test_size)]:
-            if size is not None and size != -1:
-                actual_size = min(size, len(dataset[split]))
-                dataset[split] = dataset[split].shuffle(seed=self.seed).select(range(actual_size))
-            else:
-                # Still shuffle even if selecting all, if a seed is provided
-                dataset[split] = dataset[split].shuffle(seed=self.seed)
 
+        # Safely select subsets
+        dataset = self._split_sizes(dataset)
         print(f"Train size: {len(dataset['train'])} | Val size: {len(dataset['val'])} | Test size: {len(dataset['test'])}")
         return dataset
 
     def load_and_prepare(self):
-        dataset = self.load_raw()
+        """
+        Loads the raw dataset, then preprocess and tokenize it.
+        """
         tokenized_dir = str(self.project_root / self.config['dataset']['tokenized_dir'] / f"{self.name}_tokenized_{self.config['model']['model_name'].replace('/', '_')}")
         try:
             print("Loading processed dataset from disk...")
             tokenized_dataset = load_from_disk(tokenized_dir)
         except FileNotFoundError:
             print("Failed to load dataset from disk. Tokenizing dataset...")
+            dataset = self.load_raw()
             tokenized_dataset = dataset.map(
                 self.preprocess,
                 batched=True,
                 remove_columns=dataset['train'].column_names
             )
             tokenized_dataset.save_to_disk(tokenized_dir)
+        tokenized_dataset = self._split_sizes(tokenized_dataset)
         return tokenized_dataset
+
+    def _split_sizes(self, dataset):
+        """
+        Calculate the size of each split based on the dataset size and the desired split sizes.
+        """
+        for split, size in [
+            ('train', self.train_size),
+            ('val', self.val_size),
+            ('test', self.test_size)
+        ]:
+            if size is not None and size != -1:
+                actual_size = min(size, len(dataset[split]))
+                dataset[split] = dataset[split].shuffle(seed=self.seed).select(range(actual_size))
+            else:
+                dataset[split] = dataset[split].shuffle(seed=self.seed)
+        return dataset
+        
         
     def preprocess(self, batch):
         """Tokenize the batch of data"""

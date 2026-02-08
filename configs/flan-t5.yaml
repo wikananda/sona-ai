@@ -3,7 +3,7 @@ model:
     max_input_length: 1024
     max_target_length: 256
     language: "en"
-    device: "cuda"
+    device: "auto"
     cp_dir: "cp/flan-t5-small-mediasum"
 
 lora:

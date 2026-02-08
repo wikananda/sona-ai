@@ -21,19 +21,19 @@ from peft import LoraConfig, get_peft_model, TaskType, PeftModel
 import numpy as np
 import evaluate
 from utils.utils import load_config, filter_training_args
-from summarization_dataset import SummarizationDataset
+from .summarization_dataset import SummarizationDataset
 
 print("CUDA available:", torch.cuda.is_available())
 if torch.cuda.is_available():
     print("CUDA device:", torch.cuda.get_device_name(0))
 
 class FlanT5Base:
-    def __init__(self, config_name: str):
+    def __init__(self, config_name: str, use_pretrained: bool = True):
         self.config = load_config(config_name)
+        self.project_root = Path(__file__).parent.parent
         self.device = self._get_device(self.config['model']['device'])
         self.tokenizer = self._load_tokenizer()
-        self.project_root = Path(__file__).parent.parent
-        self.model = self._get_lora_model()
+        self.model = self._get_lora_model(use_pretrained)
 
     def _get_device(self, device):
         if device == "auto":
@@ -46,16 +46,22 @@ class FlanT5Base:
         return device
 
     def _load_tokenizer(self):
-        tokenizer = AutoTokenizer.from_pretrained(self.config['model']['model_name'], cache_dir=self.config['cp_dir']['hf_cache'])
+        tokenizer = AutoTokenizer.from_pretrained(
+            self.config['model']['model_name'], 
+            cache_dir=str(self.project_root / self.config['cp_dir']['hf_cache'])
+        )
         tokenizer.pad_token = tokenizer.eos_token
         return tokenizer
 
     def _load_base_model(self):
-        model = AutoModelForSeq2SeqLM.from_pretrained(self.config['model']['model_name'], cache_dir=self.config['cp_dir']['hf_cache'])
+        model = AutoModelForSeq2SeqLM.from_pretrained(
+            self.config['model']['model_name'], 
+            cache_dir=str(self.project_root / self.config['cp_dir']['hf_cache'])
+        )
         model.config.pad_token_id = self.tokenizer.pad_token_id
         return model
 
-    def _get_lora_model(self, use_pretrained: bool = False):
+    def _get_lora_model(self, use_pretrained: bool = True):
         base_model = self._load_base_model()
         cp_dir = self.project_root / self.config['model']['cp_dir']
         
