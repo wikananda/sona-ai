@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Add project root to sys.path to allow importing from utils
 project_root = Path(__file__).parent.parent
@@ -28,10 +29,10 @@ if torch.cuda.is_available():
     print("CUDA device:", torch.cuda.get_device_name(0))
 
 class FlanT5Base:
-    def __init__(self, config_name: str, use_pretrained: bool = True):
+    def __init__(self, config_name: str, use_pretrained: bool = True, device: Optional[str] = None):
         self.config = load_config(config_name)
         self.project_root = Path(__file__).parent.parent
-        self.device = self._get_device(self.config['model']['device'])
+        self.device = device or self._get_device(self.config['model']['device'])
         self.tokenizer = self._load_tokenizer()
         self.model = self._get_lora_model(use_pretrained)
 
@@ -83,7 +84,6 @@ class FlanT5Base:
                 
         if self.config['seq2seq_args']['gradient_checkpointing']:
             model.enable_input_require_grads()
-        model.print_trainable_parameters()
         return model
 
     def get_data_collator(self):

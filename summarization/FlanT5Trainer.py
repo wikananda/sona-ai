@@ -19,6 +19,7 @@ class FlanT5Trainer(FlanT5Base):
         self.tokenized_dataset = None
         self.trainer = None
         self.args = filter_training_args(self.config['seq2seq_args'])
+        self.model.print_trainable_parameters()
 
     def prepare_data_and_trainer(self, **kwargs):
         """
@@ -78,6 +79,7 @@ class FlanT5Trainer(FlanT5Base):
         size: int, number of samples to test on. Default to 100.
         get_base_model: bool, whether to evaluate the base model. Default to True.
         """
+        print(f"Using device: {self.device}")
         test_dataset = self.tokenized_dataset['test']
         actual_size = min(size, len(test_dataset))
         print(f"Testing model on {actual_size} samples...")
