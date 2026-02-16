@@ -23,7 +23,7 @@ from utils.utils import load_config
 import argparse
 import warnings
 import logging
-from utils.utils import write_json, setup_logging
+from utils.utils import write_json, setup_logging, sanitize_for_json
 
 logger = setup_logging()
 
@@ -148,32 +148,6 @@ def run_diarization(audio, diarize_model, result, config: dict):
 
 
 # ----------- HELPER BUILDING FUNCTIONS -----------
-def sanitize_for_json(obj):
-    """
-    Make JSON safe and ready output.
-    Result from whisperx may contain numpy data or NaN type which is not JSON serializable.
-    This function will convert numpy data to Python data and NaN to None.
-
-    obj: object to make JSON safe (result['segments'])
-    """
-
-    # Doing recursion, because might encounter nested dict/list/numpy data inside the obj/dict/list
-    if isinstance(obj, dict):
-        return {k: sanitize_for_json(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [sanitize_for_json(v) for v in obj]
-    elif isinstance(obj, np.generic):
-        value = obj.item()
-        if isinstance(value, float) and math.isnan(value):
-            return None
-        return value
-    elif isinstance(obj, float):
-        if math.isnan(obj):
-            return None
-        return obj
-    else:
-        return obj
-
 def build_conversations(result_segments):
     """
     Build final conversation JSON that is ready to show in FE

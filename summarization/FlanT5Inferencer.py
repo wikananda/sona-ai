@@ -5,6 +5,7 @@ import torch
 import numpy as np
 import os
 import json
+import gc
 
 class FlanT5Inferencer(FlanT5Base):
     def __init__(
@@ -47,3 +48,11 @@ class FlanT5Inferencer(FlanT5Base):
         )
 
         return summary
+    
+    def cleanup_models(self):
+        del self.model
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        elif torch.backends.mps.is_available():
+            torch.mps.empty_cache()
