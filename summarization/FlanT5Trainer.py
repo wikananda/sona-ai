@@ -4,6 +4,7 @@ from utils.utils import filter_training_args
 
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 import numpy as np
+import matplotlib.pyplot as plt
 import json
 import os
 
@@ -72,6 +73,8 @@ class FlanT5Trainer(FlanT5Base):
         self.trainer.save_model(cp_path)
         self.tokenizer.save_pretrained(cp_path)
         print(f"Saving LoRA adapters to {cp_path}")
+        self._save_training_logs()
+        self._plot_losses()
 
     def test(self, size: int = 100, get_base_model: bool = True):
         """
@@ -166,3 +169,75 @@ class FlanT5Trainer(FlanT5Base):
             "base_predictions": base_preds,
             "labels": lora_labels
         }
+
+    def _save_training_logs(self):
+        logs = self.trainer.state.log_history
+        cp_path = str(self.project_root / self.config['model']['cp_dir'])
+        logs_path = os.path.join(cp_path, "training_logs.json")
+        with open(logs_path, "w") as f:
+            json.dump(logs, f, indent=4)
+        print(f"Training logs saved to {logs_path}")
+
+    def _extract_metrics(self):
+        logs = self.trainer.state.log_history
+        train_losses = []
+        eval_losses = []
+        rogues = {
+            "rouge1": [],
+            "rouge2": [],
+            "rougeL": [],
+            "rougeLsum": []
+        }
+        steps = []
+
+        for entry in logs:
+            if "loss" in entry:
+                train_losses.append(entry["loss"])
+                steps.append(entry["step"])
+            if "eval_loss" in entry:
+                eval_losses.append(entry["eval_loss"])
+            if "eval_rouge1" in entry:
+                rogues["rouge1"].append(entry["eval_rouge1"])
+            if "eval_rouge2" in entry:
+                rogues["rouge2"].append(entry["eval_rouge2"])
+            if "eval_rougeL" in entry:
+                rogues["rougeL"].append(entry["eval_rougeL"])
+            if "eval_rougeLsum" in entry:
+                rogues["rougeLsum"].append(entry["eval_rougeLsum"])
+        
+        return steps, train_losses, eval_losses, rogues
+                
+    def _plot_losses(self):
+        steps, train_losses, eval_losses, rogues = self._extract_metrics()
+
+        cp_path = str(self.project_root / self.config['model']['cp_dir'])
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(steps, train_losses, label="Training Loss", color='blue', marker='o', markersize=5, linewidth=3)
+        if eval_losses:
+            plt.plot(steps, eval_losses, label="Validation loss", color='orange', marker='o', markersize=5, linewidth=3)
+        
+        plt.xlabel("Steps")
+        plt.ylabel("Loss")
+        plt.title("Training and Validation Loss")
+        plt.legend()
+        loss_plot_path = os.path.join(cp_path, "loss_curve.png")
+        plt.savefig(loss_plot_path)
+
+        if rogues:
+            plt.figure(figsize=(10, 6))
+            for rouge_name, scores in rogues.items():
+                if scores:
+                    plt.plot(steps, scores, label=rouge_name, marker='o', markersize=5, linewidth=3)
+            plt.xlabel("Steps")
+            plt.ylabel("Score")
+            plt.title("ROUGE Metrics")
+            plt.legend()
+            rouge_plot_path = os.path.join(cp_path, "rouge_metrics.png")
+            plt.savefig(rouge_plot_path)
+
+        plt.close()
+        print(f"Training plots saved to {cp_path}")
+
+
+    

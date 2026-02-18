@@ -6,12 +6,38 @@ from inspect import signature
 from transformers import Seq2SeqTrainingArguments
 import evaluate
 import numpy as np
+import math
 
 def setup_logging():
     log_format = "%(asctime)s - %(levelname)s - %(message)s"
     logging.basicConfig(level=logging.INFO, format=log_format)
     return logging.getLogger(__name__)
 
+def sanitize_for_json(obj):
+    """
+    Make JSON safe and ready output.
+    Result from whisperx may contain numpy data or NaN type which is not JSON serializable.
+    This function will convert numpy data to Python data and NaN to None.
+
+    obj: object to make JSON safe (result['segments'])
+    """
+
+    # Doing recursion, because might encounter nested dict/list/numpy data inside the obj/dict/list
+    if isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_for_json(v) for v in obj]
+    elif isinstance(obj, np.generic):
+        value = obj.item()
+        if isinstance(value, float) and math.isnan(value):
+            return None
+        return value
+    elif isinstance(obj, float):
+        if math.isnan(obj):
+            return None
+        return obj
+    else:
+        return obj
 def preview_dataset(dataset):
     """
     Preview the summarization dataset

@@ -1,7 +1,7 @@
 model:
     whisper_model: "medium"
     align_model: "Wikidepia/wav2vec2-xls-r-300m-indonesian"
-    language: "id"
+    language: null
     device: "cpu"
     compute_type: "float32"
     batch_size: 8
