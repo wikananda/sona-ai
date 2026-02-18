@@ -31,8 +31,6 @@ class WhisperXEngine:
     def __init__(
         self,
         config: dict,
-        min_speakers: int = None,
-        max_speakers: int = None
     ):
         self.config = config
         self.model = None
@@ -40,11 +38,6 @@ class WhisperXEngine:
         self.align_metadata = None
         self.diarize_model = None
         self.audio = None
-
-        if min_speakers is not None:
-            self.config['input']['min_speakers'] = min_speakers
-        if max_speakers is not None:
-            self.config['input']['max_speakers'] = max_speakers
 
     def load_models(self):
         """
@@ -71,19 +64,21 @@ class WhisperXEngine:
             device=self.config['model']['device'],
         )
 
-    def run_transcription(self, audio):
+    def run_transcription(self, audio, language=None):
         """
         Running transcription
 
         model: whisper model
         audio: audio file
         config: configuration dictionary (.yaml files)
+        language: language code (e.g., 'en', 'id')
         """
         logger.info("Running transcription...")
         with Timer("Transcription"):
             result = self.model.transcribe(
                 audio,
-                batch_size=self.config['model']['batch_size']
+                batch_size=self.config['model']['batch_size'],
+                language=language or self.config['model'].get('language')
             )
         return result
 
@@ -109,24 +104,29 @@ class WhisperXEngine:
         )
         return result
 
-    def run_diarization(self, audio, result):
+    def run_diarization(self, audio, result, min_speakers=None, max_speakers=None):
         """
         Running diarization with pyannote.
 
         audio: audio file
         diarize_model: diarization model
         result: transcription result
+        min_speakers: minimum number of speakers
+        max_speakers: maximum number of speakers
         """
         logger.info("Running diarization...")
-        assert self.config['input']['min_speakers'] <= self.config['input']['max_speakers'], "min_speakers must be less than max_speakers"
-        assert self.config['input']['min_speakers'] >= 1, "min_speakers must be greater than or equal to 1"
-        assert self.config['input']['max_speakers'] >= 1, "max_speakers must be greater than or equal to 1"
+        min_s = min_speakers if min_speakers is not None else self.config['input']['min_speakers']
+        max_s = max_speakers if max_speakers is not None else self.config['input']['max_speakers']
+
+        assert min_s <= max_s, "min_speakers must be less than max_speakers"
+        assert min_s >= 1, "min_speakers must be greater than or equal to 1"
+        assert max_s >= 1, "max_speakers must be greater than or equal to 1"
 
         with Timer("Diarization"):
             diarize_result = self.diarize_model(
                 audio,
-                min_speakers=self.config['input']['min_speakers'],
-                max_speakers=self.config['input']['max_speakers'],
+                min_speakers=min_s,
+                max_speakers=max_s,
             )
 
         # Assign diarization to transcription
@@ -155,6 +155,9 @@ class WhisperXEngine:
         return conversations
 
     def cleanup_models(self):
+        """
+        Perform model cleaning up
+        """
         for m in [self.model, self.align_model, self.diarize_model]:
             if m is not None:
                 del m
@@ -164,14 +167,28 @@ class WhisperXEngine:
         elif torch.backends.mps.is_available():
             torch.mps.empty_cache()
 
-    def transcribe(self, audio_path: str):
+    def transcribe(
+        self,
+        audio_path: str,
+        language: str = None,
+        min_speakers: int = None,
+        max_speakers: int = None
+    ):
+        """
+        Main function to run transcription
+
+        audio_path: path to audio file
+        language: language code (e.g., 'en', 'id')
+        min_speakers: minimum number of speakers
+        max_speakers: maximum number of speakers
+        """
         if self.model is None or self.align_model is None or self.diarize_model is None:
             raise ReferenceError("WhisperX model not yet initialized.")
 
         self.audio = whisperx.load_audio(audio_path)
-        result = self.run_transcription(self.audio)
+        result = self.run_transcription(self.audio, language=language)
         result = self.run_alignment(result, self.audio)
-        result_final, diarize_result = self.run_diarization(self.audio, result)
+        result_final, diarize_result = self.run_diarization(self.audio, result, min_speakers=min_speakers, max_speakers=max_speakers)
 
         segments = sanitize_for_json(result_final['segments'])
         conversations = self.build_conversations(segments)

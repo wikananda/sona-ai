@@ -1,7 +1,14 @@
-from fastapi import FastAPI
+from fastapi import HTTPException
+from fastapi import FastAPI, UploadFile, File
+from fastapi.concurrency import run_in_threadpool
 from summarization.FlanT5Inferencer import FlanT5Inferencer
 from transcription.WhisperXEngine import WhisperXEngine
 from utils.utils import load_config, setup_logging
+
+from typing import Optional
+import shutil
+import uuid
+import os
 
 logger = setup_logging()
 app = FastAPI()
@@ -38,3 +45,34 @@ async def shutdown_event():
     app.state.asr.cleanup_models()
     app.state.summarizer.cleanup_models()
     logger.info("Cleanup complete!")
+
+@app.post("/transcribe")
+async def transcribe(
+    file: UploadFile = File(...),
+    language: Optional[str]=None,
+    min_speakers: Optional[int]=None,
+    max_speakers: Optional[int]=None
+):
+    filename = file.filename
+    extension = os.path.splitext(filename)[1] # get the format
+    temp_filename = f"/tmp/{uuid.uuid4()}{extension}"
+
+    # Stream the file content, so not loading it as whole. Reduce the amount of RAM usage
+    with open(temp_filename, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    try:
+        result = await run_in_threadpool(
+            app.state.asr.transcribe,
+            temp_filename,
+            language=language,
+            min_speakers=min_speakers,
+            max_speakers=max_speakers,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error transcribing file: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)
