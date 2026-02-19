@@ -194,9 +194,9 @@ class WhisperXEngine:
         conversations = self.build_conversations(segments)
 
         return {
-            'conversations': conversations,
+            'transcript': conversations,
             'diarize_result': diarize_result,
-            'result': result_final
+            'result_raw': result_final
         }
 
     @staticmethod
