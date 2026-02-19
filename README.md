@@ -122,7 +122,7 @@ Send a `POST` request to `/transcribe` with an audio file:
 ---
 
 ## 📝 TODO
-- ✅ Implement basic API for transcription
-- ✅ Implement basic UI for transcription
+- [x] Implement basic API for transcription
+- [x] Implement basic UI for transcription
 - [ ] Fine-tune Flan-T5 for summarization tasks.
 - [ ] Implement basic API for summarization
