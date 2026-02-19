@@ -7,7 +7,6 @@ data/raw/mediasum/*
 data/processed/*
 outputs/transcription/*
 outputs/summarization/*
-*.md
 
 !cp/.gitkeep
 !data/raw/audio/.gitkeep
