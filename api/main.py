@@ -6,12 +6,22 @@ from transcription.WhisperXEngine import WhisperXEngine
 from utils.utils import load_config, setup_logging
 
 from typing import Optional
+from fastapi.middleware.cors import CORSMiddleware
 import shutil
 import uuid
 import os
 
 logger = setup_logging()
 app = FastAPI()
+
+# Allow your frontend to talk to this API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # To be replaced later in production with our URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 async def startup_event():
