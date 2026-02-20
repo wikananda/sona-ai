@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Optional, Union, Dict
+import gc
 
 # Add project root to sys.path to allow importing from utils
 project_root = Path(__file__).parent.parent
@@ -45,6 +46,14 @@ class FlanT5Base:
             else:
                 return "cpu"
         return device
+
+    def cleanup_models(self):
+        del self.model
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        elif torch.backends.mps.is_available():
+            torch.mps.empty_cache()
 
     def _load_tokenizer(self):
         tokenizer = AutoTokenizer.from_pretrained(
