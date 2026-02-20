@@ -1,7 +1,8 @@
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union, Dict
+import gc
 
 # Add project root to sys.path to allow importing from utils
 project_root = Path(__file__).parent.parent
@@ -29,8 +30,8 @@ if torch.cuda.is_available():
     print("CUDA device:", torch.cuda.get_device_name(0))
 
 class FlanT5Base:
-    def __init__(self, config_name: str, use_pretrained: bool = True, device: Optional[str] = None):
-        self.config = load_config(config_name)
+    def __init__(self, config: Union[str, Dict], use_pretrained: bool = True, device: Optional[str] = None):
+        self.config = load_config(config)
         self.project_root = Path(__file__).parent.parent
         self.device = self._get_device(device or self.config['model']['device'])
         self.tokenizer = self._load_tokenizer()
@@ -45,6 +46,14 @@ class FlanT5Base:
             else:
                 return "cpu"
         return device
+
+    def cleanup_models(self):
+        del self.model
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        elif torch.backends.mps.is_available():
+            torch.mps.empty_cache()
 
     def _load_tokenizer(self):
         tokenizer = AutoTokenizer.from_pretrained(

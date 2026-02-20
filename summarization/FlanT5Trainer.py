@@ -1,3 +1,4 @@
+from typing import Union, Dict, Optional
 from .FlanT5Base import FlanT5Base
 from .summarization_dataset import SummarizationDataset
 from utils.utils import filter_training_args
@@ -12,20 +13,21 @@ class FlanT5Trainer(FlanT5Base):
     """
     Class for fine-tuning, testing and inference of FlanT5 model.
     """
-    def __init__(self, config_name: str = "flan-t5"):
+    def __init__(self, config: Union[str, Dict] = "flan-t5"):
         """
-        config_name: str, name of the config file to use. Default to "flan-t5".
+        config: str or dict, name of the config, path to YAML, or the config dict themselves. Default to "flan-t5".
         """
-        super().__init__(config_name)
+        super().__init__(config)
         self.tokenized_dataset = None
         self.trainer = None
         self.args = filter_training_args(self.config['seq2seq_args'])
         self.model.print_trainable_parameters()
 
-    def prepare_data_and_trainer(self, **kwargs):
+    def prepare_data_and_trainer(self, training_args_dict: Optional[Dict] = None, **kwargs):
         """
         Loads and tokenizes the dataset using this trainer's own tokenizer.
-        kwargs can be used to override train_size, val_size, test_size,etc.
+        training_args_dict: dict, optional training arguments to override/extend config.
+        kwargs can be used to override train_size, val_size, test_size, etc.
         """
         print("Preparing dataset...")
         
@@ -35,18 +37,24 @@ class FlanT5Trainer(FlanT5Base):
             **kwargs
         )
         self.tokenized_dataset = ds_manager.load_and_prepare()
-        self.trainer = self._get_trainer()
+        self.trainer = self._get_trainer(training_args_dict)
 
-    def _get_trainer(self):
+    def _get_trainer(self, training_args_dict: Optional[Dict] = None):
         """
         Returns a Seq2SeqTrainer instance.
         """
         if self.tokenized_dataset is None:
             raise ValueError("Dataset not prepared. Call prepare_data() first.")
+        
+        # Use config args by default, merge with custom dict if provided
+        final_args = self.args.copy()
+        if training_args_dict:
+            print("Merging custom training arguments...")
+            custom_args = filter_training_args(training_args_dict)
+            final_args.update(custom_args)
             
         training_args = Seq2SeqTrainingArguments(
-            output_dir=str(self.project_root / self.config['model']['cp_dir']),
-            **self.args
+            **final_args
         )
 
         return Seq2SeqTrainer(

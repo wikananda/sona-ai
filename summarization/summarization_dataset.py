@@ -19,7 +19,7 @@ class SummarizationDataset:
         test_size=500,
     ):
         self.project_root = Path(__file__).parent.parent
-        self.config = config or load_config('flan-t5')
+        self.config = load_config(config) if config else load_config('flan-t5')
         self.tokenizer = tokenizer
         self.name = name
         self.source = source or self.config['dataset'].get('dataset_source', 'local')
