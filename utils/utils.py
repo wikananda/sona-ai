@@ -2,6 +2,7 @@ import json
 import logging
 from pathlib import Path
 import yaml
+from typing import Union, Dict
 from inspect import signature
 from transformers import Seq2SeqTrainingArguments
 import evaluate
@@ -59,17 +60,29 @@ def load_json(path):
     with open(path, 'r') as f:
         return json.load(f)
 
-def load_config(config_name: str):
+def load_config(config: Union[str, dict]):
     """
-    Load config from a YAML file
-    config_name: str -> name of the config to be loaded (not path)
+    Load config from a YAML file or return the dict if already loaded.
+    config: str or dict -> name of the config, path to YAML, or the config dict itself.
     """
-    if config_name == 'flan-t5':
-        config_path = Path(__file__).parent.parent / 'configs' / 'flan-t5.yaml'
-    elif config_name == 'whisperx':
-        config_path = Path(__file__).parent.parent / 'configs' / 'whisperx.yaml'
-    else:
-        raise ValueError(f"Unknown config name: {config_name}")
+    if isinstance(config, dict):
+        return config
+
+    # Try to find the config file
+    config_path = Path(config)
+    
+    # If not a direct path, look in the configs directory
+    if not config_path.exists():
+        potential_path = Path(__file__).parent.parent / 'configs' / f"{config}.yaml"
+        if potential_path.exists():
+            config_path = potential_path
+        else:
+            # Try without .yaml extension if it was already provided in config
+            potential_path = Path(__file__).parent.parent / 'configs' / config
+            if potential_path.exists():
+                config_path = potential_path
+            else:
+                raise ValueError(f"Config not found: {config}. Checked path and configs/ directory.")
         
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)

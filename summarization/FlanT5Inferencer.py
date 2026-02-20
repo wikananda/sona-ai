@@ -1,3 +1,4 @@
+from typing import Union, Dict, Optional
 from .FlanT5Base import FlanT5Base
 from .prompt import build_prompt
 
@@ -10,13 +11,13 @@ import gc
 class FlanT5Inferencer(FlanT5Base):
     def __init__(
         self,
-        config_name: str = "flan-t5",
+        config: Union[str, Dict] = "flan-t5",
         use_pretrained: bool = True,
         device: str = "auto",
         max_new_tokens: int = 256,
         num_beams: int = 4,
     ):
-        super().__init__(config_name, use_pretrained=use_pretrained, device=device)
+        super().__init__(config, use_pretrained=use_pretrained, device=device)
         self.max_new_tokens = max_new_tokens
         self.num_beams = num_beams
         self.model.to(self.device)
