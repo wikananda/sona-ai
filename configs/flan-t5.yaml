@@ -1,10 +1,11 @@
 model:
-    model_name: "google/flan-t5-large"
+    model_name: "google/flan-t5-xl"
+    task_type: "auto"  # "seq2seq" | "causal" | "auto" (auto-detects from model class)
     max_input_length: 1024
     max_target_length: 256
     language: "en"
     device: "auto"
-    cp_dir: "cp/flan-t5-large-mediasum"
+    cp_dir: "cp/flan-t5-xl-mediasum"
 
 lora:
     r: 16

@@ -1,4 +1,5 @@
 import random
+from typing import Optional
 
 prompt1 = (
     "You are a professional news editor.\n"
@@ -18,7 +19,19 @@ prompt3 = (
 
 PROMPT_VARIATIONS = [prompt1, prompt2, prompt3]
 
-def build_prompt(transcript: str) -> str:
-    """Helper to prompt format the input for MediaSum"""
-    instruction = random.choice(PROMPT_VARIATIONS)
+def build_prompt(transcript: str, prompt: Optional[str] = None) -> str:
+    """
+    Helper to prompt format the input for MediaSum
+    
+    Args:
+        transcript: str, the transcript to summarize
+        prompt: str, optional custom prompt
+    
+    Returns:
+        str, the formatted prompt
+    """
+    if prompt:
+        instruction = prompt
+    else:
+        instruction = random.choice(PROMPT_VARIATIONS)
     return f"{instruction}\n\nTranscript:\n{transcript}\n\nSummary:"
