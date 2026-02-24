@@ -1,0 +1,56 @@
+model:
+    model_name: "meta-llama/Llama-3.2-3B-Instruct"
+    task_type: "causal"  # "seq2seq" | "causal" | "auto"
+    max_input_length: 512
+    max_target_length: 128
+    language: "en"
+    device: "auto"
+    cp_dir: "cp/llama-3.2-3B-Instruct-mediasum"
+
+lora:
+    r: 8
+    lora_alpha: 32
+    target_modules: ["q_proj", "v_proj"]
+    lora_dropout: 0.05
+    bias: "none"
+
+# For causal models, use training_args (maps to TrainingArguments, not Seq2SeqTrainingArguments)
+training_args:
+    # TRAINING
+    num_train_epochs: 3
+    learning_rate: 2.0e-5
+    per_device_train_batch_size: 4
+    per_device_eval_batch_size: 4
+    weight_decay: 0.01
+    gradient_accumulation_steps: 4
+
+    # EVALUATION
+    eval_strategy: "epoch"
+    logging_strategy: "epoch"
+    save_strategy: "epoch"
+
+    # PERFORMANCE
+    fp16: False
+    gradient_checkpointing: True
+
+    # MISC
+    report_to: "none"
+    load_best_model_at_end: True
+    metric_for_best_model: "eval_loss"
+    greater_is_better: False
+
+dataset:
+    dataset_source: "local"
+    dataset_name: "ccdv/mediasum"
+    dataset_dir: "data/raw/mediasum"
+    tokenized_dir: "data/processed"
+    train_data_file: "train_data.txt"
+    val_data_file: "val_data.txt"
+    test_data_file: "test_data.txt"
+    train_size: 100
+    val_size: 10
+    test_size: 10
+    test_output_dir: "outputs/summarization"
+
+cp_dir:
+    hf_cache: "cp/hf_cache"

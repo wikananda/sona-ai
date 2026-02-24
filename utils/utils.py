@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml
 from typing import Union, Dict
 from inspect import signature
-from transformers import Seq2SeqTrainingArguments
+from transformers import Seq2SeqTrainingArguments, TrainingArguments
 import evaluate
 import numpy as np
 import math
@@ -87,12 +87,15 @@ def load_config(config: Union[str, dict]):
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
-def filter_training_args(arg_dict):
+def filter_training_args(arg_dict, task_type: str = "seq2seq"):
     """
-    Gather all arguments inside the .yaml file automatically
+    Filter a dict of training arguments to only the keys accepted by the
+    relevant TrainingArguments class.
+    - task_type="seq2seq" → validates against Seq2SeqTrainingArguments
+    - task_type="causal"  → validates against TrainingArguments
     """
-    # Get the parameters
-    sig = signature(Seq2SeqTrainingArguments).parameters
+    args_class = Seq2SeqTrainingArguments if task_type == "seq2seq" else TrainingArguments
+    sig = signature(args_class).parameters
     valid_keys = set(sig.keys())
 
     filtered_args = {}

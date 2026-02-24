@@ -1,4 +1,9 @@
-from .FlanT5Trainer import FlanT5Trainer
-from .FlanT5Base import FlanT5Base
-from .FlanT5Inferencer import FlanT5Inferencer
-from .summarization_dataset import SummarizationDataset
+from .SummarizationBase import SummarizationBase
+from .SummarizationTrainer import SummarizationTrainer
+from .SummarizationInferencer import SummarizationInferencer
+from .SummarizationDataset import SummarizationDataset
+
+# Backward-compatible aliases — old imports from notebooks/scripts still work
+FlanT5Base = SummarizationBase
+FlanT5Trainer = SummarizationTrainer
+FlanT5Inferencer = SummarizationInferencer
