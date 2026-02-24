@@ -1,6 +1,6 @@
 from typing import Union, Dict, Optional
 from .SummarizationBase import SummarizationBase
-from .summarization_dataset import SummarizationDataset
+from .SummarizationDataset import SummarizationDataset
 from utils.utils import filter_training_args
 
 from transformers import (

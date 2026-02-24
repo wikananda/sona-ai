@@ -21,7 +21,7 @@ class SummarizationDataset:
         test_size: int = 500,
     ):
         self.project_root = Path(__file__).parent.parent
-        self.config = load_config(config) if config else load_config('flan-t5')
+        self.config = load_config(config) if config else load_config('llama')
         self.tokenizer = tokenizer
         self.task_type = task_type
         self.name = name

@@ -16,7 +16,7 @@ class SummarizationInferencer(SummarizationBase):
 
     def __init__(
         self,
-        config: Union[str, Dict] = "flan-t5",
+        config: Union[str, Dict] = "llama",
         base_model: bool = False,
         use_pretrained: bool = True,
         device: str = "auto",
@@ -42,7 +42,6 @@ class SummarizationInferencer(SummarizationBase):
             str: the generated summary
         """
         formatted_prompt = build_prompt(text, prompt)
-        print(formatted_prompt)
 
         inputs = self.tokenizer(
             formatted_prompt,

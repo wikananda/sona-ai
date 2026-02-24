@@ -1,16 +1,16 @@
 model:
-    model_name: "gpt2"
+    model_name: "meta-llama/Llama-3.2-3B-Instruct"
     task_type: "causal"  # "seq2seq" | "causal" | "auto"
     max_input_length: 512
     max_target_length: 128
     language: "en"
     device: "auto"
-    cp_dir: "cp/gpt2-mediasum"
+    cp_dir: "cp/llama-3.2-3B-Instruct-mediasum"
 
 lora:
-    r: 16
+    r: 8
     lora_alpha: 32
-    target_modules: ["c_attn", "c_proj"]
+    target_modules: ["q_proj", "v_proj"]
     lora_dropout: 0.05
     bias: "none"
 

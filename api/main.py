@@ -1,9 +1,10 @@
 from fastapi import HTTPException
 from fastapi import FastAPI, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
-from summarization.FlanT5Inferencer import FlanT5Inferencer
+from summarization.SummarizationInferencer import SummarizationInferencer
 from transcription.WhisperXEngine import WhisperXEngine
 from utils.utils import load_config, setup_logging
+from summarization.prompt import build_prompt
 
 from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,8 +39,8 @@ async def startup_event():
     app.state.asr.load_models()
     
     # Load FlanT5 summarization model
-    app.state.summarizer = FlanT5Inferencer(
-        config_name="flan-t5",
+    app.state.summarizer = SummarizationInferencer(
+        config_name="llama",
         use_pretrained=True,
         device="auto",
         max_new_tokens=256,
@@ -86,3 +87,21 @@ async def transcribe(
     finally:
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
+
+@app.post("/summarize")
+async def summarize(
+    text: str,
+    prompt: Optional[str] = None,
+    max_length: Optional[int] = 2048,
+):
+    try:
+        result = await run_in_threadpool(
+            app.state.summarizer.generate,
+            text,
+            prompt,
+            max_length=max_length
+        )
+        return {"summary": result}
+    except Exception as e:
+        logger.error(f"Error summarizing text: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

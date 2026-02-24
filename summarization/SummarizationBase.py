@@ -25,7 +25,7 @@ from peft import LoraConfig, get_peft_model, TaskType, PeftModel
 import numpy as np
 import evaluate
 from utils.utils import load_config, filter_training_args
-from .summarization_dataset import SummarizationDataset
+from .SummarizationDataset import SummarizationDataset
 
 print("CUDA available:", torch.cuda.is_available())
 if torch.cuda.is_available():
