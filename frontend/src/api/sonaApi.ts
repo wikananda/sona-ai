@@ -12,6 +12,12 @@ export interface TranscribeParams {
     maxSpeakers?: number | "";
 }
 
+export interface SummarizeParams {
+    text: string;
+    prompt?: string;
+    maxLength?: number | "2048";
+}
+
 const BASE_URL = "http://localhost:8000";
 
 export async function transcribeAudio(params: TranscribeParams): Promise<SpeakerSegment[]> {
@@ -35,9 +41,25 @@ export async function transcribeAudio(params: TranscribeParams): Promise<Speaker
     })
 
     if (!response.ok) {
-        throw new Error(`API error! status: ${response.status}`);
+        throw new Error(`(transcribe) API error! status: ${response.status}`);
     }
 
     const data = await response.json();
     return data.transcript;
+}
+
+export async function summarizeTranscript(params: SummarizeParams): Promise<string> {
+    const url = new URL(`${BASE_URL}/summarize`);
+    const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params)
+    })
+
+    if (!response.ok) {
+        throw new Error(`(summarize) API error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.summary;
 }

@@ -8,7 +8,7 @@ logger = setup_logging()
 router = APIRouter()
 
 @router.post("/summarize")
-async def summarize(request: Request,body: SummarizeRequest):
+async def summarize(request: Request, body: SummarizeRequest):
     try:
         result = await run_in_threadpool(
             request.app.state.summarizer.generate,

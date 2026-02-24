@@ -3,7 +3,9 @@
 import { useState } from "react";
 import AudioUploader from "@/src/components/AudioUploader";
 import TranscriptPanel from "@/src/components/TranscriptPanel";
-import { transcribeAudio, SpeakerSegment } from "@/src/api/sonaApi";
+import SummaryPanel from "@/src/components/SummaryPanel";
+import { transcribeAudio, summarizeTranscript, SpeakerSegment } from "@/src/api/sonaApi";
+import sanitizeTranscript from "@/src/utils/sanitizeTranscript";
 
 const DEFAULT_LANG = {
   label: "English",
@@ -21,9 +23,11 @@ export default function Home() {
 
   // Result state
   const [transcript, setTranscript] = useState<SpeakerSegment[]>([]);
+  const [summary, setSummary] = useState<string>("");
 
   // Loading states
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
   const handleTranscribe = async () => {
     if (!file) return;
@@ -46,13 +50,31 @@ export default function Home() {
     }
   };
 
+  const handleSummarize = async () => {
+    if (!transcript.length) return;
+
+    setIsSummarizing(true);
+    setSummary("");
+
+    try {
+      const summary = await summarizeTranscript({
+        text: sanitizeTranscript(transcript),
+      })
+      setSummary(summary);
+    } catch (error) {
+      console.error("Summarization failed:", error);
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center">
       <div className="h-48 flex items-center">
         <h1 className="text-4xl font-bold">Sona AI</h1>
       </div>
 
-      <div className="flex flex-col gap-8 w-full max-w-2xl">
+      <div className="flex flex-col gap-8 w-full max-w-2xl mb-8">
         <AudioUploader
           file={file}
           onFileChange={setFile}
@@ -68,7 +90,18 @@ export default function Home() {
           isLoading={isTranscribing}
         />
 
+        {transcript.length > 0 && (
+          <button
+            onClick={handleSummarize}
+            disabled={isSummarizing}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 hover:cursor-pointer disabled:bg-blue-200 disabled:cursor-not-allowed"
+          >
+            {isSummarizing ? "Summarizing..." : "Summarize"}
+          </button>
+        )}
+
         <TranscriptPanel segments={transcript} />
+        <SummaryPanel summary={summary} isLoading={isSummarizing} />
       </div>
     </main>
   )
