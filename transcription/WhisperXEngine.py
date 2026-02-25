@@ -26,6 +26,8 @@ import logging
 from utils.utils import write_json, setup_logging, sanitize_for_json
 
 logger = setup_logging()
+output_dir = Path(__file__).parent.parent / 'outputs' / 'transcription'
+output_dir.mkdir(parents=True, exist_ok=True)
 
 class WhisperXEngine:
     def __init__(
@@ -193,10 +195,13 @@ class WhisperXEngine:
         segments = sanitize_for_json(result_final['segments'])
         conversations = self.build_conversations(segments)
 
+        write_json(output_dir / 'conversations.json', conversations)
+        write_json(output_dir / 'result_raw.json', segments)
+
         return {
             'transcript': conversations,
             'diarize_result': diarize_result,
-            'result_raw': result_final
+            'result_raw': segments
         }
 
     @staticmethod

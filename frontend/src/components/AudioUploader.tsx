@@ -2,68 +2,45 @@
 
 import { useState } from "react";
 
-interface SpeakerSegment {
-    speaker: string;
-    text: string;
-    start: number;
-    end: number;
+interface Language {
+    label: string;
+    code: string;
+    flag: string;
 }
 
-export default function AudioUploader() {
-    const [file, setFile] = useState<File | null>(null);
-    const [transcript, setTranscript] = useState<SpeakerSegment[]>([]);
-    const [loading, setLoading] = useState(false);
+interface Props {
+    file: File | null;
+    onFileChange: (file: File | null) => void;
+    selectedLang: Language;
+    onLangChange: (lang: Language) => void;
+    minSpeakers: number | "";
+    maxSpeakers: number | "";
+    autoDetect: boolean;
+    onMinSpeakersChange: (value: number | "") => void;
+    onMaxSpeakersChange: (value: number | "") => void;
+    onAutoDetectChange: (value: boolean) => void;
+    onSubmit: () => void;
+    isLoading: boolean;
+}
 
+const LANGUAGES: Language[] = [
+    { label: "Auto detect", code: "None", flag: "🔍" },
+    { label: "English", code: "en", flag: "🇺🇸" },
+    { label: "Indonesian", code: "id", flag: "🇮🇩" },
+];
+
+export default function AudioUploader({
+    file, onFileChange,
+    selectedLang, onLangChange,
+    minSpeakers, maxSpeakers, autoDetect,
+    onMinSpeakersChange, onMaxSpeakersChange, onAutoDetectChange,
+    onSubmit, isLoading,
+}: Props) {
     // State for Language Menu
     const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
-    const [selectedLang, setSelectedLang] = useState({ label: "English", code: "en", flag: "🇺🇸" });
-
-    // State for number of speakers
-    const [minSpeakers, setMinSpeakers] = useState<number | "">("");
-    const [maxSpeakers, setMaxSpeakers] = useState<number | "">("");
-    const [autoDetect, setAutoDetect] = useState(false);
-
-    const languages = [
-        { label: "Auto detect", code: "None", flag: "🔍" },
-        { label: "English", code: "en", flag: "🇺🇸" },
-        { label: "Indonesian", code: "id", flag: "🇮🇩" },
-    ];
-
-    const handleUpload = async () => {
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append("file", file);
-
-        setLoading(true);
-        try {
-            // Updated to send language as a query parameter
-            const url = new URL("http://localhost:8000/transcribe");
-            if (selectedLang.code !== "None") {
-                url.searchParams.append("language", selectedLang.code);
-            }
-            if (minSpeakers !== "") {
-                url.searchParams.append("min_speakers", minSpeakers.toString());
-            }
-            if (maxSpeakers !== "") {
-                url.searchParams.append("max_speakers", maxSpeakers.toString());
-            }
-
-            const response = await fetch(url.toString(), {
-                method: "POST",
-                body: formData,
-            });
-
-            const data = await response.json();
-            setTranscript(data.transcript);
-        } catch (error) {
-            console.error("Error transcribing file:", error);
-        }
-        setLoading(false);
-    };
 
     return (
-        <div className="flex flex-col gap-4 w-full max-w-2xl bg-white p-6 rounded-xl shadow-lg border border-zinc-100">
+        <div className="flex flex-col gap-4 w-full max-w-full bg-white p-6 rounded-xl shadow-lg border border-zinc-100">
             <h2 className="text-xl font-bold text-zinc-800">Audio Transcription</h2>
 
             {/* Audio File Upload */}
@@ -79,7 +56,7 @@ export default function AudioUploader() {
                         hover:file:bg-zinc-300 cursor-pointer"
                     onChange={(e) => {
                         if (e.target.files) {
-                            setFile(e.target.files[0]);
+                            onFileChange(e.target.files[0]);
                         }
                     }}
                 />
@@ -106,11 +83,11 @@ export default function AudioUploader() {
                     {isLangMenuOpen && (
                         <div className="absolute left-0 z-20 mt-2 w-48 origin-top-left text-sm font-medium text-gray-700 rounded-lg bg-white shadow-xl ring-1 ring-gray-300 ring-opacity-5">
                             <div className="py-1">
-                                {languages.map((lang) => (
+                                {LANGUAGES.map((lang) => (
                                     <button
                                         key={lang.code}
                                         onClick={() => {
-                                            setSelectedLang(lang);
+                                            onLangChange(lang);
                                             setIsLangMenuOpen(false);
                                         }}
                                         className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-zinc-100 hover:rounded-md hover:cursor-pointer transition-colors"
@@ -136,7 +113,7 @@ export default function AudioUploader() {
                             min="1"
                             disabled={autoDetect}
                             value={minSpeakers}
-                            onChange={(e) => setMinSpeakers(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value)))}
+                            onChange={(e) => onMinSpeakersChange(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value)))}
                             placeholder="Optional"
                             className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-200 transition-all disabled:cursor-not-allowed disabled:opacity-50"
                         />
@@ -149,7 +126,7 @@ export default function AudioUploader() {
                             min="1"
                             disabled={autoDetect}
                             value={maxSpeakers}
-                            onChange={(e) => setMaxSpeakers(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value)))}
+                            onChange={(e) => onMaxSpeakersChange(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value)))}
                             placeholder="Optional"
                             className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-200 transition-all disabled:cursor-not-allowed disabled:opacity-50"
                         />
@@ -160,7 +137,7 @@ export default function AudioUploader() {
                         type="checkbox"
                         id="autoDetect"
                         checked={autoDetect}
-                        onChange={(e) => setAutoDetect(e.target.checked)}
+                        onChange={(e) => onAutoDetectChange(e.target.checked)}
                         className="w-4 h-4 rounded border-zinc-300 text-black focus:ring-black"
                     />
                     <label htmlFor="autoDetect" className="text-sm text-zinc-500">Auto-detect number of speakers</label>
@@ -169,29 +146,12 @@ export default function AudioUploader() {
 
             {/* Upload Button */}
             <button
-                onClick={handleUpload}
-                disabled={loading || !file}
+                onClick={onSubmit}
+                disabled={isLoading || !file}
                 className="bg-black text-white py-3 rounded-lg font-medium transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-500 hover:cursor-pointer"
             >
-                {loading ? "Transcribing..." : "Upload & Transcribe"}
+                {isLoading ? "Transcribing..." : "Upload & Transcribe"}
             </button>
-
-            {/* Result display */}
-            {transcript.length > 0 && (
-                <div className="mt-4 flex flex-col gap-3">
-                    <h3 className="font-semibold text-zinc-900 border-b pb-2 text-lg">Conversation:</h3>
-                    <div className="max-h-[400px] overflow-y-auto flex flex-col gap-1">
-                        {transcript.map((segment, index) => (
-                            <div key={index} className="flex flex-row items-center gap-8 p-2">
-                                <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
-                                    {segment.speaker}
-                                </span>
-                                <p className="text-zinc-700 leading-relaxed">{segment.text}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

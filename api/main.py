@@ -1,21 +1,17 @@
-from fastapi import HTTPException
-from fastapi import FastAPI, UploadFile, File
-from fastapi.concurrency import run_in_threadpool
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from summarization.SummarizationInferencer import SummarizationInferencer
 from transcription.WhisperXEngine import WhisperXEngine
 from utils.utils import load_config, setup_logging
-from summarization.prompt import build_prompt
 
-from typing import Optional
-from fastapi.middleware.cors import CORSMiddleware
-import shutil
-import uuid
-import os
+from api.routes.transcribe import router as transcribe_router
+from api.routes.summarize import router as summarize_router
 
 logger = setup_logging()
 app = FastAPI()
 
-# Allow your frontend to talk to this API
+# Allow frontend to talk to this API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], # To be replaced later in production with our URL
@@ -23,6 +19,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(transcribe_router)
+app.include_router(summarize_router)
 
 @app.on_event("startup")
 async def startup_event():
@@ -40,7 +39,7 @@ async def startup_event():
     
     # Load FlanT5 summarization model
     app.state.summarizer = SummarizationInferencer(
-        config_name="llama",
+        config="llama",
         use_pretrained=True,
         device="auto",
         max_new_tokens=256,
@@ -56,52 +55,3 @@ async def shutdown_event():
     app.state.asr.cleanup_models()
     app.state.summarizer.cleanup_models()
     logger.info("Cleanup complete!")
-
-@app.post("/transcribe")
-async def transcribe(
-    file: UploadFile = File(...),
-    language: Optional[str]=None,
-    min_speakers: Optional[int]=None,
-    max_speakers: Optional[int]=None
-):
-    filename = file.filename
-    extension = os.path.splitext(filename)[1] # get the format
-    temp_filename = f"/tmp/{uuid.uuid4()}{extension}"
-
-    # Stream the file content, so not loading it as whole. Reduce the amount of RAM usage
-    with open(temp_filename, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    try:
-        result = await run_in_threadpool(
-            app.state.asr.transcribe,
-            temp_filename,
-            language=language,
-            min_speakers=min_speakers,
-            max_speakers=max_speakers,
-        )
-        return result
-    except Exception as e:
-        logger.error(f"Error transcribing file: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if os.path.exists(temp_filename):
-            os.remove(temp_filename)
-
-@app.post("/summarize")
-async def summarize(
-    text: str,
-    prompt: Optional[str] = None,
-    max_length: Optional[int] = 2048,
-):
-    try:
-        result = await run_in_threadpool(
-            app.state.summarizer.generate,
-            text,
-            prompt,
-            max_length=max_length
-        )
-        return {"summary": result}
-    except Exception as e:
-        logger.error(f"Error summarizing text: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
