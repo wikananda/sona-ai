@@ -8,7 +8,7 @@ Sona AI is an interview-focused audio transcription and summarization platform. 
 
 - **Transcription**: Powered by [WhisperX](https://github.com/m-bain/whisperX) for faster-whisper inference and precise word-level alignment.
 - **Speaker Diarization**: Automatically detects, identifies, and labels different speakers in your audio files.
-- **Summarization**: Uses **Flan-T5** to generate concise and meaningful summaries of transcribed conversations.
+- **Summarization**: Uses **Llama** to generate concise and meaningful summaries of transcribed conversations.
 - **Multilingual Support**: Supports English, Indonesian, and automatic language detection.
 - **Frontend Support**: Uses [Next.js](https://nextjs.org/) for a modern, responsive web interface.
 
@@ -76,7 +76,7 @@ Sona AI is an interview-focused audio transcription and summarization platform. 
 - **Framework**: [FastAPI](https://fastapi.tiangolo.com/)
 - **ASR Engine**: [WhisperX](https://github.com/m-bain/whisperX) (faster-whisper + wav2vec2 alignment)
 - **Diarization**: [pyannote.audio](https://github.com/pyannote/pyannote-audio)
-- **Summarization**: [Hugging Face Transformers](https://huggingface.co/docs/transformers/en/model_doc/flan-t5) (Flan-T5)
+- **Summarization**: [Hugging Face Transformers](https://huggingface.co/meta-llama) (Llama)
 - **Deep Learning**: PyTorch
 
 ### Frontend
@@ -92,7 +92,7 @@ Sona AI is an interview-focused audio transcription and summarization platform. 
 sona-ai/
 ├── api/                # FastAPI application & endpoints
 ├── transcription/      # WhisperX engine implementation
-├── summarization/      # Flan-T5 training and inference logic
+├── summarization/      # Llama training and inference logic
 ├── configs/            # Model and application configurations (.yaml)
 ├── frontend/           # Next.js web application
 ├── utils/              # Helper functions and utilities
@@ -113,16 +113,24 @@ Send a `POST` request to `/transcribe` with an audio file:
     - `min_speakers`: (Optional) Minimum number of speakers
     - `max_speakers`: (Optional) Maximum number of speakers
 
+### Summarization API
+Send a `POST` request to `/summarize` with a transcript:
+- **Endpoint**: `http://localhost:8000/summarize`
+- **Parameters**:
+    - `text`: The transcript to summarize
+    - `prompt`: (Optional) Custom instruction prompt
+    - `max_length`: (Optional) Maximum token length for the input
+
 ### Web Interface
 1. Upload an audio file through the dashboard.
 2. Select the language or use auto-detection.
 3. Configure speaker settings if necessary.
 4. Click **Upload & Transcribe** to generate transcription.
+5. Click **Summarize** to generate summary once the transcription is generated.
 
 ---
 
 ## 📝 TODO
-- [x] Implement basic API for transcription
-- [x] Implement basic UI for transcription
-- [ ] Fine-tune Flan-T5 for summarization tasks.
-- [ ] Implement basic API for summarization
+- [x] Implement basic API for transcription and summarization
+- [x] Implement basic UI for transcription and summarization
+- [ ] UI Overhaul
