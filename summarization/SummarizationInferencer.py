@@ -2,11 +2,16 @@ from typing import Union, Dict, Optional
 from .SummarizationBase import SummarizationBase
 from .prompt import build_prompt
 
+from utils.utils import write_json
+
 import torch
 import numpy as np
 import os
 import json
+from pathlib import Path
 
+output_dir = Path(__file__).parent.parent / 'outputs' / 'summarization'
+output_dir.mkdir(parents=True, exist_ok=True)
 
 class SummarizationInferencer(SummarizationBase):
     """
@@ -68,5 +73,7 @@ class SummarizationInferencer(SummarizationBase):
         else:
             # Seq2Seq decoder produces only the target sequence
             summary = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+        write_json(output_dir / 'summary.json', {'text': text, 'summary': summary})
 
         return summary
