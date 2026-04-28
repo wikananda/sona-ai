@@ -1,32 +1,19 @@
 import os
 from dotenv import load_dotenv
-load_dotenv()
 
-import sys
-from pathlib import Path
-project_root = Path(__file__).parent.parent
-if str(project_root) not in sys.path:
-    sys.path.append(str(project_root))
+from sona_ai.core import PROJECT_ROOT, Timer, sanitize_for_json, setup_logging, write_json
 
 import whisperx
 import torch
 import gc
 from whisperx.diarize import DiarizationPipeline
 
-import time
-import math
-import json
-import numpy as np
-import yaml
-from utils.Timer import Timer
-from utils.utils import load_config
-import argparse
 import warnings
 import logging
-from utils.utils import write_json, setup_logging, sanitize_for_json
 
+load_dotenv(PROJECT_ROOT / ".env")
 logger = setup_logging()
-output_dir = Path(__file__).parent.parent / 'outputs' / 'transcription'
+output_dir = PROJECT_ROOT / 'outputs' / 'transcription'
 output_dir.mkdir(parents=True, exist_ok=True)
 
 class WhisperXEngine:
@@ -219,6 +206,6 @@ class WhisperXEngine:
         # loading model with no weights (legacy loading) for PyTorch 2.6.0+
         os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
         
-        # set hugging face directory to local relative directory if config provided
+        # Set the Hugging Face cache to a project-local directory if configured.
         if config and 'cp_dir' in config and 'hf_cache' in config['cp_dir']:
-            os.environ["HF_HOME"] = config['cp_dir']['hf_cache']
+            os.environ["HF_HOME"] = str(PROJECT_ROOT / config['cp_dir']['hf_cache'])

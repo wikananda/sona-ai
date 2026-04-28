@@ -4,10 +4,10 @@ from pathlib import Path
 from typing import Optional, Union, Dict
 import gc
 
-# Add project root to sys.path to allow importing from utils
-project_root = Path(__file__).parent.parent
-if str(project_root) not in sys.path:
-    sys.path.append(str(project_root))
+# Keep legacy training imports working without making the backend depend on them.
+backend_src = Path(__file__).resolve().parents[3] / "backend" / "src"
+if str(backend_src) not in sys.path:
+    sys.path.append(str(backend_src))
 
 import yaml
 import torch
@@ -24,8 +24,9 @@ from transformers import (
 from peft import LoraConfig, get_peft_model, TaskType, PeftModel
 import numpy as np
 import evaluate
-from utils.utils import load_config, filter_training_args
+from sona_ai.core import load_config
 from .SummarizationDataset import SummarizationDataset
+from .training_utils import filter_training_args
 
 print("CUDA available:", torch.cuda.is_available())
 if torch.cuda.is_available():

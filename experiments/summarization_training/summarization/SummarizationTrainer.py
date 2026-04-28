@@ -1,7 +1,7 @@
 from typing import Union, Dict, Optional
 from .SummarizationBase import SummarizationBase
 from .SummarizationDataset import SummarizationDataset
-from utils.utils import filter_training_args
+from .training_utils import filter_training_args
 
 from transformers import (
     Seq2SeqTrainer,

@@ -32,7 +32,8 @@ Sona AI is an interview-focused audio transcription and summarization platform. 
 
 2. **Install Python dependencies**:
    ```bash
-   pip install -r requirements.txt
+   pip install -r backend/requirements.txt
+   pip install -e backend
    ```
 
 3. **Configure Environment Variables**:
@@ -47,7 +48,7 @@ Sona AI is an interview-focused audio transcription and summarization platform. 
 
 4. **Run the API**:
    ```bash
-   uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+   uvicorn sona_ai.api.main:app --app-dir backend/src --host 0.0.0.0 --port 8000 --reload
    ```
 
 ### Frontend Setup
@@ -80,7 +81,7 @@ Sona AI is an interview-focused audio transcription and summarization platform. 
 - **Deep Learning**: PyTorch
 
 ### Frontend
-- **Framework**: [Next.js 15](https://nextjs.org/) (App Router)
+- **Framework**: [Next.js](https://nextjs.org/) (App Router)
 - **Language**: TypeScript
 - **Styling**: [Tailwind CSS 4](https://tailwindcss.com/)
 
@@ -90,12 +91,17 @@ Sona AI is an interview-focused audio transcription and summarization platform. 
 
 ```text
 sona-ai/
-├── api/                # FastAPI application & endpoints
-├── transcription/      # WhisperX engine implementation
-├── summarization/      # Llama training and inference logic
+├── backend/            # FastAPI runtime package
+│   └── src/sona_ai/
+│       ├── api/        # FastAPI app, routes, schemas
+│       ├── services/   # Runtime orchestration layer
+│       ├── transcription/
+│       ├── summarization/
+│       ├── retrieval/  # Future RAG/vector-store integration points
+│       └── core/       # Config, paths, logging, serialization helpers
+├── experiments/        # Legacy research and fine-tuning code
 ├── configs/            # Model and application configurations (.yaml)
 ├── frontend/           # Next.js web application
-├── utils/              # Helper functions and utilities
 ├── data/               # Local data storage (raw audio, etc.)
 └── outputs/            # Generated transcripts and summaries
 ```

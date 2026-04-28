@@ -5,7 +5,7 @@ import shutil
 import uuid
 import os
 
-from utils.utils import setup_logging
+from sona_ai.core import setup_logging
 
 logger = setup_logging()
 router = APIRouter()
@@ -28,7 +28,7 @@ async def transcribe(
 
     try:
         result = await run_in_threadpool(
-            request.app.state.asr.transcribe,
+            request.app.state.transcription_service.transcribe,
             temp_filename,
             language=language,
             min_speakers=min_speakers,

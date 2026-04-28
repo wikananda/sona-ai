@@ -4,7 +4,7 @@ from datasets import load_dataset, load_from_disk, Features, Value, Sequence
 from transformers import AutoTokenizer
 from .prompt import build_prompt
 
-from utils.utils import load_config
+from sona_ai.core import load_config
 
 
 class SummarizationDataset:

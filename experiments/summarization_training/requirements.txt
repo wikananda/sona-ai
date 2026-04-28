@@ -1,0 +1,5 @@
+-r ../../backend/requirements.txt
+datasets
+evaluate==0.4.6
+rouge-score==0.1.2
+matplotlib

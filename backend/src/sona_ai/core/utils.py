@@ -1,18 +1,20 @@
 import json
 import logging
-from pathlib import Path
-import yaml
-from typing import Union, Dict
-from inspect import signature
-from transformers import Seq2SeqTrainingArguments, TrainingArguments
-import evaluate
-import numpy as np
 import math
+from pathlib import Path
+from typing import Any, Union
+
+import numpy as np
+import yaml
+
+from .paths import PROJECT_ROOT
+
 
 def setup_logging():
     log_format = "%(asctime)s - %(levelname)s - %(message)s"
     logging.basicConfig(level=logging.INFO, format=log_format)
     return logging.getLogger(__name__)
+
 
 def sanitize_for_json(obj):
     """
@@ -39,26 +41,25 @@ def sanitize_for_json(obj):
         return obj
     else:
         return obj
-def preview_dataset(dataset):
-    """
-    Preview the summarization dataset
-    """
-    for i in range(5):
-        print(dataset[i])
 
-def write_json(path, data):
+
+def write_json(path: Union[str, Path], data: Any):
     """
     Write JSON data to a file
     """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, 'w') as f:
         json.dump(data, f, indent=2)
 
-def load_json(path):
+
+def load_json(path: Union[str, Path]):
     """
     Load JSON data from a file
     """
     with open(path, 'r') as f:
         return json.load(f)
+
 
 def load_config(config: Union[str, dict]):
     """
@@ -73,12 +74,12 @@ def load_config(config: Union[str, dict]):
     
     # If not a direct path, look in the configs directory
     if not config_path.exists():
-        potential_path = Path(__file__).parent.parent / 'configs' / f"{config}.yaml"
+        potential_path = PROJECT_ROOT / 'configs' / f"{config}.yaml"
         if potential_path.exists():
             config_path = potential_path
         else:
             # Try without .yaml extension if it was already provided in config
-            potential_path = Path(__file__).parent.parent / 'configs' / config
+            potential_path = PROJECT_ROOT / 'configs' / config
             if potential_path.exists():
                 config_path = potential_path
             else:
@@ -86,27 +87,3 @@ def load_config(config: Union[str, dict]):
         
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
-
-def filter_training_args(arg_dict, task_type: str = "seq2seq"):
-    """
-    Filter a dict of training arguments to only the keys accepted by the
-    relevant TrainingArguments class.
-    - task_type="seq2seq" → validates against Seq2SeqTrainingArguments
-    - task_type="causal"  → validates against TrainingArguments
-    """
-    args_class = Seq2SeqTrainingArguments if task_type == "seq2seq" else TrainingArguments
-    sig = signature(args_class).parameters
-    valid_keys = set(sig.keys())
-
-    filtered_args = {}
-    unused = []
-
-    for k, v in arg_dict.items():
-        if k in valid_keys:
-            filtered_args[k] = v
-        else:
-            unused.append(k)
-
-    if unused:
-        print(f"Warning: Unused arguments: {unused}")
-    return filtered_args

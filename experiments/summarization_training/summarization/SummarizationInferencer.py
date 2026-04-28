@@ -2,7 +2,7 @@ from typing import Union, Dict, Optional
 from .SummarizationBase import SummarizationBase
 from .prompt import build_prompt
 
-from utils.utils import write_json
+from sona_ai.core import PROJECT_ROOT, write_json
 
 import torch
 import numpy as np
@@ -10,7 +10,7 @@ import os
 import json
 from pathlib import Path
 
-output_dir = Path(__file__).parent.parent / 'outputs' / 'summarization'
+output_dir = PROJECT_ROOT / 'outputs' / 'summarization'
 output_dir.mkdir(parents=True, exist_ok=True)
 
 class SummarizationInferencer(SummarizationBase):

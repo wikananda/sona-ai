@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 
-from utils.utils import setup_logging
-from api.schemas.summarize import SummarizeRequest
+from sona_ai.core import setup_logging
+from sona_ai.api.schemas.summarize import SummarizeRequest
 
 logger = setup_logging()
 router = APIRouter()
@@ -11,7 +11,7 @@ router = APIRouter()
 async def summarize(request: Request, body: SummarizeRequest):
     try:
         result = await run_in_threadpool(
-            request.app.state.summarizer.generate,
+            request.app.state.summarization_service.summarize,
             body.text,
             body.prompt,
             max_length=body.max_length

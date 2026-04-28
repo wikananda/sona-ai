@@ -15,10 +15,10 @@ export interface TranscribeParams {
 export interface SummarizeParams {
     text: string;
     prompt?: string;
-    maxLength?: number | "2048";
+    maxLength?: number;
 }
 
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export async function transcribeAudio(params: TranscribeParams): Promise<SpeakerSegment[]> {
     const formData = new FormData();
@@ -28,10 +28,10 @@ export async function transcribeAudio(params: TranscribeParams): Promise<Speaker
     if (params.language && params.language !== "None") {
         url.searchParams.append("language", params.language);
     }
-    if (params.minSpeakers !== "") {
+    if (params.minSpeakers !== undefined && params.minSpeakers !== "") {
         url.searchParams.append("min_speakers", String(params.minSpeakers));
     }
-    if (params.maxSpeakers !== "") {
+    if (params.maxSpeakers !== undefined && params.maxSpeakers !== "") {
         url.searchParams.append("max_speakers", String(params.maxSpeakers));
     }
 
@@ -53,7 +53,11 @@ export async function summarizeTranscript(params: SummarizeParams): Promise<stri
     const response = await fetch(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params)
+        body: JSON.stringify({
+            text: params.text,
+            prompt: params.prompt,
+            max_length: params.maxLength,
+        })
     })
 
     if (!response.ok) {
