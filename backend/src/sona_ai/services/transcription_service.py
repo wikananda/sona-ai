@@ -1,11 +1,11 @@
 from typing import Optional
 
-from sona_ai.transcription import WhisperXEngine
+from sona_ai.pipelines import SpeechPipeline
 
 
 class TranscriptionService:
-    def __init__(self, engine: WhisperXEngine):
-        self.engine = engine
+    def __init__(self, pipeline: SpeechPipeline):
+        self.pipeline = pipeline
 
     def transcribe(
         self,
@@ -14,7 +14,7 @@ class TranscriptionService:
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
     ):
-        return self.engine.transcribe(
+        return self.pipeline.transcribe(
             audio_path,
             language=language,
             min_speakers=min_speakers,
@@ -22,5 +22,4 @@ class TranscriptionService:
         )
 
     def close(self):
-        self.engine.cleanup_models()
-
+        self.pipeline.cleanup_models()

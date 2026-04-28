@@ -95,8 +95,10 @@ sona-ai/
 │   └── src/sona_ai/
 │       ├── api/        # FastAPI app, routes, schemas
 │       ├── services/   # Runtime orchestration layer
-│       ├── transcription/
-│       ├── summarization/
+│       ├── pipelines/  # Speech pipeline orchestration
+│       ├── transcription/ # ASR adapters, e.g. WhisperX
+│       ├── diarization/   # Diarization adapters, e.g. pyannote
+│       ├── summarization/ # LLM summarization runtime
 │       ├── retrieval/  # Future RAG/vector-store integration points
 │       └── core/       # Config, paths, logging, serialization helpers
 ├── experiments/        # Legacy research and fine-tuning code
