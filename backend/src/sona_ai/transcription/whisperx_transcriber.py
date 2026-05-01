@@ -1,10 +1,11 @@
 import gc
+from pathlib import Path
 from typing import Optional
 
 import torch
 import whisperx
 
-from sona_ai.core import Timer, setup_logging
+from sona_ai.core import PROJECT_ROOT, Timer, setup_logging
 from sona_ai.transcription.schemas import TranscriptionResult
 
 
@@ -17,22 +18,30 @@ class WhisperXTranscriber:
         self.model = None
         self.align_model = None
         self.align_metadata = None
+        self.cache_dir = self._cache_dir()
 
     def load_models(self):
         logger.info("Loading WhisperX transcription models...")
         model_config = self.config["model"]
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         self.model = whisperx.load_model(
             model_config["whisper_model"],
             language=model_config["language"],
             device=model_config["device"],
             compute_type=model_config["compute_type"],
+            download_root=str(self.cache_dir / "whisper"),
         )
         self.align_model, self.align_metadata = whisperx.load_align_model(
             language_code=model_config["language"],
             device=model_config["device"],
             model_name=model_config["align_model"],
+            model_dir=str(self.cache_dir),
         )
+
+    def _cache_dir(self) -> Path:
+        cache_dir = self.config.get("cp_dir", {}).get("hf_cache", "cp/hf_cache")
+        return PROJECT_ROOT / cache_dir
 
     def transcribe(
         self,
@@ -82,4 +91,3 @@ class WhisperXTranscriber:
             torch.cuda.empty_cache()
         elif torch.backends.mps.is_available():
             torch.mps.empty_cache()
-

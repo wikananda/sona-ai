@@ -105,7 +105,14 @@ class SpeechPipeline:
         os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
         if config and "cp_dir" in config and "hf_cache" in config["cp_dir"]:
-            os.environ["HF_HOME"] = str(PROJECT_ROOT / config["cp_dir"]["hf_cache"])
+            cache_dir = PROJECT_ROOT / config["cp_dir"]["hf_cache"]
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            os.environ["HF_HOME"] = str(cache_dir)
+            os.environ["HF_HUB_CACHE"] = str(cache_dir / "hub")
+            os.environ["HUGGINGFACE_HUB_CACHE"] = str(cache_dir / "hub")
+            os.environ["TRANSFORMERS_CACHE"] = str(cache_dir / "transformers")
+            os.environ["TORCH_HOME"] = str(cache_dir / "torch")
+            os.environ["PYANNOTE_CACHE"] = str(cache_dir / "pyannote")
 
     def close(self):
         self.cleanup_models()
