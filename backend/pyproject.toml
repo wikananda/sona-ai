@@ -10,3 +10,6 @@ description = "Runtime backend for Sona AI"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.optional-dependencies]
+parakeet = ["nemo_toolkit[asr]"]
