@@ -5,10 +5,7 @@ from typing import Optional
 
 import pandas as pd
 import torch
-import whisperx
 from dotenv import load_dotenv
-from pyannote.audio import Pipeline
-from whisperx.audio import SAMPLE_RATE
 
 from sona_ai.core import PROJECT_ROOT, Timer, setup_logging
 from sona_ai.diarization.schemas import DiarizationResult, SpeakerTurn
@@ -33,6 +30,8 @@ class PyannoteDiarizer:
         if os.getenv("HF_TOKEN") is None:
             raise EnvironmentError("Hugging Face token is not set")
 
+        from pyannote.audio import Pipeline
+
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         pipeline = Pipeline.from_pretrained(
             self.model_name,
@@ -51,10 +50,12 @@ class PyannoteDiarizer:
             raise ReferenceError("Diarization model is not initialized.")
 
         min_s, max_s = self._resolve_speaker_bounds(min_speakers, max_speakers)
+        import whisperx
+
         audio = whisperx.load_audio(audio_path)
         audio_data = {
             "waveform": torch.from_numpy(audio[None, :]),
-            "sample_rate": SAMPLE_RATE,
+            "sample_rate": 16000,
         }
 
         logger.info("Running diarization...")

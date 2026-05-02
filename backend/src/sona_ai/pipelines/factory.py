@@ -1,12 +1,9 @@
 import os
 from typing import Optional
 
-from sona_ai.alignment import Wav2Vec2Aligner
 from sona_ai.core import load_config
-from sona_ai.diarization import PyannoteDiarizer
 from sona_ai.pipelines.speaker_assignment import WhisperXSpeakerAssigner
 from sona_ai.pipelines.speech_pipeline import SpeechPipeline
-from sona_ai.transcription import ParakeetTranscriber, WhisperXTranscriber
 
 
 def build_speech_pipeline(config: Optional[dict] = None) -> SpeechPipeline:
@@ -25,9 +22,14 @@ def build_speech_pipeline(config: Optional[dict] = None) -> SpeechPipeline:
     SpeechPipeline.setup_environment(config=engine_config)
 
     if engine == "whisperx":
+        from sona_ai.alignment import Wav2Vec2Aligner
+        from sona_ai.transcription import WhisperXTranscriber
+
         transcriber = WhisperXTranscriber(engine_config)
         aligner = Wav2Vec2Aligner(engine_config)
     elif engine == "parakeet":
+        from sona_ai.transcription import ParakeetTranscriber
+
         transcriber = ParakeetTranscriber(engine_config)
         aligner = None
     else:
@@ -49,5 +51,6 @@ def _build_diarizer(speech_config: dict):
         return None
 
     config_name = diarization_config.get("config", "whisperx")
-    return PyannoteDiarizer(load_config(config_name))
+    from sona_ai.diarization import PyannoteDiarizer
 
+    return PyannoteDiarizer(load_config(config_name))

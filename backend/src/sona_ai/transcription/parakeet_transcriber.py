@@ -26,14 +26,25 @@ class ParakeetTranscriber:
     def load_models(self):
         logger.info("Loading Parakeet transcription model...")
         self._setup_cache_environment()
+        self._patch_numpy_sctypes()
 
         try:
             import nemo.collections.asr as nemo_asr
         except ImportError as exc:
             raise ImportError(
                 "Parakeet transcription requires NVIDIA NeMo. "
-                "Install it with `pip install -r backend/requirements-parakeet.txt`."
+                "Install it with `pip install -r backend/requirements.txt`."
             ) from exc
+        except RuntimeError as exc:
+            if "torchvision::nms" in str(exc):
+                raise RuntimeError(
+                    "Parakeet could not import NeMo because torchvision is not "
+                    "compatible with the installed torch. This project pins "
+                    "torch==2.8.0, which needs torchvision==0.23.0. Run "
+                    "`pip install --upgrade torchvision==0.23.0` or reinstall "
+                    "`backend/requirements.txt` after pulling this change."
+                ) from exc
+            raise
 
         self.model = nemo_asr.models.ASRModel.from_pretrained(
             model_name=self.model_name,
@@ -51,6 +62,7 @@ class ParakeetTranscriber:
         if self.model is None:
             raise ReferenceError("Parakeet transcription model is not initialized.")
 
+        self._patch_numpy_sctypes()
         resolved_language = language or self.language
         self._validate_language(resolved_language)
 
@@ -106,6 +118,20 @@ class ParakeetTranscriber:
         os.environ["NEMO_HOME"] = str(self.cache_dir / "nemo")
         os.environ["NEMO_CACHE_DIR"] = str(self.cache_dir / "nemo")
         os.environ["XDG_CACHE_HOME"] = str(self.cache_dir / "xdg")
+
+    def _patch_numpy_sctypes(self):
+        import numpy as np
+
+        if hasattr(np, "sctypes"):
+            return
+
+        np.sctypes = {
+            "int": [np.int8, np.int16, np.int32, np.int64],
+            "uint": [np.uint8, np.uint16, np.uint32, np.uint64],
+            "float": [np.float16, np.float32, np.float64],
+            "complex": [np.complex64, np.complex128],
+            "others": [np.bool_, np.object_, np.bytes_, np.str_, np.void],
+        }
 
     def cleanup_models(self):
         if self.model is not None:

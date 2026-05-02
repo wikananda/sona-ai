@@ -51,13 +51,7 @@ Sona AI is an interview-focused audio transcription and summarization platform. 
    uvicorn sona_ai.api.main:app --app-dir backend/src --host 0.0.0.0 --port 8000 --reload
    ```
 
-### Optional Parakeet ASR
-
-Parakeet support uses NVIDIA NeMo and is installed separately because it is a heavier dependency:
-
-```bash
-pip install -r backend/requirements-parakeet.txt
-```
+### Parakeet ASR
 
 To run the API with Parakeet instead of WhisperX, set:
 

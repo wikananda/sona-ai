@@ -1,16 +1,19 @@
 from sona_ai.core import load_config
-from sona_ai.pipelines import SpeechPipeline, WhisperXSpeakerAssigner
-from sona_ai.transcription import WhisperXTranscriber
 from sona_ai.diarization import PyannoteDiarizer
+from sona_ai.pipelines import SpeechPipeline, WhisperXSpeakerAssigner
+from sona_ai.transcription import ParakeetTranscriber
 
-audio_path = "data/raw/audio/audio_indo.mp3"
 
-config = load_config("whisperx")
-SpeechPipeline.setup_environment(config)
+audio_path = "data/raw/audio/audio.mp3"
+
+parakeet_config = load_config("parakeet")
+diarization_config = load_config("whisperx")
+SpeechPipeline.setup_environment(parakeet_config)
 
 pipeline = SpeechPipeline(
-    transcriber=WhisperXTranscriber(config),
-    diarizer=PyannoteDiarizer(config),
+    transcriber=ParakeetTranscriber(parakeet_config),
+    aligner=None,
+    diarizer=PyannoteDiarizer(diarization_config),
     speaker_assigner=WhisperXSpeakerAssigner(),
 )
 
@@ -19,7 +22,7 @@ pipeline.load_models()
 try:
     result = pipeline.transcribe(
         audio_path,
-        language="id",
+        language="en",
         min_speakers=2,
         max_speakers=2,
     )
