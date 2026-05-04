@@ -12,6 +12,7 @@ import {
     Recording,
     RuntimeDevice,
     RuntimeDevices,
+    retranscribeRecording,
     TranscriptionModel,
     uploadProjectRecording,
 } from "@/src/api/sonaApi";
@@ -29,6 +30,7 @@ export default function ProjectDetailPage() {
     const [isLoadingProject, setIsLoadingProject] = useState(true);
     const [isLoadingRecording, setIsLoadingRecording] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [retranscribingId, setRetranscribingId] = useState<string>();
     const [runtimeDevices, setRuntimeDevices] = useState<RuntimeDevices>({
         default: "auto",
         available: ["auto", "cpu"],
@@ -145,6 +147,22 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleRetranscribeRecording = async (recordingId: string) => {
+        if (!window.confirm("Re-transcribe this recording with its current settings?")) return;
+
+        setError("");
+        setRetranscribingId(recordingId);
+        try {
+            const recording = await retranscribeRecording(recordingId);
+            setSelectedRecording(recording);
+            await refreshProject();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to re-transcribe recording");
+        } finally {
+            setRetranscribingId(undefined);
+        }
+    };
+
     if (isLoadingProject) {
         return (
             <main className="min-h-screen bg-zinc-100 p-6 text-sm text-zinc-500">
@@ -199,6 +217,8 @@ export default function ProjectDetailPage() {
                         recording={selectedRecording}
                         isLoading={isLoadingRecording}
                         runtimeDevices={runtimeDevices}
+                        isRetranscribing={retranscribingId === selectedRecording?.id}
+                        onRetranscribe={handleRetranscribeRecording}
                     />
                 </div>
             </div>

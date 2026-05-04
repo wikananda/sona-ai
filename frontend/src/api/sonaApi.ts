@@ -127,6 +127,12 @@ export async function deleteRecording(recordingId: string): Promise<void> {
     await requestJson(`/recordings/${recordingId}`, { method: "DELETE" });
 }
 
+export async function retranscribeRecording(recordingId: string): Promise<Recording> {
+    return requestJson(`/recordings/${recordingId}/retranscribe`, {
+        method: "POST",
+    });
+}
+
 export async function transcribeAudio(params: TranscribeParams): Promise<SpeakerSegment[]> {
     const formData = new FormData();
     formData.append("file", params.file);

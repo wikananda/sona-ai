@@ -19,9 +19,17 @@ interface Props {
     recording?: Recording | null;
     isLoading: boolean;
     runtimeDevices: RuntimeDevices;
+    isRetranscribing?: boolean;
+    onRetranscribe?: (recordingId: string) => void;
 }
 
-export default function RecordingDetail({ recording, isLoading, runtimeDevices }: Props) {
+export default function RecordingDetail({
+    recording,
+    isLoading,
+    runtimeDevices,
+    isRetranscribing = false,
+    onRetranscribe,
+}: Props) {
     const [activeTab, setActiveTab] = useState<DetailTab>("transcript");
     const [summary, setSummary] = useState("");
     const [summaryModel, setSummaryModel] = useState<SummaryModel>("qwen");
@@ -40,6 +48,9 @@ export default function RecordingDetail({ recording, isLoading, runtimeDevices }
     }
 
     const segments = recording.transcript?.segments ?? [];
+    const canRetranscribe =
+        Boolean(onRetranscribe) &&
+        (recording.status === "done" || recording.status === "failed");
 
     const handleSummarize = async () => {
         if (!segments.length) return;
@@ -82,23 +93,49 @@ export default function RecordingDetail({ recording, isLoading, runtimeDevices }
                     <p className="text-sm text-zinc-500">Transcription is running.</p>
                 )}
                 {recording.status === "failed" && (
-                    <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                        {recording.error ?? "Transcription failed."}
+                    <div className="flex flex-col gap-4">
+                        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                            {recording.error ?? "Transcription failed."}
+                        </div>
+                        {canRetranscribe && (
+                            <div>
+                                <button
+                                    type="button"
+                                    onClick={() => onRetranscribe?.(recording.id)}
+                                    disabled={isRetranscribing}
+                                    className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
                 {recording.status === "done" && (
                     <div className="flex flex-col gap-5">
-                        <div className="flex border-b border-zinc-200">
-                            <TabButton
-                                label="Transcription"
-                                isActive={activeTab === "transcript"}
-                                onClick={() => setActiveTab("transcript")}
-                            />
-                            <TabButton
-                                label="Summary"
-                                isActive={activeTab === "summary"}
-                                onClick={() => setActiveTab("summary")}
-                            />
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200">
+                            <div className="flex">
+                                <TabButton
+                                    label="Transcription"
+                                    isActive={activeTab === "transcript"}
+                                    onClick={() => setActiveTab("transcript")}
+                                />
+                                <TabButton
+                                    label="Summary"
+                                    isActive={activeTab === "summary"}
+                                    onClick={() => setActiveTab("summary")}
+                                />
+                            </div>
+                            {activeTab === "transcript" && canRetranscribe && (
+                                <button
+                                    type="button"
+                                    onClick={() => onRetranscribe?.(recording.id)}
+                                    disabled={isRetranscribing}
+                                    className="mb-2 rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
+                                </button>
+                            )}
                         </div>
 
                         {activeTab === "transcript" && (

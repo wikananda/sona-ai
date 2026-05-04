@@ -165,6 +165,35 @@ def get_recording(recording_id: str, db: Session = Depends(get_db)):
     return _serialize_recording(recording, include_transcript=True)
 
 
+@router.post("/recordings/{recording_id}/retranscribe")
+def retranscribe_recording(
+    recording_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    recording = db.get(Recording, recording_id)
+    if recording is None:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    if recording.status in {RecordingStatus.PENDING, RecordingStatus.PROCESSING}:
+        raise HTTPException(
+            status_code=409,
+            detail="Recording transcription is already running",
+        )
+
+    recording.status = RecordingStatus.PENDING
+    recording.error = None
+    db.commit()
+    db.refresh(recording)
+
+    background_tasks.add_task(
+        run_transcription,
+        recording.id,
+        request.app.state.transcription_service,
+    )
+    return _serialize_recording(recording, include_transcript=False)
+
+
 @router.delete("/recordings/{recording_id}")
 def delete_recording(recording_id: str, db: Session = Depends(get_db)):
     recording = db.get(Recording, recording_id)
