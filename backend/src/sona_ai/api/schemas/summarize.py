@@ -6,3 +6,4 @@ class SummarizeRequest(BaseModel):
     prompt: Optional[str] = None
     max_length: Optional[int] = 2048
     model: Optional[str] = "qwen"
+    device: Optional[str] = "auto"

@@ -16,6 +16,7 @@ async def transcribe(
     file: UploadFile = File(...),
     language: Optional[str]=None,
     model: Optional[str]=None,
+    device: Optional[str]=None,
     min_speakers: Optional[int]=None,
     max_speakers: Optional[int]=None
 ):
@@ -34,11 +35,14 @@ async def transcribe(
             temp_filename,
             language=language,
             model=model,
+            device=device,
             min_speakers=min_speakers,
             max_speakers=max_speakers,
         )
         return result
     except Exception as e:
+        if isinstance(e, ValueError):
+            raise HTTPException(status_code=400, detail=str(e))
         logger.error(f"Error transcribing file: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:

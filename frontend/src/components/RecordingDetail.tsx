@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Recording, summarizeTranscript, SummaryModel } from "@/src/api/sonaApi";
+import {
+    Recording,
+    RuntimeDevice,
+    RuntimeDevices,
+    summarizeTranscript,
+    SummaryModel,
+} from "@/src/api/sonaApi";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import SummaryPanel from "@/src/components/SummaryPanel";
 import TranscriptPanel from "@/src/components/TranscriptPanel";
@@ -12,13 +18,18 @@ type DetailTab = "transcript" | "summary";
 interface Props {
     recording?: Recording | null;
     isLoading: boolean;
+    runtimeDevices: RuntimeDevices;
 }
 
-export default function RecordingDetail({ recording, isLoading }: Props) {
+export default function RecordingDetail({ recording, isLoading, runtimeDevices }: Props) {
     const [activeTab, setActiveTab] = useState<DetailTab>("transcript");
     const [summary, setSummary] = useState("");
     const [summaryModel, setSummaryModel] = useState<SummaryModel>("qwen");
+    const [summaryDevice, setSummaryDevice] = useState<RuntimeDevice>(runtimeDevices.default);
     const [isSummarizing, setIsSummarizing] = useState(false);
+    const selectedSummaryDevice = runtimeDevices.available.includes(summaryDevice)
+        ? summaryDevice
+        : runtimeDevices.default;
 
     if (isLoading && !recording) {
         return <div className="p-6 text-sm text-zinc-500">Loading recording...</div>;
@@ -39,6 +50,7 @@ export default function RecordingDetail({ recording, isLoading }: Props) {
             const nextSummary = await summarizeTranscript({
                 text: sanitizeTranscript(segments),
                 model: summaryModel,
+                device: selectedSummaryDevice,
             });
             setSummary(nextSummary);
         } finally {
@@ -99,6 +111,9 @@ export default function RecordingDetail({ recording, isLoading }: Props) {
                                 isLoading={isSummarizing}
                                 selectedModel={summaryModel}
                                 onModelChange={setSummaryModel}
+                                selectedDevice={selectedSummaryDevice}
+                                onDeviceChange={setSummaryDevice}
+                                runtimeDevices={runtimeDevices}
                                 onSummarize={handleSummarize}
                                 canSummarize={segments.length > 0}
                             />

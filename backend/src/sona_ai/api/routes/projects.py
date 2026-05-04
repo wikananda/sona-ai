@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from sona_ai.api.schemas.projects import ProjectCreate
-from sona_ai.core import setup_logging
+from sona_ai.core import setup_logging, validate_device_available
 from sona_ai.db.models import Project, Recording, RecordingStatus
 from sona_ai.db.session import get_db
 from sona_ai.services.recording_worker import run_transcription
@@ -101,6 +101,7 @@ def upload_project_recording(
     file: UploadFile = File(...),
     language: Optional[str] = Form(default=None),
     model: str = Form(default="parakeet"),
+    device: str = Form(default="auto"),
     min_speakers: Optional[int] = Form(default=None),
     max_speakers: Optional[int] = Form(default=None),
     db: Session = Depends(get_db),
@@ -110,6 +111,7 @@ def upload_project_recording(
         raise HTTPException(status_code=404, detail="Project not found")
 
     model = _normalize_model(model)
+    device = _normalize_device(device)
     language = _normalize_language(language)
     _validate_speakers(min_speakers, max_speakers)
 
@@ -126,6 +128,7 @@ def upload_project_recording(
             file_size_bytes=saved_audio.file_size_bytes,
             language_hint=language,
             model=model,
+            device=device,
             min_speakers=min_speakers,
             max_speakers=max_speakers,
             status=RecordingStatus.PENDING,
@@ -200,6 +203,7 @@ def _serialize_recording(recording: Recording, include_transcript: bool) -> dict
         "file_size_bytes": recording.file_size_bytes,
         "language_hint": recording.language_hint,
         "model": recording.model,
+        "device": recording.device,
         "min_speakers": recording.min_speakers,
         "max_speakers": recording.max_speakers,
         "status": recording.status,
@@ -245,6 +249,13 @@ def _normalize_model(model: str) -> str:
             detail=f"Unsupported transcription model. Use one of: {allowed}",
         )
     return model_name
+
+
+def _normalize_device(device: str) -> str:
+    try:
+        return validate_device_available(device)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def _normalize_language(language: Optional[str]) -> Optional[str]:

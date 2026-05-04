@@ -1,17 +1,19 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { TranscriptionModel } from "@/src/api/sonaApi";
+import { RuntimeDevice, RuntimeDevices, TranscriptionModel } from "@/src/api/sonaApi";
 
 interface Props {
     onUpload: (params: {
         files: File[];
         language?: string;
         model: TranscriptionModel;
+        device: RuntimeDevice;
         minSpeakers?: number | "";
         maxSpeakers?: number | "";
     }) => Promise<void>;
     isUploading: boolean;
+    runtimeDevices: RuntimeDevices;
 }
 
 const LANGUAGES = [
@@ -25,12 +27,16 @@ const MODELS: { label: string; value: TranscriptionModel }[] = [
     { label: "WhisperX", value: "whisperx" },
 ];
 
-export default function RecordingUploader({ onUpload, isUploading }: Props) {
+export default function RecordingUploader({ onUpload, isUploading, runtimeDevices }: Props) {
     const [files, setFiles] = useState<File[]>([]);
     const [language, setLanguage] = useState("auto");
     const [model, setModel] = useState<TranscriptionModel>("parakeet");
+    const [device, setDevice] = useState<RuntimeDevice>(runtimeDevices.default);
     const [minSpeakers, setMinSpeakers] = useState<number | "">("");
     const [maxSpeakers, setMaxSpeakers] = useState<number | "">("");
+    const selectedDevice = runtimeDevices.available.includes(device)
+        ? device
+        : runtimeDevices.default;
 
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
@@ -40,6 +46,7 @@ export default function RecordingUploader({ onUpload, isUploading }: Props) {
             files,
             language,
             model,
+            device: selectedDevice,
             minSpeakers,
             maxSpeakers,
         });
@@ -48,7 +55,7 @@ export default function RecordingUploader({ onUpload, isUploading }: Props) {
 
     return (
         <form onSubmit={handleSubmit} className="rounded-lg border border-zinc-200 bg-white p-4">
-            <div className="grid gap-4 xl:grid-cols-[1.5fr_0.8fr_0.8fr_0.7fr_0.7fr_auto]">
+            <div className="grid gap-4 xl:grid-cols-[1.5fr_0.8fr_0.8fr_0.7fr_0.7fr_0.7fr_auto]">
                 <label className="flex min-h-11 cursor-pointer items-center rounded-md border border-dashed border-zinc-300 px-3 text-sm text-zinc-600">
                     <input
                         type="file"
@@ -82,6 +89,18 @@ export default function RecordingUploader({ onUpload, isUploading }: Props) {
                     {MODELS.map((item) => (
                         <option key={item.value} value={item.value}>
                             {item.label}
+                        </option>
+                    ))}
+                </select>
+
+                <select
+                    value={selectedDevice}
+                    onChange={(event) => setDevice(event.target.value as RuntimeDevice)}
+                    className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900"
+                >
+                    {runtimeDevices.available.map((item) => (
+                        <option key={item} value={item}>
+                            {deviceLabel(item)}
                         </option>
                     ))}
                 </select>
@@ -159,4 +178,9 @@ function formatFileSize(bytes: number): string {
     const kb = bytes / 1024;
     if (kb < 1024) return `${kb.toFixed(1)} KB`;
     return `${(kb / 1024).toFixed(1)} MB`;
+}
+
+function deviceLabel(device: RuntimeDevice): string {
+    if (device === "auto") return "Auto device";
+    return device.toUpperCase();
 }

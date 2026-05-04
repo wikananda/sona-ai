@@ -1,4 +1,5 @@
 from sqlalchemy import create_engine, event
+from sqlalchemy import text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from sona_ai.core import PROJECT_ROOT
@@ -29,3 +30,16 @@ def init_db():
     from sona_ai.db import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _migrate_sqlite()
+
+
+def _migrate_sqlite():
+    with engine.begin() as connection:
+        columns = {
+            row[1]
+            for row in connection.execute(text("PRAGMA table_info(recordings)"))
+        }
+        if "device" not in columns:
+            connection.execute(
+                text("ALTER TABLE recordings ADD COLUMN device VARCHAR(32) NOT NULL DEFAULT 'auto'")
+            )

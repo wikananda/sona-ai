@@ -16,12 +16,13 @@ class Gemma4Summarizer:
         self,
         config: Union[str, Dict] = "gemma",
         max_new_tokens: int = 256,
+        device: Optional[str] = None,
         write_outputs: bool = False,
     ):
         self.config = load_config(config)
         self.max_new_tokens = max_new_tokens
         self.write_outputs = write_outputs
-        self.device = self._resolve_device(self.config["model"].get("device", "auto"))
+        self.device = self._resolve_device(device or self.config["model"].get("device", "auto"))
         self.processor = None
         self.model = None
 

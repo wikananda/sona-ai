@@ -25,6 +25,7 @@ def run_transcription(recording_id: str, transcription_service: TranscriptionSer
             str(PROJECT_ROOT / recording.stored_path),
             language=recording.language_hint,
             model=recording.model,
+            device=recording.device,
             min_speakers=recording.min_speakers,
             max_speakers=recording.max_speakers,
         )
@@ -39,6 +40,7 @@ def run_transcription(recording_id: str, transcription_service: TranscriptionSer
             diarization_engine="pyannote",
             model_config_json=json.dumps({
                 "model": recording.model,
+                "device": recording.device,
                 "language": recording.language_hint,
                 "min_speakers": recording.min_speakers,
                 "max_speakers": recording.max_speakers,

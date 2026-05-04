@@ -7,8 +7,11 @@ import {
     deleteRecording,
     getProject,
     getRecording,
+    getRuntimeDevices,
     Project,
     Recording,
+    RuntimeDevice,
+    RuntimeDevices,
     TranscriptionModel,
     uploadProjectRecording,
 } from "@/src/api/sonaApi";
@@ -26,6 +29,11 @@ export default function ProjectDetailPage() {
     const [isLoadingProject, setIsLoadingProject] = useState(true);
     const [isLoadingRecording, setIsLoadingRecording] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [runtimeDevices, setRuntimeDevices] = useState<RuntimeDevices>({
+        default: "auto",
+        available: ["auto", "cpu"],
+        torch: { cuda: false, mps: false },
+    });
     const [error, setError] = useState("");
 
     const recordings = useMemo(() => project?.recordings ?? [], [project]);
@@ -66,6 +74,12 @@ export default function ProjectDetailPage() {
     }, [refreshProject]);
 
     useEffect(() => {
+        getRuntimeDevices()
+            .then(setRuntimeDevices)
+            .catch((err) => setError(err.message));
+    }, []);
+
+    useEffect(() => {
         refreshSelectedRecording().catch((err) => setError(err.message));
     }, [refreshSelectedRecording]);
 
@@ -84,6 +98,7 @@ export default function ProjectDetailPage() {
         files: File[];
         language?: string;
         model: TranscriptionModel;
+        device: RuntimeDevice;
         minSpeakers?: number | "";
         maxSpeakers?: number | "";
     }) => {
@@ -97,6 +112,7 @@ export default function ProjectDetailPage() {
                     file,
                     language: params.language,
                     model: params.model,
+                    device: params.device,
                     minSpeakers: params.minSpeakers,
                     maxSpeakers: params.maxSpeakers,
                 });
@@ -160,7 +176,11 @@ export default function ProjectDetailPage() {
                     </div>
                 </header>
 
-                <RecordingUploader onUpload={handleUpload} isUploading={isUploading} />
+                <RecordingUploader
+                    onUpload={handleUpload}
+                    isUploading={isUploading}
+                    runtimeDevices={runtimeDevices}
+                />
 
                 {error && (
                     <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -178,6 +198,7 @@ export default function ProjectDetailPage() {
                     <RecordingDetail
                         recording={selectedRecording}
                         isLoading={isLoadingRecording}
+                        runtimeDevices={runtimeDevices}
                     />
                 </div>
             </div>

@@ -61,6 +61,7 @@ class Recording(Base):
     file_size_bytes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     language_hint: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     model: Mapped[str] = mapped_column(String(32), nullable=False, default="parakeet")
+    device: Mapped[str] = mapped_column(String(32), nullable=False, default="auto")
     min_speakers: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     max_speakers: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(

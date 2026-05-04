@@ -8,6 +8,16 @@ export interface SpeakerSegment {
 export type RecordingStatus = "pending" | "processing" | "done" | "failed";
 export type TranscriptionModel = "parakeet" | "whisperx";
 export type SummaryModel = "qwen" | "llama" | "gemma";
+export type RuntimeDevice = "auto" | "cpu" | "mps" | "cuda";
+
+export interface RuntimeDevices {
+    default: RuntimeDevice;
+    available: RuntimeDevice[];
+    torch: {
+        cuda: boolean;
+        mps: boolean;
+    };
+}
 
 export interface Project {
     id: string;
@@ -39,6 +49,7 @@ export interface Recording {
     file_size_bytes?: number | null;
     language_hint?: string | null;
     model: TranscriptionModel;
+    device: RuntimeDevice;
     min_speakers?: number | null;
     max_speakers?: number | null;
     status: RecordingStatus;
@@ -52,6 +63,7 @@ export interface TranscribeParams {
     file: File;
     language?: string;
     model?: TranscriptionModel;
+    device?: RuntimeDevice;
     minSpeakers?: number | "";
     maxSpeakers?: number | "";
 }
@@ -65,6 +77,7 @@ export interface SummarizeParams {
     prompt?: string;
     maxLength?: number;
     model?: SummaryModel;
+    device?: RuntimeDevice;
 }
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -92,6 +105,10 @@ export async function deleteProject(projectId: string): Promise<void> {
     await requestJson(`/projects/${projectId}`, { method: "DELETE" });
 }
 
+export async function getRuntimeDevices(): Promise<RuntimeDevices> {
+    return requestJson("/runtime/devices");
+}
+
 export async function uploadProjectRecording(
     params: UploadProjectRecordingParams,
 ): Promise<Recording> {
@@ -117,6 +134,7 @@ export async function transcribeAudio(params: TranscribeParams): Promise<Speaker
     const url = new URL(`${BASE_URL}/transcribe`);
     appendSearchParam(url, "language", params.language);
     appendSearchParam(url, "model", params.model);
+    appendSearchParam(url, "device", params.device);
     appendSearchParam(url, "min_speakers", params.minSpeakers);
     appendSearchParam(url, "max_speakers", params.maxSpeakers);
 
@@ -142,6 +160,7 @@ export async function summarizeTranscript(params: SummarizeParams): Promise<stri
             prompt: params.prompt,
             max_length: params.maxLength,
             model: params.model ?? "qwen",
+            device: params.device ?? "auto",
         }),
     });
 
@@ -153,6 +172,7 @@ function buildRecordingFormData(params: TranscribeParams): FormData {
     formData.append("file", params.file);
     appendFormValue(formData, "language", params.language);
     appendFormValue(formData, "model", params.model ?? "parakeet");
+    appendFormValue(formData, "device", params.device ?? "auto");
     appendFormValue(formData, "min_speakers", params.minSpeakers);
     appendFormValue(formData, "max_speakers", params.maxSpeakers);
     return formData;

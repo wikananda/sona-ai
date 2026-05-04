@@ -16,8 +16,11 @@ async def summarize(request: Request, body: SummarizeRequest):
             body.prompt,
             max_length=body.max_length,
             model=body.model,
+            device=body.device,
         )
         return {"summary": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Error summarizing text: %s", str(e))
         raise HTTPException(status_code=500, detail=str(e))

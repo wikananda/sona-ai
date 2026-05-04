@@ -1,12 +1,15 @@
 "use client";
 
-import { SummaryModel } from "@/src/api/sonaApi";
+import { RuntimeDevice, RuntimeDevices, SummaryModel } from "@/src/api/sonaApi";
 
 interface Props {
     summary: string;
     isLoading: boolean;
     selectedModel: SummaryModel;
     onModelChange: (model: SummaryModel) => void;
+    selectedDevice: RuntimeDevice;
+    onDeviceChange: (device: RuntimeDevice) => void;
+    runtimeDevices: RuntimeDevices;
     onSummarize: () => void;
     canSummarize: boolean;
 }
@@ -34,6 +37,9 @@ export default function SummaryPanel({
     isLoading,
     selectedModel,
     onModelChange,
+    selectedDevice,
+    onDeviceChange,
+    runtimeDevices,
     onSummarize,
     canSummarize,
 }: Props) {
@@ -66,6 +72,25 @@ export default function SummaryPanel({
                             {SUMMARY_MODELS.map((model) => (
                                 <option key={model.value} value={model.value}>
                                     {model.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label htmlFor="summary-device" className="text-xs font-medium text-zinc-500">
+                            Device
+                        </label>
+                        <select
+                            id="summary-device"
+                            value={selectedDevice}
+                            onChange={(event) => onDeviceChange(event.target.value as RuntimeDevice)}
+                            disabled={isLoading}
+                            className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {runtimeDevices.available.map((device) => (
+                                <option key={device} value={device}>
+                                    {deviceLabel(device)}
                                 </option>
                             ))}
                         </select>
@@ -106,4 +131,9 @@ export default function SummaryPanel({
             )}
         </div>
     );
+}
+
+function deviceLabel(device: RuntimeDevice): string {
+    if (device === "auto") return "Auto";
+    return device.toUpperCase();
 }

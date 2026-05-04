@@ -1,6 +1,8 @@
 import threading
 from typing import Optional
 
+from sona_ai.core import resolve_device, validate_device_available
+
 
 SUPPORTED_SUMMARY_MODELS = {
     "qwen": "qwen",
@@ -32,8 +34,9 @@ class SummarizationService:
         prompt: Optional[str] = None,
         max_length: int = 2048,
         model: Optional[str] = None,
+        device: Optional[str] = None,
     ) -> str:
-        summarizer = self._get_summarizer(model)
+        summarizer = self._get_summarizer(model, device)
         return summarizer.generate(text, prompt, max_length=max_length)
 
     def close(self):
@@ -41,19 +44,25 @@ class SummarizationService:
             summarizer.cleanup_models()
         self._summarizers = {}
 
-    def _get_summarizer(self, model: Optional[str] = None):
+    def _get_summarizer(
+        self,
+        model: Optional[str] = None,
+        device: Optional[str] = None,
+    ):
         model_name = self._normalize_model(model or self.config)
-        if model_name in self._summarizers:
-            return self._summarizers[model_name]
+        device_name = validate_device_available(device or self.device)
+        key = self._cache_key(model_name, device_name)
+        if key in self._summarizers:
+            return self._summarizers[key]
 
         with self._lock:
-            if model_name in self._summarizers:
-                return self._summarizers[model_name]
+            if key in self._summarizers:
+                return self._summarizers[key]
 
-            self._summarizers[model_name] = self._build_summarizer(model_name)
-            return self._summarizers[model_name]
+            self._summarizers[key] = self._build_summarizer(model_name, device_name)
+            return self._summarizers[key]
 
-    def _build_summarizer(self, model_name: str):
+    def _build_summarizer(self, model_name: str, device: str):
         from sona_ai.core import load_config
 
         config = load_config(model_name)
@@ -65,6 +74,7 @@ class SummarizationService:
             return GGUFLLMSummarizer(
                 config=config,
                 max_new_tokens=self.max_new_tokens,
+                device=device,
             )
 
         if backend == "gemma4":
@@ -73,6 +83,7 @@ class SummarizationService:
             return Gemma4Summarizer(
                 config=config,
                 max_new_tokens=self.max_new_tokens,
+                device=device,
             )
 
         from sona_ai.summarization import LocalLLMSummarizer
@@ -80,7 +91,7 @@ class SummarizationService:
         return LocalLLMSummarizer(
             config=config,
             use_pretrained=self.use_pretrained,
-            device=self.device,
+            device=resolve_device(device),
             max_new_tokens=self.max_new_tokens,
             num_beams=self.num_beams,
         )
@@ -91,3 +102,6 @@ class SummarizationService:
             allowed = ", ".join(sorted(SUPPORTED_SUMMARY_MODELS))
             raise ValueError(f"Unsupported summarization model: {model}. Use one of: {allowed}")
         return SUPPORTED_SUMMARY_MODELS[model_name]
+
+    def _cache_key(self, model: str, device: str) -> tuple[str, str]:
+        return (model, resolve_device(device))

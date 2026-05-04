@@ -5,7 +5,7 @@ model:
     max_input_length: 512
     max_target_length: 128
     language: "en"
-    device: "mps"
+    device: "auto"
     cp_dir: "cp/gemma-4-E2B-it"
 
 generation:
