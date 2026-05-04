@@ -7,6 +7,7 @@ export interface SpeakerSegment {
 
 export type RecordingStatus = "pending" | "processing" | "done" | "failed";
 export type TranscriptionModel = "parakeet" | "whisperx";
+export type SummaryModel = "qwen" | "llama" | "gemma";
 
 export interface Project {
     id: string;
@@ -63,6 +64,7 @@ export interface SummarizeParams {
     text: string;
     prompt?: string;
     maxLength?: number;
+    model?: SummaryModel;
 }
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -139,6 +141,7 @@ export async function summarizeTranscript(params: SummarizeParams): Promise<stri
             text: params.text,
             prompt: params.prompt,
             max_length: params.maxLength,
+            model: params.model ?? "qwen",
         }),
     });
 

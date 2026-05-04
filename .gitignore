@@ -10,7 +10,7 @@ backend/data/*
 outputs/transcription/*
 outputs/summarization/*
 CLAUDE.md
-# planning/*
+planning/*
 
 !cp/.gitkeep
 !data/raw/audio/.gitkeep

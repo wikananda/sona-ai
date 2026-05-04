@@ -14,7 +14,8 @@ async def summarize(request: Request, body: SummarizeRequest):
             request.app.state.summarization_service.summarize,
             body.text,
             body.prompt,
-            max_length=body.max_length
+            max_length=body.max_length,
+            model=body.model,
         )
         return {"summary": result}
     except Exception as e:

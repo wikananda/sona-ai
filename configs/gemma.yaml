@@ -1,0 +1,15 @@
+model:
+    backend: "transformers"
+    model_name: "google/gemma-4-E2B-it"
+    task_type: "causal"
+    max_input_length: 512
+    max_target_length: 128
+    language: "en"
+    device: "auto"
+    cp_dir: "cp/gemma-4-E2B-it"
+
+generation:
+    max_new_tokens: 256
+
+cp_dir:
+    hf_cache: "cp/hf_cache"

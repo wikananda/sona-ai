@@ -9,6 +9,7 @@ export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [error, setError] = useState("");
 
   const refreshProjects = async () => {
@@ -29,6 +30,7 @@ export default function Home() {
     try {
       const project = await createProject(params);
       setProjects((current) => [project, ...current]);
+      setIsCreateModalOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create project");
     } finally {
@@ -51,12 +53,19 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-zinc-100 text-zinc-950">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-8">
-        <header className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">Sona AI</h1>
-          <p className="text-sm text-zinc-600">Projects</p>
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">Sona AI</h1>
+            <p className="text-sm text-zinc-600">Projects</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white"
+          >
+            New project
+          </button>
         </header>
-
-        <NewProjectForm onCreate={handleCreate} isCreating={isCreating} />
 
         {error && (
           <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -107,6 +116,37 @@ export default function Home() {
           </div>
         </section>
       </div>
+
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
+              <div>
+                <h2 className="text-base font-semibold text-zinc-950">New project</h2>
+                <p className="mt-1 text-sm text-zinc-500">
+                  Create a workspace for related recordings.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                disabled={isCreating}
+                className="rounded-md px-2 py-1 text-xl leading-none text-zinc-500 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Close new project form"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-5">
+              <NewProjectForm
+                onCreate={handleCreate}
+                onCancel={() => setIsCreateModalOpen(false)}
+                isCreating={isCreating}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

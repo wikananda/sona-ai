@@ -1,4 +1,5 @@
 model:
+    backend: "transformers"
     model_name: "meta-llama/Llama-3.2-3B-Instruct"
     task_type: "causal"  # "seq2seq" | "causal" | "auto"
     max_input_length: 512
