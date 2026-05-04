@@ -7,4 +7,4 @@ diarization:
     config: "whisperx"
 
 summarization:
-    config: "llama"
+    config: "qwen"

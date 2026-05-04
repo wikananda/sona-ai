@@ -35,12 +35,25 @@ def sanitize_for_json(obj):
         if isinstance(value, float) and math.isnan(value):
             return None
         return value
+    elif _is_torch_tensor(obj):
+        if obj.numel() == 1:
+            return sanitize_for_json(obj.item())
+        return sanitize_for_json(obj.detach().cpu().tolist())
     elif isinstance(obj, float):
         if math.isnan(obj):
             return None
         return obj
     else:
         return obj
+
+
+def _is_torch_tensor(obj):
+    try:
+        import torch
+    except ImportError:
+        return False
+
+    return isinstance(obj, torch.Tensor)
 
 
 def write_json(path: Union[str, Path], data: Any):
