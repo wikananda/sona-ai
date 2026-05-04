@@ -7,6 +7,8 @@ data/raw/mediasum/*
 data/processed/*
 outputs/transcription/*
 outputs/summarization/*
+CLAUDE.md
+# planning/*
 
 !cp/.gitkeep
 !data/raw/audio/.gitkeep

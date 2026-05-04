@@ -79,6 +79,107 @@ class TranscriptionResult:
             raw=result,
         )
 
+    @classmethod
+    def from_parakeet_hypothesis(
+        cls,
+        hypothesis: Any,
+        language: Optional[str] = None,
+    ) -> "TranscriptionResult":
+        text = getattr(hypothesis, "text", None) or str(hypothesis)
+        timestamps = getattr(hypothesis, "timestamp", None) or {}
+        word_timestamps = timestamps.get("word") or []
+        segment_timestamps = timestamps.get("segment") or []
+
+        words = [_word_from_stamp(stamp) for stamp in word_timestamps]
+        segments = _segments_from_stamps(text, segment_timestamps, words)
+        raw = {
+            "text": text,
+            "segments": [segment.to_dict() for segment in segments],
+            "timestamp": timestamps,
+        }
+
+        return cls(
+            segments=segments,
+            language=language,
+            raw=raw,
+        )
+
     def to_segment_dicts(self) -> list[dict[str, Any]]:
         return [segment.to_dict() for segment in self.segments]
 
+
+def _word_from_stamp(stamp: dict[str, Any]) -> WordSegment:
+    return WordSegment(
+        word=str(_stamp_text(stamp, ["word", "text", "token", "char"])),
+        start=_stamp_time(stamp, ["start", "start_offset"]),
+        end=_stamp_time(stamp, ["end", "end_offset"]),
+    )
+
+
+def _segments_from_stamps(
+    text: str,
+    segment_timestamps: list[dict[str, Any]],
+    words: list[WordSegment],
+) -> list[TranscriptSegment]:
+    if segment_timestamps:
+        return [
+            _segment_from_stamp(stamp, words)
+            for stamp in segment_timestamps
+        ]
+
+    start = words[0].start if words and words[0].start is not None else 0.0
+    end = words[-1].end if words and words[-1].end is not None else start
+
+    return [
+        TranscriptSegment(
+            text=text,
+            start=start,
+            end=end,
+            words=words,
+        )
+    ]
+
+
+def _segment_from_stamp(
+    stamp: dict[str, Any],
+    words: list[WordSegment],
+) -> TranscriptSegment:
+    text = str(_stamp_text(stamp, ["segment", "text", "word"]))
+    start = _stamp_time(stamp, ["start", "start_offset"]) or 0.0
+    end = _stamp_time(stamp, ["end", "end_offset"]) or start
+    segment_words = [
+        word
+        for word in words
+        if _word_overlaps_segment(word, start, end)
+    ]
+
+    return TranscriptSegment(
+        text=text,
+        start=start,
+        end=end,
+        words=segment_words,
+    )
+
+
+def _stamp_text(stamp: dict[str, Any], keys: list[str]) -> str:
+    for key in keys:
+        if key in stamp and stamp[key] is not None:
+            return stamp[key]
+    return ""
+
+
+def _stamp_time(stamp: dict[str, Any], keys: list[str]) -> Optional[float]:
+    for key in keys:
+        if key in stamp and stamp[key] is not None:
+            return float(stamp[key])
+    return None
+
+
+def _word_overlaps_segment(
+    word: WordSegment,
+    segment_start: float,
+    segment_end: float,
+) -> bool:
+    if word.start is None or word.end is None:
+        return False
+    return max(0.0, min(segment_end, word.end) - max(segment_start, word.start)) > 0

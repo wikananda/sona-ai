@@ -1,0 +1,10 @@
+model:
+    model_name: "nvidia/parakeet-tdt-0.6b-v3"
+    language: "en"
+    supported_languages: ["en"]
+    device: "auto"
+    batch_size: 1
+
+cp_dir:
+    hf_cache: "cp/hf_cache"
+

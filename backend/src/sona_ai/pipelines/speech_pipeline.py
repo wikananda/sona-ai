@@ -3,6 +3,7 @@ import os
 import warnings
 from typing import Optional
 
+from sona_ai.alignment.base import Aligner
 from sona_ai.core import PROJECT_ROOT, setup_logging, write_json
 from sona_ai.diarization.base import Diarizer
 from sona_ai.pipelines.speaker_assignment import WhisperXSpeakerAssigner
@@ -17,17 +18,21 @@ class SpeechPipeline:
     def __init__(
         self,
         transcriber: Transcriber,
+        aligner: Optional[Aligner] = None,
         diarizer: Optional[Diarizer] = None,
         speaker_assigner: Optional[WhisperXSpeakerAssigner] = None,
         write_outputs: bool = True,
     ):
         self.transcriber = transcriber
+        self.aligner = aligner
         self.diarizer = diarizer
         self.speaker_assigner = speaker_assigner or WhisperXSpeakerAssigner()
         self.write_outputs = write_outputs
 
     def load_models(self):
         self.transcriber.load_models()
+        if self.aligner is not None:
+            self.aligner.load_models()
         if self.diarizer is not None:
             self.diarizer.load_models()
 
@@ -39,6 +44,8 @@ class SpeechPipeline:
         max_speakers: Optional[int] = None,
     ):
         transcription = self.transcriber.transcribe(audio_path, language=language)
+        if self.aligner is not None:
+            transcription = self.aligner.align(transcription, audio_path)
 
         if self.diarizer is None:
             segments = transcription.to_segment_dicts()
@@ -92,6 +99,8 @@ class SpeechPipeline:
 
     def cleanup_models(self):
         self.transcriber.cleanup_models()
+        if self.aligner is not None:
+            self.aligner.cleanup_models()
         if self.diarizer is not None:
             self.diarizer.cleanup_models()
 
@@ -105,7 +114,17 @@ class SpeechPipeline:
         os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
         if config and "cp_dir" in config and "hf_cache" in config["cp_dir"]:
-            os.environ["HF_HOME"] = str(PROJECT_ROOT / config["cp_dir"]["hf_cache"])
+            cache_dir = PROJECT_ROOT / config["cp_dir"]["hf_cache"]
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            os.environ["HF_HOME"] = str(cache_dir)
+            os.environ["HF_HUB_CACHE"] = str(cache_dir / "hub")
+            os.environ["HUGGINGFACE_HUB_CACHE"] = str(cache_dir / "hub")
+            os.environ["TRANSFORMERS_CACHE"] = str(cache_dir / "transformers")
+            os.environ["TORCH_HOME"] = str(cache_dir / "torch")
+            os.environ["PYANNOTE_CACHE"] = str(cache_dir / "pyannote")
+            os.environ["NEMO_HOME"] = str(cache_dir / "nemo")
+            os.environ["NEMO_CACHE_DIR"] = str(cache_dir / "nemo")
+            os.environ["XDG_CACHE_HOME"] = str(cache_dir / "xdg")
 
     def close(self):
         self.cleanup_models()

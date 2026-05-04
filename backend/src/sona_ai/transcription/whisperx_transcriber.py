@@ -1,10 +1,11 @@
 import gc
+from pathlib import Path
 from typing import Optional
 
 import torch
 import whisperx
 
-from sona_ai.core import Timer, setup_logging
+from sona_ai.core import PROJECT_ROOT, Timer, setup_logging
 from sona_ai.transcription.schemas import TranscriptionResult
 
 
@@ -15,37 +16,36 @@ class WhisperXTranscriber:
     def __init__(self, config: dict):
         self.config = config
         self.model = None
-        self.align_model = None
-        self.align_metadata = None
+        self.cache_dir = self._cache_dir()
 
     def load_models(self):
-        logger.info("Loading WhisperX transcription models...")
+        logger.info("Loading WhisperX transcription model...")
         model_config = self.config["model"]
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         self.model = whisperx.load_model(
             model_config["whisper_model"],
             language=model_config["language"],
             device=model_config["device"],
             compute_type=model_config["compute_type"],
+            download_root=str(self.cache_dir / "whisper"),
         )
-        self.align_model, self.align_metadata = whisperx.load_align_model(
-            language_code=model_config["language"],
-            device=model_config["device"],
-            model_name=model_config["align_model"],
-        )
+
+    def _cache_dir(self) -> Path:
+        cache_dir = self.config.get("cp_dir", {}).get("hf_cache", "cp/hf_cache")
+        return PROJECT_ROOT / cache_dir
 
     def transcribe(
         self,
         audio_path: str,
         language: Optional[str] = None,
     ) -> TranscriptionResult:
-        if self.model is None or self.align_model is None:
-            raise ReferenceError("WhisperX transcription models are not initialized.")
+        if self.model is None:
+            raise ReferenceError("WhisperX transcription model is not initialized.")
 
         audio = whisperx.load_audio(audio_path)
         transcription = self._run_transcription(audio, language=language)
-        aligned = self._run_alignment(transcription, audio)
-        return TranscriptionResult.from_whisperx_result(aligned)
+        return TranscriptionResult.from_whisperx_result(transcription)
 
     def _run_transcription(self, audio, language: Optional[str] = None) -> dict:
         logger.info("Running transcription...")
@@ -56,30 +56,14 @@ class WhisperXTranscriber:
                 language=language or self.config["model"].get("language"),
             )
 
-    def _run_alignment(self, result: dict, audio) -> dict:
-        logger.info("Running alignment...")
-        with Timer("Alignment"):
-            return whisperx.align(
-                result["segments"],
-                self.align_model,
-                self.align_metadata,
-                audio,
-                device=self.config["model"]["device"],
-                return_char_alignments=False,
-            )
-
     def cleanup_models(self):
-        for model in [self.model, self.align_model]:
-            if model is not None:
-                del model
+        if self.model is not None:
+            del self.model
 
         self.model = None
-        self.align_model = None
-        self.align_metadata = None
         gc.collect()
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         elif torch.backends.mps.is_available():
             torch.mps.empty_cache()
-

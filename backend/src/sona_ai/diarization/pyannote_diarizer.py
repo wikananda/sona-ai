@@ -1,11 +1,11 @@
 import gc
 import os
+from pathlib import Path
 from typing import Optional
 
+import pandas as pd
 import torch
-import whisperx
 from dotenv import load_dotenv
-from whisperx.diarize import DiarizationPipeline
 
 from sona_ai.core import PROJECT_ROOT, Timer, setup_logging
 from sona_ai.diarization.schemas import DiarizationResult, SpeakerTurn
@@ -19,16 +19,26 @@ class PyannoteDiarizer:
     def __init__(self, config: dict):
         self.config = config
         self.model = None
+        self.model_name = (
+            self.config.get("diarization", {}).get("model_name")
+            or "pyannote/speaker-diarization-3.1"
+        )
+        self.cache_dir = self._cache_dir()
 
     def load_models(self):
         logger.info("Loading pyannote diarization model...")
         if os.getenv("HF_TOKEN") is None:
             raise EnvironmentError("Hugging Face token is not set")
 
-        self.model = DiarizationPipeline(
+        from pyannote.audio import Pipeline
+
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        pipeline = Pipeline.from_pretrained(
+            self.model_name,
             use_auth_token=os.getenv("HF_TOKEN"),
-            device=self.config["model"]["device"],
+            cache_dir=self.cache_dir,
         )
+        self.model = pipeline.to(torch.device(self.config["model"]["device"]))
 
     def diarize(
         self,
@@ -40,20 +50,31 @@ class PyannoteDiarizer:
             raise ReferenceError("Diarization model is not initialized.")
 
         min_s, max_s = self._resolve_speaker_bounds(min_speakers, max_speakers)
+        import whisperx
+
         audio = whisperx.load_audio(audio_path)
+        audio_data = {
+            "waveform": torch.from_numpy(audio[None, :]),
+            "sample_rate": 16000,
+        }
 
         logger.info("Running diarization...")
         with Timer("Diarization"):
             diarization = self.model(
-                audio,
+                audio_data,
                 min_speakers=min_s,
                 max_speakers=max_s,
             )
+        diarization_df = self._to_dataframe(diarization)
 
         return DiarizationResult(
-            turns=self._build_turns(diarization),
-            raw=diarization,
+            turns=self._build_turns(diarization_df),
+            raw=diarization_df,
         )
+
+    def _cache_dir(self) -> Path:
+        cache_dir = self.config.get("cp_dir", {}).get("hf_cache", "cp/hf_cache")
+        return PROJECT_ROOT / cache_dir / "pyannote"
 
     def _resolve_speaker_bounds(
         self,
@@ -72,13 +93,40 @@ class PyannoteDiarizer:
 
         return min_s, max_s
 
+    def _to_dataframe(self, diarization) -> pd.DataFrame:
+        if isinstance(diarization, pd.DataFrame):
+            return diarization
+
+        rows = []
+        for segment, label, speaker in diarization.itertracks(yield_label=True):
+            rows.append({
+                "segment": segment,
+                "label": label,
+                "speaker": speaker,
+                "start": segment.start,
+                "end": segment.end,
+            })
+
+        return pd.DataFrame(rows)
+
     def _build_turns(self, diarization) -> list[SpeakerTurn]:
         turns = []
-        for segment, _, speaker in diarization.itertracks(yield_label=True):
+        if hasattr(diarization, "itertracks"):
+            diarization = self._to_dataframe(diarization)
+
+        for _, row in diarization.iterrows():
+            segment = row.get("segment")
+            start = row.get("start", getattr(segment, "start", None))
+            end = row.get("end", getattr(segment, "end", None))
+            speaker = row.get("speaker", row.get("label", "Unknown"))
+
+            if start is None or end is None:
+                continue
+
             turns.append(
                 SpeakerTurn(
-                    start=segment.start,
-                    end=segment.end,
+                    start=float(start),
+                    end=float(end),
                     speaker=str(speaker),
                 )
             )
@@ -94,4 +142,3 @@ class PyannoteDiarizer:
             torch.cuda.empty_cache()
         elif torch.backends.mps.is_available():
             torch.mps.empty_cache()
-

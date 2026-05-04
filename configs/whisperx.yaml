@@ -3,7 +3,7 @@ model:
     # align_model: "Wikidepia/wav2vec2-xls-r-300m-indonesian"
     align_model: "facebook/wav2vec2-large-960h-lv60-self"
     language: null
-    device: "cpu"
+    device: "mps"
     compute_type: "float32"
     batch_size: 8
 
