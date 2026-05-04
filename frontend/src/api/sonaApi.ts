@@ -133,6 +133,17 @@ export async function retranscribeRecording(recordingId: string): Promise<Record
     });
 }
 
+export async function renameTranscriptSpeakers(
+    recordingId: string,
+    speakers: Record<string, string>,
+): Promise<Recording> {
+    return requestJson(`/recordings/${recordingId}/transcript/speakers`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ speakers }),
+    });
+}
+
 export async function transcribeAudio(params: TranscribeParams): Promise<SpeakerSegment[]> {
     const formData = new FormData();
     formData.append("file", params.file);

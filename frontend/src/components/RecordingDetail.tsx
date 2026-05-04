@@ -21,6 +21,11 @@ interface Props {
     runtimeDevices: RuntimeDevices;
     isRetranscribing?: boolean;
     onRetranscribe?: (recordingId: string) => void;
+    isRenamingSpeakers?: boolean;
+    onRenameSpeakers?: (
+        recordingId: string,
+        speakers: Record<string, string>,
+    ) => Promise<void>;
 }
 
 export default function RecordingDetail({
@@ -29,8 +34,11 @@ export default function RecordingDetail({
     runtimeDevices,
     isRetranscribing = false,
     onRetranscribe,
+    isRenamingSpeakers = false,
+    onRenameSpeakers,
 }: Props) {
     const [activeTab, setActiveTab] = useState<DetailTab>("transcript");
+    const [isSpeakerEditorOpen, setIsSpeakerEditorOpen] = useState(false);
     const [summary, setSummary] = useState("");
     const [summaryModel, setSummaryModel] = useState<SummaryModel>("qwen");
     const [summaryDevice, setSummaryDevice] = useState<RuntimeDevice>(runtimeDevices.default);
@@ -51,6 +59,9 @@ export default function RecordingDetail({
     const canRetranscribe =
         Boolean(onRetranscribe) &&
         (recording.status === "done" || recording.status === "failed");
+    const canRenameSpeakers =
+        Boolean(onRenameSpeakers) &&
+        segments.some((segment) => Boolean(segment.speaker));
 
     const handleSummarize = async () => {
         if (!segments.length) return;
@@ -67,6 +78,13 @@ export default function RecordingDetail({
         } finally {
             setIsSummarizing(false);
         }
+    };
+
+    const handleRenameSpeakers = async (speakers: Record<string, string>) => {
+        if (!onRenameSpeakers) return;
+
+        await onRenameSpeakers(recording.id, speakers);
+        setSummary("");
     };
 
     return (
@@ -126,20 +144,40 @@ export default function RecordingDetail({
                                     onClick={() => setActiveTab("summary")}
                                 />
                             </div>
-                            {activeTab === "transcript" && canRetranscribe && (
-                                <button
-                                    type="button"
-                                    onClick={() => onRetranscribe?.(recording.id)}
-                                    disabled={isRetranscribing}
-                                    className="mb-2 rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
-                                </button>
+                            {activeTab === "transcript" && (canRenameSpeakers || canRetranscribe) && (
+                                <div className="mb-2 flex flex-wrap items-center gap-2">
+                                    {canRenameSpeakers && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsSpeakerEditorOpen(true)}
+                                            disabled={isRenamingSpeakers}
+                                            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {isRenamingSpeakers ? "Saving speakers..." : "Edit speakers"}
+                                        </button>
+                                    )}
+                                    {canRetranscribe && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onRetranscribe?.(recording.id)}
+                                            disabled={isRetranscribing}
+                                            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
+                                        </button>
+                                    )}
+                                </div>
                             )}
                         </div>
 
                         {activeTab === "transcript" && (
-                            <TranscriptPanel segments={segments} />
+                            <TranscriptPanel
+                                segments={segments}
+                                isSavingSpeakers={isRenamingSpeakers}
+                                onRenameSpeakers={handleRenameSpeakers}
+                                isSpeakerEditorOpen={isSpeakerEditorOpen}
+                                onSpeakerEditorClose={() => setIsSpeakerEditorOpen(false)}
+                            />
                         )}
 
                         {activeTab === "summary" && (

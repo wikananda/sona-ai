@@ -12,6 +12,7 @@ import {
     Recording,
     RuntimeDevice,
     RuntimeDevices,
+    renameTranscriptSpeakers,
     retranscribeRecording,
     TranscriptionModel,
     uploadProjectRecording,
@@ -31,6 +32,7 @@ export default function ProjectDetailPage() {
     const [isLoadingRecording, setIsLoadingRecording] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [retranscribingId, setRetranscribingId] = useState<string>();
+    const [renamingSpeakerId, setRenamingSpeakerId] = useState<string>();
     const [runtimeDevices, setRuntimeDevices] = useState<RuntimeDevices>({
         default: "auto",
         available: ["auto", "cpu"],
@@ -163,6 +165,23 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleRenameTranscriptSpeakers = async (
+        recordingId: string,
+        speakers: Record<string, string>,
+    ) => {
+        setError("");
+        setRenamingSpeakerId(recordingId);
+        try {
+            const recording = await renameTranscriptSpeakers(recordingId, speakers);
+            setSelectedRecording(recording);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to rename speakers");
+            throw err;
+        } finally {
+            setRenamingSpeakerId(undefined);
+        }
+    };
+
     if (isLoadingProject) {
         return (
             <main className="min-h-screen bg-zinc-100 p-6 text-sm text-zinc-500">
@@ -219,6 +238,8 @@ export default function ProjectDetailPage() {
                         runtimeDevices={runtimeDevices}
                         isRetranscribing={retranscribingId === selectedRecording?.id}
                         onRetranscribe={handleRetranscribeRecording}
+                        isRenamingSpeakers={renamingSpeakerId === selectedRecording?.id}
+                        onRenameSpeakers={handleRenameTranscriptSpeakers}
                     />
                 </div>
             </div>

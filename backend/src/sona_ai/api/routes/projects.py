@@ -15,7 +15,7 @@ from fastapi import (
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from sona_ai.api.schemas.projects import ProjectCreate
+from sona_ai.api.schemas.projects import ProjectCreate, TranscriptSpeakerRename
 from sona_ai.core import setup_logging, validate_device_available
 from sona_ai.db.models import Project, Recording, RecordingStatus
 from sona_ai.db.session import get_db
@@ -192,6 +192,57 @@ def retranscribe_recording(
         request.app.state.transcription_service,
     )
     return _serialize_recording(recording, include_transcript=False)
+
+
+@router.patch("/recordings/{recording_id}/transcript/speakers")
+def rename_transcript_speakers(
+    recording_id: str,
+    body: TranscriptSpeakerRename,
+    db: Session = Depends(get_db),
+):
+    recording = db.scalar(
+        select(Recording)
+        .where(Recording.id == recording_id)
+        .options(selectinload(Recording.transcript))
+    )
+    if recording is None:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    if recording.transcript is None:
+        raise HTTPException(status_code=404, detail="Transcript not found")
+
+    speaker_names = {
+        speaker: name.strip()
+        for speaker, name in body.speakers.items()
+    }
+    if any(not name for name in speaker_names.values()):
+        raise HTTPException(status_code=400, detail="Speaker names cannot be empty")
+
+    segments = json.loads(recording.transcript.segments_json)
+    present_speakers = {
+        segment.get("speaker")
+        for segment in segments
+        if isinstance(segment, dict) and segment.get("speaker")
+    }
+    speaker_names = {
+        speaker: name
+        for speaker, name in speaker_names.items()
+        if speaker in present_speakers
+    }
+
+    if speaker_names:
+        for segment in segments:
+            if not isinstance(segment, dict):
+                continue
+            speaker = segment.get("speaker")
+            if speaker in speaker_names:
+                segment["speaker"] = speaker_names[speaker]
+
+        recording.transcript.segments_json = json.dumps(segments)
+        db.commit()
+        db.refresh(recording)
+        db.refresh(recording.transcript)
+
+    return _serialize_recording(recording, include_transcript=True)
 
 
 @router.delete("/recordings/{recording_id}")
