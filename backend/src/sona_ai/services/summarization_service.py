@@ -67,6 +67,14 @@ class SummarizationService:
                 max_new_tokens=self.max_new_tokens,
             )
 
+        if backend == "gemma4":
+            from sona_ai.summarization import Gemma4Summarizer
+
+            return Gemma4Summarizer(
+                config=config,
+                max_new_tokens=self.max_new_tokens,
+            )
+
         from sona_ai.summarization import LocalLLMSummarizer
 
         return LocalLLMSummarizer(

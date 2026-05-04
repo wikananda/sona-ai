@@ -1,11 +1,11 @@
 model:
-    backend: "transformers"
+    backend: "gemma4"
     model_name: "google/gemma-4-E2B-it"
     task_type: "causal"
     max_input_length: 512
     max_target_length: 128
     language: "en"
-    device: "auto"
+    device: "mps"
     cp_dir: "cp/gemma-4-E2B-it"
 
 generation:

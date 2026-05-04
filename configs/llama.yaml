@@ -5,7 +5,7 @@ model:
     max_input_length: 512
     max_target_length: 128
     language: "en"
-    device: "auto"
+    device: "mps"
     cp_dir: "cp/llama-3.2-3B-Instruct-mediasum"
 
 lora:

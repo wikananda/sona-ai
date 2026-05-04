@@ -19,5 +19,5 @@ async def summarize(request: Request, body: SummarizeRequest):
         )
         return {"summary": result}
     except Exception as e:
-        logger.error(f"Error summarizing text: {str(e)}")
+        logger.exception("Error summarizing text: %s", str(e))
         raise HTTPException(status_code=500, detail=str(e))
