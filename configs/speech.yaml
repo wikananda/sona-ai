@@ -1,11 +1,10 @@
 transcription:
-    engine: "whisperx"  # "whisperx" | "parakeet"
-    config: "whisperx"
+    engine: "parakeet"  # "whisperx" | "parakeet"
+    config: "parakeet"
 
 diarization:
     enabled: true
     config: "whisperx"
 
 summarization:
-    config: "llama"
-
+    config: "qwen"

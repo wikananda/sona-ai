@@ -1,5 +1,6 @@
 import gc
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -32,6 +33,7 @@ class PyannoteDiarizer:
 
         from pyannote.audio import Pipeline
 
+        self._patch_huggingface_hub_auth_kwarg()
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         pipeline = Pipeline.from_pretrained(
             self.model_name,
@@ -66,15 +68,51 @@ class PyannoteDiarizer:
                 max_speakers=max_s,
             )
         diarization_df = self._to_dataframe(diarization)
+        turns = self._build_turns(diarization_df)
+        speakers = sorted({turn.speaker for turn in turns})
+        logger.info(
+            "Diarization detected %d speakers across %d turns: %s",
+            len(speakers),
+            len(turns),
+            speakers,
+        )
 
         return DiarizationResult(
-            turns=self._build_turns(diarization_df),
+            turns=turns,
             raw=diarization_df,
         )
 
     def _cache_dir(self) -> Path:
         cache_dir = self.config.get("cp_dir", {}).get("hf_cache", "cp/hf_cache")
         return PROJECT_ROOT / cache_dir / "pyannote"
+
+    def _patch_huggingface_hub_auth_kwarg(self) -> None:
+        from huggingface_hub import hf_hub_download
+
+        if getattr(hf_hub_download, "_sona_auth_compat", False):
+            compat_download = hf_hub_download
+        else:
+            def compat_download(*args, **kwargs):
+                if "use_auth_token" in kwargs and "token" not in kwargs:
+                    kwargs["token"] = kwargs.pop("use_auth_token")
+                else:
+                    kwargs.pop("use_auth_token", None)
+                return hf_hub_download(*args, **kwargs)
+
+            compat_download._sona_auth_compat = True
+
+            import huggingface_hub
+
+            huggingface_hub.hf_hub_download = compat_download
+
+        for module in list(sys.modules.values()):
+            if module is None:
+                continue
+            module_name = getattr(module, "__name__", "")
+            if not module_name.startswith("pyannote.audio"):
+                continue
+            if hasattr(module, "hf_hub_download"):
+                setattr(module, "hf_hub_download", compat_download)
 
     def _resolve_speaker_bounds(
         self,

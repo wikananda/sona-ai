@@ -85,8 +85,8 @@ class TranscriptionResult:
         hypothesis: Any,
         language: Optional[str] = None,
     ) -> "TranscriptionResult":
-        text = getattr(hypothesis, "text", None) or str(hypothesis)
-        timestamps = getattr(hypothesis, "timestamp", None) or {}
+        text = _hypothesis_text(hypothesis)
+        timestamps = _hypothesis_timestamps(hypothesis)
         word_timestamps = timestamps.get("word") or []
         segment_timestamps = timestamps.get("segment") or []
 
@@ -106,6 +106,23 @@ class TranscriptionResult:
 
     def to_segment_dicts(self) -> list[dict[str, Any]]:
         return [segment.to_dict() for segment in self.segments]
+
+
+def _hypothesis_text(hypothesis: Any) -> str:
+    if isinstance(hypothesis, str):
+        return hypothesis
+    if isinstance(hypothesis, dict):
+        return str(hypothesis.get("text") or "")
+    return str(getattr(hypothesis, "text", None) or "")
+
+
+def _hypothesis_timestamps(hypothesis: Any) -> dict[str, Any]:
+    if isinstance(hypothesis, dict):
+        timestamps = hypothesis.get("timestamp") or hypothesis.get("timestamps") or {}
+    else:
+        timestamps = getattr(hypothesis, "timestamp", None) or {}
+
+    return timestamps if isinstance(timestamps, dict) else {}
 
 
 def _word_from_stamp(stamp: dict[str, Any]) -> WordSegment:

@@ -1,9 +1,11 @@
 model:
     whisper_model: "medium"
-    # align_model: "Wikidepia/wav2vec2-xls-r-300m-indonesian"
-    align_model: "facebook/wav2vec2-large-960h-lv60-self"
+    align_model: "facebook/wav2vec2-base"
+    align_models:
+        en: "facebook/wav2vec2-base"
+        id: "indonesian-nlp/wav2vec2-large-xlsr-indonesian"
     language: null
-    device: "mps"
+    device: "cpu"
     compute_type: "float32"
     batch_size: 8
 

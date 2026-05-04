@@ -71,7 +71,7 @@ class ParakeetTranscriber:
             hypotheses = self._transcribe_with_timestamps(audio_path)
 
         return TranscriptionResult.from_parakeet_hypothesis(
-            hypotheses[0],
+            self._first_hypothesis(hypotheses),
             language=resolved_language,
         )
 
@@ -85,6 +85,19 @@ class ParakeetTranscriber:
         except TypeError:
             kwargs.pop("batch_size", None)
             return self.model.transcribe([audio_path], **kwargs)
+
+    def _first_hypothesis(self, hypotheses):
+        if hasattr(hypotheses, "text") or isinstance(hypotheses, (str, dict)):
+            return hypotheses
+
+        if isinstance(hypotheses, (list, tuple)):
+            for item in hypotheses:
+                try:
+                    return self._first_hypothesis(item)
+                except ValueError:
+                    continue
+
+        raise ValueError("Parakeet did not return a transcription hypothesis.")
 
     def _validate_language(self, language: Optional[str]):
         if not language or not self.supported_languages:

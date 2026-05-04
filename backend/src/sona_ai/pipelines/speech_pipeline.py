@@ -64,6 +64,17 @@ class SpeechPipeline:
             max_speakers=max_speakers,
         )
         segments = self.speaker_assigner.assign(transcription, diarization)
+        speakers = sorted({
+            segment.get("speaker")
+            for segment in segments
+            if segment.get("speaker")
+        })
+        logger.info(
+            "Final transcript has %d speakers across %d segments: %s",
+            len(speakers),
+            len(segments),
+            speakers,
+        )
         conversations = self._build_conversations(segments)
 
         result = {

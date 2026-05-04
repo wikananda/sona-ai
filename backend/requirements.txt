@@ -1,5 +1,5 @@
-transformers==4.48.1
-tokenizers==0.21.0
+transformers>=5.5.0
+tokenizers>=0.21.0
 peft==0.13.0
 torch==2.8.0
 torchvision==0.23.0
@@ -12,4 +12,7 @@ fastapi
 uvicorn
 python-multipart
 python-dotenv
+sqlalchemy>=2.0
+huggingface_hub
+llama-cpp-python
 nemo_toolkit[asr]
