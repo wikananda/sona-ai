@@ -14,38 +14,29 @@ logger = setup_logging()
 class Wav2Vec2Aligner:
     def __init__(self, config: dict):
         self.config = config
-        self.align_model = None
-        self.align_metadata = None
+        self.align_models = {}
         self.cache_dir = self._cache_dir()
 
     def load_models(self):
-        logger.info("Loading wav2vec2 alignment model...")
-        model_config = self.config["model"]
+        logger.info("Wav2Vec2 alignment models will load per language on first use.")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-        self.align_model, self.align_metadata = whisperx.load_align_model(
-            language_code=model_config["language"],
-            device=model_config["device"],
-            model_name=model_config["align_model"],
-            model_dir=str(self.cache_dir),
-        )
 
     def align(
         self,
         transcription: TranscriptionResult,
         audio_path: str,
     ) -> TranscriptionResult:
-        if self.align_model is None:
-            raise ReferenceError("Alignment model is not initialized.")
+        language = self._resolve_language(transcription.language)
+        align_model, align_metadata = self._get_align_model(language)
 
         audio = whisperx.load_audio(audio_path)
 
-        logger.info("Running alignment...")
+        logger.info("Running alignment with %s wav2vec2 model...", language)
         with Timer("Alignment"):
             aligned = whisperx.align(
                 transcription.to_segment_dicts(),
-                self.align_model,
-                self.align_metadata,
+                align_model,
+                align_metadata,
                 audio,
                 device=self.config["model"]["device"],
                 return_char_alignments=False,
@@ -60,16 +51,45 @@ class Wav2Vec2Aligner:
         cache_dir = self.config.get("cp_dir", {}).get("hf_cache", "cp/hf_cache")
         return PROJECT_ROOT / cache_dir
 
-    def cleanup_models(self):
-        if self.align_model is not None:
-            del self.align_model
+    def _get_align_model(self, language: str):
+        if language in self.align_models:
+            return self.align_models[language]
 
-        self.align_model = None
-        self.align_metadata = None
+        model_name = self._align_model_name(language)
+        logger.info("Loading %s alignment model: %s", language, model_name)
+        align_model, align_metadata = whisperx.load_align_model(
+            language_code=language,
+            device=self.config["model"]["device"],
+            model_name=model_name,
+            model_dir=str(self.cache_dir),
+        )
+        self.align_models[language] = (align_model, align_metadata)
+        return self.align_models[language]
+
+    def _align_model_name(self, language: str) -> str:
+        model_config = self.config["model"]
+        align_models = model_config.get("align_models", {})
+        return align_models.get(language) or model_config["align_model"]
+
+    def _resolve_language(self, language: str | None) -> str:
+        resolved = (language or self.config["model"].get("language") or "en").lower()
+        aliases = {
+            "eng": "en",
+            "english": "en",
+            "indonesian": "id",
+            "indonesia": "id",
+            "ind": "id",
+        }
+        return aliases.get(resolved, resolved)
+
+    def cleanup_models(self):
+        for align_model, _ in self.align_models.values():
+            del align_model
+
+        self.align_models = {}
         gc.collect()
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         elif torch.backends.mps.is_available():
             torch.mps.empty_cache()
-
