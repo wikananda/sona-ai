@@ -1,108 +1,120 @@
 "use client";
 
-import { useState } from "react";
-import AudioUploader from "@/src/components/AudioUploader";
-import TranscriptPanel from "@/src/components/TranscriptPanel";
-import SummaryPanel from "@/src/components/SummaryPanel";
-import { transcribeAudio, summarizeTranscript, SpeakerSegment } from "@/src/api/sonaApi";
-import sanitizeTranscript from "@/src/utils/sanitizeTranscript";
-
-const DEFAULT_LANG = {
-  label: "English",
-  code: "en",
-  flag: "🇺🇸",
-}
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import NewProjectForm from "@/src/components/NewProjectForm";
+import { createProject, deleteProject, listProjects, Project } from "@/src/api/sonaApi";
 
 export default function Home() {
-  // Upload form state
-  const [file, setFile] = useState<File | null>(null);
-  const [selectedLang, setSelectedLang] = useState(DEFAULT_LANG);
-  const [minSpeakers, setMinSpeakers] = useState<number | "">("");
-  const [maxSpeakers, setMaxSpeakers] = useState<number | "">("");
-  const [autoDetect, setAutoDetect] = useState(true);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState("");
 
-  // Result state
-  const [transcript, setTranscript] = useState<SpeakerSegment[]>([]);
-  const [summary, setSummary] = useState<string>("");
+  const refreshProjects = async () => {
+    setError("");
+    const data = await listProjects();
+    setProjects(data);
+  };
 
-  // Loading states
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [isSummarizing, setIsSummarizing] = useState(false);
+  useEffect(() => {
+    refreshProjects()
+      .catch((err) => setError(err.message))
+      .finally(() => setIsLoading(false));
+  }, []);
 
-  const handleTranscribe = async () => {
-    if (!file) return;
-
-    setIsTranscribing(true);
-    setTranscript([]);
-
+  const handleCreate = async (params: { name: string; description?: string }) => {
+    setIsCreating(true);
+    setError("");
     try {
-      const segments = await transcribeAudio({
-        file,
-        language: selectedLang.code,
-        minSpeakers: minSpeakers,
-        maxSpeakers: maxSpeakers,
-      });
-      setTranscript(segments);
-    } catch (error) {
-      console.error("Transcription failed:", error);
+      const project = await createProject(params);
+      setProjects((current) => [project, ...current]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create project");
     } finally {
-      setIsTranscribing(false);
+      setIsCreating(false);
     }
   };
 
-  const handleSummarize = async () => {
-    if (!transcript.length) return;
+  const handleDelete = async (projectId: string) => {
+    if (!window.confirm("Delete this project and all recordings?")) return;
 
-    setIsSummarizing(true);
-    setSummary("");
-
+    setError("");
     try {
-      const summary = await summarizeTranscript({
-        text: sanitizeTranscript(transcript),
-      })
-      setSummary(summary);
-    } catch (error) {
-      console.error("Summarization failed:", error);
-    } finally {
-      setIsSummarizing(false);
+      await deleteProject(projectId);
+      setProjects((current) => current.filter((project) => project.id !== projectId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete project");
     }
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center">
-      <div className="h-48 flex items-center">
-        <h1 className="text-4xl font-bold">Sona AI</h1>
-      </div>
+    <main className="min-h-screen bg-zinc-100 text-zinc-950">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-8">
+        <header className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold">Sona AI</h1>
+          <p className="text-sm text-zinc-600">Projects</p>
+        </header>
 
-      <div className="flex flex-col gap-8 w-full max-w-2xl mb-8">
-        <AudioUploader
-          file={file}
-          onFileChange={setFile}
-          selectedLang={selectedLang}
-          onLangChange={setSelectedLang}
-          minSpeakers={minSpeakers}
-          maxSpeakers={maxSpeakers}
-          autoDetect={autoDetect}
-          onMinSpeakersChange={setMinSpeakers}
-          onMaxSpeakersChange={setMaxSpeakers}
-          onAutoDetectChange={setAutoDetect}
-          onSubmit={handleTranscribe}
-          isLoading={isTranscribing}
-        />
+        <NewProjectForm onCreate={handleCreate} isCreating={isCreating} />
 
-        {transcript.length > 0 && (
-          <button
-            onClick={handleSummarize}
-            disabled={isSummarizing}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 hover:cursor-pointer disabled:bg-blue-200 disabled:cursor-not-allowed"
-          >
-            {isSummarizing ? "Summarizing..." : "Summarize"}
-          </button>
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {error}
+          </div>
         )}
 
-        <TranscriptPanel segments={transcript} />
-        <SummaryPanel summary={summary} isLoading={isSummarizing} />
+        <section className="rounded-lg border border-zinc-200 bg-white">
+          <div className="border-b border-zinc-200 px-4 py-3">
+            <h2 className="text-sm font-semibold">Recent projects</h2>
+          </div>
+
+          {isLoading && (
+            <div className="px-4 py-8 text-sm text-zinc-500">Loading projects...</div>
+          )}
+
+          {!isLoading && projects.length === 0 && (
+            <div className="px-4 py-10 text-sm text-zinc-500">
+              Create a project to start uploading recordings.
+            </div>
+          )}
+
+          <div className="divide-y divide-zinc-200">
+            {projects.map((project) => (
+              <div key={project.id} className="flex items-center justify-between gap-4 px-4 py-4">
+                <Link href={`/projects/${project.id}`} className="min-w-0 flex-1">
+                  <h3 className="truncate text-base font-medium text-zinc-950">
+                    {project.name}
+                  </h3>
+                  <p className="mt-1 truncate text-sm text-zinc-500">
+                    {project.description || "No description"}
+                  </p>
+                </Link>
+                <div className="flex items-center gap-4">
+                  <span className="hidden text-xs text-zinc-500 sm:inline">
+                    {formatDate(project.created_at)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(project.id)}
+                    className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:border-red-300 hover:text-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     </main>
-  )
+  );
+}
+
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
 }

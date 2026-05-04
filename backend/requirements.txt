@@ -12,4 +12,5 @@ fastapi
 uvicorn
 python-multipart
 python-dotenv
+sqlalchemy>=2.0
 nemo_toolkit[asr]

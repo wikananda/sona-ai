@@ -1,15 +1,48 @@
+import threading
 from typing import Optional
-
-from sona_ai.summarization import LocalLLMSummarizer
 
 
 class SummarizationService:
-    def __init__(self, summarizer: LocalLLMSummarizer):
-        self.summarizer = summarizer
+    def __init__(
+        self,
+        config: str = "llama",
+        use_pretrained: bool = True,
+        device: str = "auto",
+        max_new_tokens: int = 256,
+        num_beams: int = 4,
+    ):
+        self.config = config
+        self.use_pretrained = use_pretrained
+        self.device = device
+        self.max_new_tokens = max_new_tokens
+        self.num_beams = num_beams
+        self.summarizer = None
+        self._lock = threading.Lock()
 
     def summarize(self, text: str, prompt: Optional[str] = None, max_length: int = 2048) -> str:
-        return self.summarizer.generate(text, prompt, max_length=max_length)
+        summarizer = self._get_summarizer()
+        return summarizer.generate(text, prompt, max_length=max_length)
 
     def close(self):
-        self.summarizer.cleanup_models()
+        if self.summarizer is not None:
+            self.summarizer.cleanup_models()
+            self.summarizer = None
 
+    def _get_summarizer(self):
+        if self.summarizer is not None:
+            return self.summarizer
+
+        with self._lock:
+            if self.summarizer is not None:
+                return self.summarizer
+
+            from sona_ai.summarization import LocalLLMSummarizer
+
+            self.summarizer = LocalLLMSummarizer(
+                config=self.config,
+                use_pretrained=self.use_pretrained,
+                device=self.device,
+                max_new_tokens=self.max_new_tokens,
+                num_beams=self.num_beams,
+            )
+            return self.summarizer

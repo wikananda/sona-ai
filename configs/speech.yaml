@@ -1,6 +1,6 @@
 transcription:
-    engine: "whisperx"  # "whisperx" | "parakeet"
-    config: "whisperx"
+    engine: "parakeet"  # "whisperx" | "parakeet"
+    config: "parakeet"
 
 diarization:
     enabled: true
@@ -8,4 +8,3 @@ diarization:
 
 summarization:
     config: "llama"
-

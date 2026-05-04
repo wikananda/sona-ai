@@ -6,14 +6,19 @@ from sona_ai.pipelines.speaker_assignment import WhisperXSpeakerAssigner
 from sona_ai.pipelines.speech_pipeline import SpeechPipeline
 
 
-def build_speech_pipeline(config: Optional[dict] = None) -> SpeechPipeline:
+def build_speech_pipeline(
+    config: Optional[dict] = None,
+    engine: Optional[str] = None,
+    engine_config_name: Optional[str] = None,
+    write_outputs: bool = True,
+) -> SpeechPipeline:
     speech_config = config or load_config("speech")
     transcription_config = speech_config.get("transcription", {})
-    engine = os.getenv(
+    engine = (engine or os.getenv(
         "SONA_TRANSCRIPTION_ENGINE",
         transcription_config.get("engine", "whisperx"),
-    ).lower()
-    engine_config_name = os.getenv(
+    )).lower()
+    engine_config_name = engine_config_name or os.getenv(
         "SONA_TRANSCRIPTION_CONFIG",
         transcription_config.get("config", engine),
     )
@@ -42,6 +47,7 @@ def build_speech_pipeline(config: Optional[dict] = None) -> SpeechPipeline:
         aligner=aligner,
         diarizer=diarizer,
         speaker_assigner=WhisperXSpeakerAssigner(),
+        write_outputs=write_outputs,
     )
 
 

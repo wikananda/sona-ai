@@ -5,6 +5,8 @@ cp/*
 data/raw/audio/*
 data/raw/mediasum/*
 data/processed/*
+data/projects/*
+backend/data/*
 outputs/transcription/*
 outputs/summarization/*
 CLAUDE.md
@@ -14,5 +16,7 @@ CLAUDE.md
 !data/raw/audio/.gitkeep
 !data/raw/mediasum/.gitkeep
 !data/processed/.gitkeep
+!data/projects/.gitkeep
+!backend/data/.gitkeep
 !outputs/transcription/.gitkeep
 !outputs/summarization/.gitkeep
