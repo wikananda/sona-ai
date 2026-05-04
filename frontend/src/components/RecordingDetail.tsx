@@ -1,17 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import {
     Recording,
+    RetranscribeParams,
     RuntimeDevice,
     RuntimeDevices,
     summarizeTranscript,
     SummaryModel,
+    TranscriptionModel,
 } from "@/src/api/sonaApi";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import SummaryPanel from "@/src/components/SummaryPanel";
 import TranscriptPanel from "@/src/components/TranscriptPanel";
 import sanitizeTranscript from "@/src/utils/sanitizeTranscript";
+import {
+    deviceLabel,
+    numberOrEmpty,
+    TRANSCRIPTION_LANGUAGES,
+    TRANSCRIPTION_MODELS,
+} from "@/src/utils/transcriptionSettings";
 
 type DetailTab = "transcript" | "summary";
 
@@ -20,7 +28,10 @@ interface Props {
     isLoading: boolean;
     runtimeDevices: RuntimeDevices;
     isRetranscribing?: boolean;
-    onRetranscribe?: (recordingId: string) => void;
+    onRetranscribe?: (
+        recordingId: string,
+        settings: RetranscribeParams,
+    ) => Promise<void>;
     isRenamingSpeakers?: boolean;
     onRenameSpeakers?: (
         recordingId: string,
@@ -39,6 +50,16 @@ export default function RecordingDetail({
 }: Props) {
     const [activeTab, setActiveTab] = useState<DetailTab>("transcript");
     const [isSpeakerEditorOpen, setIsSpeakerEditorOpen] = useState(false);
+    const [isRetranscribeEditorOpen, setIsRetranscribeEditorOpen] = useState(false);
+    const [retranscribeLanguage, setRetranscribeLanguage] = useState("auto");
+    const [retranscribeModel, setRetranscribeModel] =
+        useState<TranscriptionModel>("parakeet");
+    const [retranscribeDevice, setRetranscribeDevice] =
+        useState<RuntimeDevice>(runtimeDevices.default);
+    const [retranscribeMinSpeakers, setRetranscribeMinSpeakers] =
+        useState<number | "">("");
+    const [retranscribeMaxSpeakers, setRetranscribeMaxSpeakers] =
+        useState<number | "">("");
     const [summary, setSummary] = useState("");
     const [summaryModel, setSummaryModel] = useState<SummaryModel>("qwen");
     const [summaryDevice, setSummaryDevice] = useState<RuntimeDevice>(runtimeDevices.default);
@@ -87,6 +108,43 @@ export default function RecordingDetail({
         setSummary("");
     };
 
+    const openRetranscribeEditor = () => {
+        const recordingDevice = runtimeDevices.available.includes(recording.device)
+            ? recording.device
+            : runtimeDevices.default;
+
+        setRetranscribeLanguage(recording.language_hint ?? "auto");
+        setRetranscribeModel(recording.model);
+        setRetranscribeDevice(recordingDevice);
+        setRetranscribeMinSpeakers(recording.min_speakers ?? "");
+        setRetranscribeMaxSpeakers(recording.max_speakers ?? "");
+        setIsRetranscribeEditorOpen(true);
+    };
+
+    const closeRetranscribeEditor = () => {
+        if (isRetranscribing) return;
+        setIsRetranscribeEditorOpen(false);
+    };
+
+    const handleRetranscribeSubmit = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!onRetranscribe) return;
+
+        const selectedDevice = runtimeDevices.available.includes(retranscribeDevice)
+            ? retranscribeDevice
+            : runtimeDevices.default;
+
+        await onRetranscribe(recording.id, {
+            language: retranscribeLanguage,
+            model: retranscribeModel,
+            device: selectedDevice,
+            minSpeakers: retranscribeMinSpeakers,
+            maxSpeakers: retranscribeMaxSpeakers,
+        });
+        setSummary("");
+        setIsRetranscribeEditorOpen(false);
+    };
+
     return (
         <section className="flex min-h-[520px] flex-col bg-white">
             <div className="border-b border-zinc-200 px-6 py-4">
@@ -119,7 +177,7 @@ export default function RecordingDetail({
                             <div>
                                 <button
                                     type="button"
-                                    onClick={() => onRetranscribe?.(recording.id)}
+                                    onClick={openRetranscribeEditor}
                                     disabled={isRetranscribing}
                                     className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
@@ -159,7 +217,7 @@ export default function RecordingDetail({
                                     {canRetranscribe && (
                                         <button
                                             type="button"
-                                            onClick={() => onRetranscribe?.(recording.id)}
+                                            onClick={openRetranscribeEditor}
                                             disabled={isRetranscribing}
                                             className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
@@ -196,6 +254,147 @@ export default function RecordingDetail({
                     </div>
                 )}
             </div>
+
+            {isRetranscribeEditorOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+                    <form
+                        onSubmit={handleRetranscribeSubmit}
+                        className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-xl"
+                    >
+                        <div className="flex items-start justify-between gap-4">
+                            <h3 className="text-base font-semibold text-zinc-950">
+                                Re-transcribe settings
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={closeRetranscribeEditor}
+                                disabled={isRetranscribing}
+                                className="text-sm font-medium text-zinc-500 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Close
+                            </button>
+                        </div>
+
+                        <div className="mt-5 grid gap-4 md:grid-cols-2">
+                            <label className="flex flex-col gap-1">
+                                <span className="text-xs font-medium text-zinc-500">
+                                    Language
+                                </span>
+                                <select
+                                    value={retranscribeLanguage}
+                                    onChange={(event) => setRetranscribeLanguage(event.target.value)}
+                                    disabled={isRetranscribing}
+                                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {TRANSCRIPTION_LANGUAGES.map((item) => (
+                                        <option key={item.value} value={item.value}>
+                                            {item.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+
+                            <label className="flex flex-col gap-1">
+                                <span className="text-xs font-medium text-zinc-500">
+                                    Model
+                                </span>
+                                <select
+                                    value={retranscribeModel}
+                                    onChange={(event) => setRetranscribeModel(
+                                        event.target.value as TranscriptionModel,
+                                    )}
+                                    disabled={isRetranscribing}
+                                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {TRANSCRIPTION_MODELS.map((item) => (
+                                        <option key={item.value} value={item.value}>
+                                            {item.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+
+                            <label className="flex flex-col gap-1">
+                                <span className="text-xs font-medium text-zinc-500">
+                                    Device
+                                </span>
+                                <select
+                                    value={
+                                        runtimeDevices.available.includes(retranscribeDevice)
+                                            ? retranscribeDevice
+                                            : runtimeDevices.default
+                                    }
+                                    onChange={(event) => setRetranscribeDevice(
+                                        event.target.value as RuntimeDevice,
+                                    )}
+                                    disabled={isRetranscribing}
+                                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {runtimeDevices.available.map((device) => (
+                                        <option key={device} value={device}>
+                                            {deviceLabel(device)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <label className="flex flex-col gap-1">
+                                    <span className="text-xs font-medium text-zinc-500">
+                                        Min speakers
+                                    </span>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={retranscribeMinSpeakers}
+                                        onChange={(event) => setRetranscribeMinSpeakers(
+                                            numberOrEmpty(event.target.value),
+                                        )}
+                                        disabled={isRetranscribing}
+                                        placeholder="Auto"
+                                        className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                    />
+                                </label>
+
+                                <label className="flex flex-col gap-1">
+                                    <span className="text-xs font-medium text-zinc-500">
+                                        Max speakers
+                                    </span>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={retranscribeMaxSpeakers}
+                                        onChange={(event) => setRetranscribeMaxSpeakers(
+                                            numberOrEmpty(event.target.value),
+                                        )}
+                                        disabled={isRetranscribing}
+                                        placeholder="Auto"
+                                        className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                    />
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={closeRetranscribeEditor}
+                                disabled={isRetranscribing}
+                                className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isRetranscribing}
+                                className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {isRetranscribing ? "Starting..." : "Start re-transcribe"}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
         </section>
     );
 }

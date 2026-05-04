@@ -26,6 +26,13 @@ export default function TranscriptPanel({
         ).sort(),
         [segments],
     );
+    const speakerColumnCh = useMemo(() => {
+        const longestSpeaker = speakers.reduce(
+            (longest, speaker) => Math.max(longest, speaker.length),
+            0,
+        );
+        return Math.min(Math.max(longestSpeaker + 1, 6), 20);
+    }, [speakers]);
     const [speakerError, setSpeakerError] = useState("");
 
     if (segments.length === 0) return null;
@@ -75,9 +82,12 @@ export default function TranscriptPanel({
                 {segments.map((segment, index) => (
                     <div
                         key={index}
-                        className="grid grid-cols-[112px_1fr] items-start gap-4 border-b border-zinc-100 py-3 last:border-b-0"
+                        style={{
+                            gridTemplateColumns: `${speakerColumnCh}ch minmax(0, 1fr)`,
+                        }}
+                        className="grid items-start gap-3 border-b border-zinc-100 py-3 last:border-b-0"
                     >
-                        <span className="text-sm font-bold leading-relaxed text-zinc-700">
+                        <span className="min-w-0 break-words text-sm font-bold leading-relaxed text-zinc-700">
                             {segment.speaker}
                         </span>
                         <p className="text-sm leading-relaxed text-zinc-700">

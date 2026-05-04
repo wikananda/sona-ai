@@ -10,6 +10,7 @@ import {
     getRuntimeDevices,
     Project,
     Recording,
+    RetranscribeParams,
     RuntimeDevice,
     RuntimeDevices,
     renameTranscriptSpeakers,
@@ -149,17 +150,19 @@ export default function ProjectDetailPage() {
         }
     };
 
-    const handleRetranscribeRecording = async (recordingId: string) => {
-        if (!window.confirm("Re-transcribe this recording with its current settings?")) return;
-
+    const handleRetranscribeRecording = async (
+        recordingId: string,
+        settings: RetranscribeParams,
+    ) => {
         setError("");
         setRetranscribingId(recordingId);
         try {
-            const recording = await retranscribeRecording(recordingId);
+            const recording = await retranscribeRecording(recordingId, settings);
             setSelectedRecording(recording);
             await refreshProject();
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to re-transcribe recording");
+            throw err;
         } finally {
             setRetranscribingId(undefined);
         }

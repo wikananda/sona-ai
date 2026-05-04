@@ -72,6 +72,14 @@ export interface UploadProjectRecordingParams extends TranscribeParams {
     projectId: string;
 }
 
+export interface RetranscribeParams {
+    language?: string;
+    model: TranscriptionModel;
+    device: RuntimeDevice;
+    minSpeakers?: number | "";
+    maxSpeakers?: number | "";
+}
+
 export interface SummarizeParams {
     text: string;
     prompt?: string;
@@ -127,9 +135,22 @@ export async function deleteRecording(recordingId: string): Promise<void> {
     await requestJson(`/recordings/${recordingId}`, { method: "DELETE" });
 }
 
-export async function retranscribeRecording(recordingId: string): Promise<Recording> {
+export async function retranscribeRecording(
+    recordingId: string,
+    params?: RetranscribeParams,
+): Promise<Recording> {
     return requestJson(`/recordings/${recordingId}/retranscribe`, {
         method: "POST",
+        headers: params ? { "Content-Type": "application/json" } : undefined,
+        body: params
+            ? JSON.stringify({
+                language: params.language ?? "auto",
+                model: params.model,
+                device: params.device,
+                min_speakers: emptyToNull(params.minSpeakers),
+                max_speakers: emptyToNull(params.maxSpeakers),
+            })
+            : undefined,
     });
 }
 
@@ -221,6 +242,11 @@ function appendSearchParam(
     if (value !== undefined && value !== "") {
         url.searchParams.append(key, String(value));
     }
+}
+
+function emptyToNull(value?: string | number | ""): number | null {
+    if (value === undefined || value === "") return null;
+    return Number(value);
 }
 
 async function errorMessage(response: Response, label: string): Promise<string> {

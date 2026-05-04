@@ -68,9 +68,17 @@ class PyannoteDiarizer:
                 max_speakers=max_s,
             )
         diarization_df = self._to_dataframe(diarization)
+        turns = self._build_turns(diarization_df)
+        speakers = sorted({turn.speaker for turn in turns})
+        logger.info(
+            "Diarization detected %d speakers across %d turns: %s",
+            len(speakers),
+            len(turns),
+            speakers,
+        )
 
         return DiarizationResult(
-            turns=self._build_turns(diarization_df),
+            turns=turns,
             raw=diarization_df,
         )
 

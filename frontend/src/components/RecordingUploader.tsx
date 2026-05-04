@@ -2,6 +2,12 @@
 
 import { FormEvent, useState } from "react";
 import { RuntimeDevice, RuntimeDevices, TranscriptionModel } from "@/src/api/sonaApi";
+import {
+    deviceLabel,
+    numberOrEmpty,
+    TRANSCRIPTION_LANGUAGES,
+    TRANSCRIPTION_MODELS,
+} from "@/src/utils/transcriptionSettings";
 
 interface Props {
     onUpload: (params: {
@@ -15,17 +21,6 @@ interface Props {
     isUploading: boolean;
     runtimeDevices: RuntimeDevices;
 }
-
-const LANGUAGES = [
-    { label: "Auto detect", value: "auto" },
-    { label: "English", value: "en" },
-    { label: "Indonesian", value: "id" },
-];
-
-const MODELS: { label: string; value: TranscriptionModel }[] = [
-    { label: "Parakeet", value: "parakeet" },
-    { label: "WhisperX", value: "whisperx" },
-];
 
 export default function RecordingUploader({ onUpload, isUploading, runtimeDevices }: Props) {
     const [files, setFiles] = useState<File[]>([]);
@@ -74,7 +69,7 @@ export default function RecordingUploader({ onUpload, isUploading, runtimeDevice
                     onChange={(event) => setLanguage(event.target.value)}
                     className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900"
                 >
-                    {LANGUAGES.map((item) => (
+                    {TRANSCRIPTION_LANGUAGES.map((item) => (
                         <option key={item.value} value={item.value}>
                             {item.label}
                         </option>
@@ -86,7 +81,7 @@ export default function RecordingUploader({ onUpload, isUploading, runtimeDevice
                     onChange={(event) => setModel(event.target.value as TranscriptionModel)}
                     className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900"
                 >
-                    {MODELS.map((item) => (
+                    {TRANSCRIPTION_MODELS.map((item) => (
                         <option key={item.value} value={item.value}>
                             {item.label}
                         </option>
@@ -168,19 +163,9 @@ export default function RecordingUploader({ onUpload, isUploading, runtimeDevice
     );
 }
 
-function numberOrEmpty(value: string): number | "" {
-    if (!value) return "";
-    return Math.max(1, Number.parseInt(value, 10));
-}
-
 function formatFileSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     const kb = bytes / 1024;
     if (kb < 1024) return `${kb.toFixed(1)} KB`;
     return `${(kb / 1024).toFixed(1)} MB`;
-}
-
-function deviceLabel(device: RuntimeDevice): string {
-    if (device === "auto") return "Auto device";
-    return device.toUpperCase();
 }

@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import (
     APIRouter,
     BackgroundTasks,
+    Body,
     Depends,
     File,
     Form,
@@ -15,8 +16,12 @@ from fastapi import (
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from sona_ai.api.schemas.projects import ProjectCreate, TranscriptSpeakerRename
-from sona_ai.core import setup_logging, validate_device_available
+from sona_ai.api.schemas.projects import (
+    ProjectCreate,
+    RecordingRetranscribe,
+    TranscriptSpeakerRename,
+)
+from sona_ai.core import PROJECT_ROOT, setup_logging, validate_device_available
 from sona_ai.db.models import Project, Recording, RecordingStatus
 from sona_ai.db.session import get_db
 from sona_ai.services.recording_worker import run_transcription
@@ -170,6 +175,7 @@ def retranscribe_recording(
     recording_id: str,
     request: Request,
     background_tasks: BackgroundTasks,
+    body: RecordingRetranscribe | None = Body(default=None),
     db: Session = Depends(get_db),
 ):
     recording = db.get(Recording, recording_id)
@@ -180,6 +186,22 @@ def retranscribe_recording(
             status_code=409,
             detail="Recording transcription is already running",
         )
+    if not (PROJECT_ROOT / recording.stored_path).is_file():
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Recording audio file is missing. Re-upload the audio before "
+                "running transcription again."
+            ),
+        )
+
+    if body is not None:
+        recording.language_hint = _normalize_language(body.language)
+        recording.model = _normalize_model(body.model or recording.model)
+        recording.device = _normalize_device(body.device or recording.device)
+        recording.min_speakers = body.min_speakers
+        recording.max_speakers = body.max_speakers
+        _validate_speakers(recording.min_speakers, recording.max_speakers)
 
     recording.status = RecordingStatus.PENDING
     recording.error = None
