@@ -69,7 +69,21 @@ def _build_diarizer(speech_config: dict):
     device = diarization_config.get("device")
     if device is not None:
         diarization_engine_config.setdefault("model", {})["device"] = device
-    return PyannoteDiarizer(diarization_engine_config)
+
+    engine = (
+        diarization_config.get("engine")
+        or diarization_engine_config.get("diarization", {}).get("engine")
+        or "pyannote"
+    )
+
+    if engine == "community_external":
+        from sona_ai.diarization import ExternalCommunityDiarizer
+        return ExternalCommunityDiarizer(diarization_engine_config)
+    elif engine == "pyannote":
+        from sona_ai.diarization import PyannoteDiarizer
+        return PyannoteDiarizer(diarization_engine_config)
+    else:
+        raise ValueError(f"Unsupported diarization engine: {engine}")
 
 
 def _set_diarization_device(speech_config: dict, device: str) -> None:

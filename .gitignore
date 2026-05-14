@@ -11,6 +11,7 @@ outputs/transcription/*
 outputs/summarization/*
 CLAUDE.md
 planning/*
+# tutorial/*
 
 !cp/.gitkeep
 !data/raw/audio/.gitkeep

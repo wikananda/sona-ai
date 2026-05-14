@@ -9,6 +9,11 @@ model:
     compute_type: "float32"
     batch_size: 8
 
+diarization:
+    enabled: true
+    config: "diarization-community"
+    engine: "community_external"
+
 input:
     audio_file: "data/raw/audio_indo.mp3"
     min_speakers: 2
