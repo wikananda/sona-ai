@@ -6,7 +6,7 @@ from typing import Optional
 from sona_ai.alignment.base import Aligner
 from sona_ai.core import PROJECT_ROOT, setup_logging, write_json
 from sona_ai.diarization.base import Diarizer
-from sona_ai.pipelines.speaker_assignment import WhisperXSpeakerAssigner
+from sona_ai.pipelines.speaker_assignment import SpeakerAssigner
 from sona_ai.transcription.base import Transcriber
 
 
@@ -20,13 +20,13 @@ class SpeechPipeline:
         transcriber: Transcriber,
         aligner: Optional[Aligner] = None,
         diarizer: Optional[Diarizer] = None,
-        speaker_assigner: Optional[WhisperXSpeakerAssigner] = None,
+        speaker_assigner: Optional[SpeakerAssigner] = None,
         write_outputs: bool = True,
     ):
         self.transcriber = transcriber
         self.aligner = aligner
         self.diarizer = diarizer
-        self.speaker_assigner = speaker_assigner or WhisperXSpeakerAssigner()
+        self.speaker_assigner = speaker_assigner or SpeakerAssigner()
         self.write_outputs = write_outputs
 
     def load_models(self):

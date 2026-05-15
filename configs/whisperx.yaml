@@ -15,7 +15,7 @@ diarization:
     engine: "community_external"
 
 input:
-    audio_file: "data/raw/audio_indo.mp3"
+    audio_file: "data/raw/audio/audio_indo.mp3"
     min_speakers: 2
     max_speakers: 2
 

@@ -1,7 +1,7 @@
-from .speaker_assignment import WhisperXSpeakerAssigner
+from .speaker_assignment import SpeakerAssigner
 from .speech_pipeline import SpeechPipeline
 
-__all__ = ["SpeechPipeline", "WhisperXSpeakerAssigner", "build_speech_pipeline"]
+__all__ = ["SpeechPipeline", "SpeakerAssigner", "build_speech_pipeline"]
 
 
 def __getattr__(name):
