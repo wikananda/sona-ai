@@ -90,6 +90,10 @@ export interface SummarizeParams {
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+export function recordingAudioUrl(recordingId: string): string {
+    return `${BASE_URL}/recordings/${recordingId}/audio`;
+}
+
 export async function createProject(params: {
     name: string;
     description?: string;

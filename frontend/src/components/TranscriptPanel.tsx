@@ -7,6 +7,8 @@ interface Props {
     onRenameSpeakers?: (speakers: Record<string, string>) => Promise<void>;
     isSpeakerEditorOpen?: boolean;
     onSpeakerEditorClose?: () => void;
+    activeSegmentIndex?: number;
+    onSeekToSegment?: (start: number) => void;
 }
 
 export default function TranscriptPanel({
@@ -15,6 +17,8 @@ export default function TranscriptPanel({
     onRenameSpeakers,
     isSpeakerEditorOpen = false,
     onSpeakerEditorClose,
+    activeSegmentIndex = -1,
+    onSeekToSegment,
 }: Props) {
     const speakers = useMemo(
         () => Array.from(
@@ -80,12 +84,21 @@ export default function TranscriptPanel({
         <div className="flex max-w-full flex-col">
             <div className="flex max-h-[520px] flex-col gap-1 overflow-y-auto pr-2">
                 {segments.map((segment, index) => (
-                    <div
+                    <button
                         key={index}
+                        type="button"
+                        onClick={() => onSeekToSegment?.(segment.start)}
+                        disabled={!onSeekToSegment}
                         style={{
                             gridTemplateColumns: `${speakerColumnCh}ch minmax(0, 1fr)`,
                         }}
-                        className="grid items-start gap-3 border-b border-zinc-100 py-3 last:border-b-0"
+                        className={`grid w-full items-start gap-3 border-b border-zinc-100 py-3 text-left transition-colors last:border-b-0 ${
+                            activeSegmentIndex === index
+                                ? "bg-zinc-100"
+                                : onSeekToSegment
+                                  ? "hover:bg-zinc-50"
+                                  : ""
+                        } ${onSeekToSegment ? "cursor-pointer" : "cursor-default"}`}
                     >
                         <span className="min-w-0 break-words text-sm font-bold leading-relaxed text-zinc-700">
                             {segment.speaker}
@@ -93,7 +106,7 @@ export default function TranscriptPanel({
                         <p className="text-sm leading-relaxed text-zinc-700">
                             {segment.text}
                         </p>
-                    </div>
+                    </button>
                 ))}
             </div>
 

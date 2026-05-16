@@ -2,7 +2,7 @@ model:
     whisper_model: "medium"
     align_model: "facebook/wav2vec2-base"
     align_models:
-        en: "facebook/wav2vec2-base"
+        en: "facebook/wav2vec2-base-960h"
         id: "indonesian-nlp/wav2vec2-large-xlsr-indonesian"
     language: null
     device: "cpu"

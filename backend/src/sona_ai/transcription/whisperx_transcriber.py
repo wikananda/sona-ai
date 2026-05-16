@@ -22,7 +22,6 @@ class WhisperXTranscriber:
         logger.info("Loading WhisperX transcription model...")
         model_config = self.config["model"]
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-
         self.model = whisperx.load_model(
             model_config["whisper_model"],
             language=model_config["language"],

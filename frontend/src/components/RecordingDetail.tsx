@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import {
+    recordingAudioUrl,
     Recording,
     RetranscribeParams,
     RuntimeDevice,
@@ -48,7 +49,9 @@ export default function RecordingDetail({
     isRenamingSpeakers = false,
     onRenameSpeakers,
 }: Props) {
+    const audioRef = useRef<HTMLAudioElement | null>(null);
     const [activeTab, setActiveTab] = useState<DetailTab>("transcript");
+    const [currentTime, setCurrentTime] = useState(0);
     const [isSpeakerEditorOpen, setIsSpeakerEditorOpen] = useState(false);
     const [isRetranscribeEditorOpen, setIsRetranscribeEditorOpen] = useState(false);
     const [retranscribeLanguage, setRetranscribeLanguage] = useState("auto");
@@ -77,6 +80,9 @@ export default function RecordingDetail({
     }
 
     const segments = recording.transcript?.segments ?? [];
+    const activeSegmentIndex = segments.findIndex(
+        (segment) => currentTime >= segment.start && currentTime < segment.end,
+    );
     const canRetranscribe =
         Boolean(onRetranscribe) &&
         (recording.status === "done" || recording.status === "failed");
@@ -106,6 +112,14 @@ export default function RecordingDetail({
 
         await onRenameSpeakers(recording.id, speakers);
         setSummary("");
+    };
+
+    const handleSeekToSegment = async (start: number) => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        audio.currentTime = start;
+        await audio.play().catch(() => undefined);
     };
 
     const openRetranscribeEditor = () => {
@@ -189,6 +203,18 @@ export default function RecordingDetail({
                 )}
                 {recording.status === "done" && (
                     <div className="flex flex-col gap-5">
+                        <audio
+                            key={recording.id}
+                            ref={audioRef}
+                            controls
+                            src={recordingAudioUrl(recording.id)}
+                            onTimeUpdate={(event) => {
+                                setCurrentTime(event.currentTarget.currentTime);
+                            }}
+                            onLoadedMetadata={() => setCurrentTime(0)}
+                            className="w-full"
+                        />
+
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200">
                             <div className="flex">
                                 <TabButton
@@ -235,6 +261,8 @@ export default function RecordingDetail({
                                 onRenameSpeakers={handleRenameSpeakers}
                                 isSpeakerEditorOpen={isSpeakerEditorOpen}
                                 onSpeakerEditorClose={() => setIsSpeakerEditorOpen(false)}
+                                activeSegmentIndex={activeSegmentIndex}
+                                onSeekToSegment={handleSeekToSegment}
                             />
                         )}
 

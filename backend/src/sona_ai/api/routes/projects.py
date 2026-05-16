@@ -13,6 +13,7 @@ from fastapi import (
     Request,
     UploadFile,
 )
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -168,6 +169,23 @@ def get_recording(recording_id: str, db: Session = Depends(get_db)):
     if recording is None:
         raise HTTPException(status_code=404, detail="Recording not found")
     return _serialize_recording(recording, include_transcript=True)
+
+
+@router.get("/recordings/{recording_id}/audio")
+def get_recording_audio(recording_id: str, db: Session = Depends(get_db)):
+    recording = db.get(Recording, recording_id)
+    if recording is None:
+        raise HTTPException(status_code=404, detail="Recording not found")
+
+    audio_path = (PROJECT_ROOT / recording.stored_path).resolve()
+    if not audio_path.is_file():
+        raise HTTPException(status_code=404, detail="Recording audio file not found")
+
+    return FileResponse(
+        audio_path,
+        media_type=recording.mime_type or "application/octet-stream",
+        filename=recording.original_name,
+    )
 
 
 @router.post("/recordings/{recording_id}/retranscribe")

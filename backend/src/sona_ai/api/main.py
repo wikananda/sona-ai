@@ -41,7 +41,7 @@ async def startup_event():
     
     logger.info("Loading models...")
     
-    speech_pipeline = build_speech_pipeline(speech_config, device="auto")
+    speech_pipeline = build_speech_pipeline(speech_config)
     speech_pipeline.load_models()
     app.state.transcription_service = TranscriptionService(
         speech_pipeline,
