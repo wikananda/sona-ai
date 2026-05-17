@@ -32,6 +32,29 @@ class PipelineProfile:
             resolve_device(self.device),
         )
 
+    def to_metadata(self) -> dict:
+        return {
+            "transcription": {
+                "engine": self.transcription_engine,
+                "config": self.transcription_config,
+            },
+            "alignment": {
+                "enabled": self.alignment_enabled,
+                "engine": self.alignment_engine,
+                "config": self.alignment_config,
+            },
+            "diarization": {
+                "enabled": self.diarization_enabled,
+                "engine": self.diarization_engine,
+                "config": self.diarization_config,
+            },
+            "runtime": {
+                "device": self.device,
+                "requested_device": self.device,
+                "resolved_device": resolve_device(self.device),
+            },
+        }
+
 def resolve_pipeline_profile(
     speech_config: dict,
     model: Optional[str] = None,

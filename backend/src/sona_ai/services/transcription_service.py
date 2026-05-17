@@ -66,13 +66,7 @@ class TranscriptionService:
         model: Optional[str],
         device: Optional[str],
     ) -> SpeechPipeline:
-        model_name = self._normalize_model(model or self.default_model)
-        device_name = validate_device_available(device or self.default_device)
-        profile = resolve_pipeline_profile(
-            self.speech_config,
-            model=model_name,
-            device=device_name
-        )
+        profile = self.resolve_profile(model, device)
         key = profile.cache_key()
         logger.info(
             "Building speech pipeline: transcription=%s/%s alignment=%s/%s/%s "
@@ -104,7 +98,7 @@ class TranscriptionService:
             profile_config = speech_config_for_profile(self.speech_config, profile)
             pipeline = build_speech_pipeline(
                 profile_config,
-                device=device_name,
+                device=profile.device,
             )
             pipeline.load_models()
             self._pipelines[key] = pipeline
@@ -116,6 +110,19 @@ class TranscriptionService:
             allowed = ", ".join(sorted(SUPPORTED_TRANSCRIPTION_MODELS))
             raise ValueError(f"Unsupported transcription model: {model}. Use one of: {allowed}")
         return model_name
+
+    def resolve_profile(
+        self,
+        model: Optional[str] = None,
+        device: Optional[str] = None,
+    ) -> PipelineProfile:
+        model_name = self._normalize_model(model or self.default_model)
+        device_name = validate_device_available(device or self.default_device)
+        return resolve_pipeline_profile(
+            self.speech_config,
+            model=model_name,
+            device=device_name,
+        )
 
     # def _cache_key(self, model: str, device: str) -> tuple[str, str]:
     #     return (model, resolve_device(device))
