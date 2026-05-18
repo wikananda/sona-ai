@@ -44,7 +44,7 @@ def _build_transcriber(
     transcription_config = speech_config.get("transcription", {})
     resolved_engine = (engine or os.getenv(
         "SONA_TRANSCRIPTION_ENGINE",
-        transcription_config.get("engine", "whisperx"),
+        transcription_config.get("engine", "parakeet"),
     )).lower()
     resolved_config_name = engine_config_name or os.getenv(
         "SONA_TRANSCRIPTION_CONFIG",
@@ -71,8 +71,7 @@ def _build_diarizer(speech_config: dict):
     if not diarization_config.get("enabled", True):
         return None
 
-    config_name = diarization_config.get("config", "whisperx")
-    from sona_ai.diarization import PyannoteDiarizer
+    config_name = diarization_config.get("config", "diarization-community")
 
     diarization_engine_config = deepcopy(load_config(config_name))
     device = diarization_config.get("device")
@@ -82,7 +81,7 @@ def _build_diarizer(speech_config: dict):
     engine = (
         diarization_config.get("engine")
         or diarization_engine_config.get("diarization", {}).get("engine")
-        or "pyannote"
+        or "community_external"
     )
     logger.info(f"Diarization engine: {engine}")
     if engine == "community_external":

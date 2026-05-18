@@ -36,7 +36,7 @@ def resolve_engine_config(speech_config: dict[str, Any]) -> dict[str, Any]:
     transcription_config = speech_config.get("transcription", {})
     engine = os.getenv(
         "SONA_TRANSCRIPTION_ENGINE",
-        transcription_config.get("engine", "whisperx"),
+        transcription_config.get("engine", "parakeet"),
     )
     config_name = os.getenv(
         "SONA_TRANSCRIPTION_CONFIG",
