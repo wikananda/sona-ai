@@ -13,6 +13,7 @@ from fastapi import (
     Request,
     UploadFile,
 )
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -23,8 +24,9 @@ from sona_ai.api.schemas.projects import (
     RecordingRetranscribe,
     TranscriptSpeakerRename,
 )
+from sona_ai.api.schemas.summarize import RecordingSummaryRequest
 from sona_ai.core import PROJECT_ROOT, setup_logging, validate_device_available
-from sona_ai.db.models import Project, Recording, RecordingStatus
+from sona_ai.db.models import Project, Recording, RecordingStatus, RecordingSummary
 from sona_ai.db.session import get_db
 from sona_ai.services.recording_worker import run_transcription
 from sona_ai.services.transcription_service import SUPPORTED_TRANSCRIPTION_MODELS
@@ -184,10 +186,78 @@ def get_recording(recording_id: str, db: Session = Depends(get_db)):
     recording = db.scalar(
         select(Recording)
         .where(Recording.id == recording_id)
-        .options(selectinload(Recording.transcript))
+        .options(
+            selectinload(Recording.transcript),
+            selectinload(Recording.summary),
+        )
     )
     if recording is None:
         raise HTTPException(status_code=404, detail="Recording not found")
+    return _serialize_recording(recording, include_transcript=True)
+
+
+@router.post("/recordings/{recording_id}/summary")
+async def summarize_recording(
+    recording_id: str,
+    request: Request,
+    body: RecordingSummaryRequest,
+    db: Session = Depends(get_db),
+):
+    recording = db.scalar(
+        select(Recording)
+        .where(Recording.id == recording_id)
+        .options(
+            selectinload(Recording.transcript),
+            selectinload(Recording.summary),
+        )
+    )
+    if recording is None:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    if recording.transcript is None:
+        raise HTTPException(status_code=404, detail="Transcript not found")
+
+    transcript_text = _summary_text_from_segments(
+        json.loads(recording.transcript.segments_json)
+    )
+    if not transcript_text:
+        raise HTTPException(status_code=400, detail="Transcript is empty")
+
+    try:
+        result = await run_in_threadpool(
+            request.app.state.summarization_service.summarize,
+            transcript_text,
+            body.prompt,
+            max_length=body.max_length,
+            model=body.model,
+            device=body.device,
+            mode=body.mode,
+            byok=body.byok.model_dump() if body.byok else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Error summarizing recording: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    summary = recording.summary
+    if summary is None:
+        summary = RecordingSummary(
+            id=str(uuid.uuid4()),
+            recording_id=recording.id,
+        )
+        recording.summary = summary
+        db.add(summary)
+
+    summary.text = result
+    summary.mode = body.mode
+    summary.model = body.model if body.mode == "local" else None
+    summary.device = body.device if body.mode == "local" else None
+    summary.provider = body.byok.provider if body.mode == "byok" and body.byok else None
+    summary.provider_model = body.byok.model if body.mode == "byok" and body.byok else None
+
+    db.commit()
+    db.refresh(recording)
+    db.refresh(summary)
     return _serialize_recording(recording, include_transcript=True)
 
 
@@ -243,6 +313,10 @@ def retranscribe_recording(
 
     recording.status = RecordingStatus.PENDING
     recording.error = None
+    if recording.summary is not None:
+        summary = recording.summary
+        recording.summary = None
+        db.delete(summary)
     db.commit()
     db.refresh(recording)
 
@@ -298,6 +372,10 @@ def rename_transcript_speakers(
                 segment["speaker"] = speaker_names[speaker]
 
         recording.transcript.segments_json = json.dumps(segments)
+        if recording.summary is not None:
+            summary = recording.summary
+            recording.summary = None
+            db.delete(summary)
         db.commit()
         db.refresh(recording)
         db.refresh(recording.transcript)
@@ -354,6 +432,7 @@ def _serialize_recording(recording: Recording, include_transcript: bool) -> dict
 
     if include_transcript:
         data["transcript"] = _serialize_transcript(recording)
+        data["summary"] = _serialize_summary(recording)
 
     return data
 
@@ -378,6 +457,41 @@ def _serialize_transcript(recording: Recording) -> Optional[dict]:
         "created_at": transcript.created_at.isoformat(),
         "updated_at": transcript.updated_at.isoformat(),
     }
+
+
+def _serialize_summary(recording: Recording) -> Optional[dict]:
+    summary = recording.summary
+    if summary is None:
+        return None
+
+    return {
+        "id": summary.id,
+        "recording_id": summary.recording_id,
+        "text": summary.text,
+        "mode": summary.mode,
+        "model": summary.model,
+        "device": summary.device,
+        "provider": summary.provider,
+        "provider_model": summary.provider_model,
+        "created_at": summary.created_at.isoformat(),
+        "updated_at": summary.updated_at.isoformat(),
+    }
+
+
+def _summary_text_from_segments(segments: list) -> str:
+    lines = []
+    for segment in segments:
+        if not isinstance(segment, dict):
+            continue
+
+        text = str(segment.get("text") or "").strip()
+        if not text:
+            continue
+
+        speaker = str(segment.get("speaker") or "Speaker").strip()
+        lines.append(f"{speaker}: {text}")
+
+    return "\n".join(lines)
 
 
 def _normalize_model(model: str) -> str:

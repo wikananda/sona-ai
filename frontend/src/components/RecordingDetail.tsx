@@ -1,13 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import {
     recordingAudioUrl,
     Recording,
+    RecordingSummaryParams,
     RetranscribeParams,
     RuntimeDevice,
     RuntimeDevices,
-    summarizeTranscript,
     SummaryModel,
     TranscriptionModel,
     SummaryMode,
@@ -16,7 +16,6 @@ import {
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import SummaryPanel from "@/src/components/SummaryPanel";
 import TranscriptPanel from "@/src/components/TranscriptPanel";
-import sanitizeTranscript from "@/src/utils/sanitizeTranscript";
 import {
     deviceLabel,
     isTranscriptionModel,
@@ -41,6 +40,11 @@ interface Props {
         recordingId: string,
         speakers: Record<string, string>,
     ) => Promise<void>;
+    isSummarizing?: boolean;
+    onSummarize?: (
+        recordingId: string,
+        settings: RecordingSummaryParams,
+    ) => Promise<void>;
 }
 
 export default function RecordingDetail({
@@ -51,9 +55,10 @@ export default function RecordingDetail({
     onRetranscribe,
     isRenamingSpeakers = false,
     onRenameSpeakers,
+    isSummarizing = false,
+    onSummarize,
 }: Props) {
     const audioRef = useRef<HTMLAudioElement | null>(null);
-    const activeRecordingIdRef = useRef<string | undefined>(undefined);
     const [activeTab, setActiveTab] = useState<DetailTab>("transcript");
     const [currentTime, setCurrentTime] = useState(0);
     const [isSpeakerEditorOpen, setIsSpeakerEditorOpen] = useState(false);
@@ -67,7 +72,6 @@ export default function RecordingDetail({
         useState<number | "">("");
     const [retranscribeMaxSpeakers, setRetranscribeMaxSpeakers] =
         useState<number | "">("");
-    const [summary, setSummary] = useState("");
     const [summaryModel, setSummaryModel] = useState<SummaryModel>("qwen");
     const [summaryDevice, setSummaryDevice] = useState<RuntimeDevice>(runtimeDevices.default);
     const [summaryMode, setSummaryMode] = useState<SummaryMode>("local");
@@ -75,19 +79,9 @@ export default function RecordingDetail({
     const [byokApiKey, setBYOKApiKey] = useState("");
     const [byokModel, setBYOKModel] = useState("gpt-4o-mini");
     const [byokBaseUrl, setBYOKBaseUrl] = useState("");
-    const [isSummarizing, setIsSummarizing] = useState(false);
     const selectedSummaryDevice = runtimeDevices.available.includes(summaryDevice)
         ? summaryDevice
         : runtimeDevices.default;
-
-    useEffect(() => {
-        activeRecordingIdRef.current = recording?.id;
-        setSummary("");
-        setCurrentTime(0);
-        setIsSummarizing(false);
-        setIsSpeakerEditorOpen(false);
-        setIsRetranscribeEditorOpen(false);
-    }, [recording?.id]);
 
     if (isLoading && !recording) {
         return <div className="p-6 text-sm text-zinc-500">Loading recording...</div>;
@@ -98,6 +92,7 @@ export default function RecordingDetail({
     }
 
     const segments = recording.transcript?.segments ?? [];
+    const summary = recording.summary?.text ?? "";
     const activeSegmentIndex = segments.findIndex(
         (segment) => currentTime >= segment.start && currentTime < segment.end,
     );
@@ -109,39 +104,25 @@ export default function RecordingDetail({
         segments.some((segment) => Boolean(segment.speaker));
 
     const handleSummarize = async () => {
-        if (!segments.length) return;
+        if (!onSummarize || !segments.length) return;
 
-        const recordingId = recording.id;
-        setIsSummarizing(true);
-        setSummary("");
-        try {
-            const nextSummary = await summarizeTranscript({
-                text: sanitizeTranscript(segments),
-                model: summaryModel,
-                device: selectedSummaryDevice,
-                mode: summaryMode,
-                byok: summaryMode === "byok" ? {
-                    provider: byokProvider,
-                    apiKey: byokApiKey,
-                    model: byokModel,
-                    baseUrl: byokBaseUrl,
-                } : undefined,
-            });
-            if (activeRecordingIdRef.current === recordingId) {
-                setSummary(nextSummary);
-            }
-        } finally {
-            if (activeRecordingIdRef.current === recordingId) {
-                setIsSummarizing(false);
-            }
-        }
+        await onSummarize(recording.id, {
+            model: summaryModel,
+            device: selectedSummaryDevice,
+            mode: summaryMode,
+            byok: summaryMode === "byok" ? {
+                provider: byokProvider,
+                apiKey: byokApiKey,
+                model: byokModel,
+                baseUrl: byokBaseUrl,
+            } : undefined,
+        });
     };
 
     const handleRenameSpeakers = async (speakers: Record<string, string>) => {
         if (!onRenameSpeakers) return;
 
         await onRenameSpeakers(recording.id, speakers);
-        setSummary("");
     };
 
     const handleSeekToSegment = async (start: number) => {
@@ -187,7 +168,6 @@ export default function RecordingDetail({
             minSpeakers: retranscribeMinSpeakers,
             maxSpeakers: retranscribeMaxSpeakers,
         });
-        setSummary("");
         setIsRetranscribeEditorOpen(false);
     };
 
@@ -318,7 +298,7 @@ export default function RecordingDetail({
                                 byokBaseUrl={byokBaseUrl}
                                 onBYOKBaseUrlChange={setBYOKBaseUrl}
                                 onSummarize={handleSummarize}
-                                canSummarize={segments.length > 0}
+                                canSummarize={Boolean(onSummarize) && segments.length > 0}
                             />
                         )}
                     </div>

@@ -45,6 +45,19 @@ export interface Transcript {
     updated_at: string;
 }
 
+export interface RecordingSummary {
+    id: string;
+    recording_id: string;
+    text: string;
+    mode: SummaryMode;
+    model?: string | null;
+    device?: RuntimeDevice | null;
+    provider?: BYOKProvider | null;
+    provider_model?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface Recording {
     id: string;
     project_id: string;
@@ -62,6 +75,7 @@ export interface Recording {
     created_at: string;
     updated_at: string;
     transcript?: Transcript | null;
+    summary?: RecordingSummary | null;
 }
 
 export interface TranscribeParams {
@@ -94,6 +108,15 @@ export interface BYOKSummarySettings {
 
 export interface SummarizeParams {
     text: string;
+    prompt?: string;
+    maxLength?: number;
+    mode?: SummaryMode;
+    model?: SummaryModel;
+    device?: RuntimeDevice;
+    byok?: BYOKSummarySettings;
+}
+
+export interface RecordingSummaryParams {
     prompt?: string;
     maxLength?: number;
     mode?: SummaryMode;
@@ -241,6 +264,31 @@ export async function summarizeTranscript(params: SummarizeParams): Promise<stri
     });
 
     return data.summary;
+}
+
+export async function summarizeRecording(
+    recordingId: string,
+    params: RecordingSummaryParams,
+): Promise<Recording> {
+    return requestJson(`/recordings/${recordingId}/summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            prompt: params.prompt,
+            max_length: params.maxLength,
+            mode: params.mode ?? "local",
+            model: params.model ?? "qwen",
+            device: params.device ?? "auto",
+            byok: params.byok
+                ? {
+                    provider: params.byok.provider,
+                    api_key: params.byok.apiKey,
+                    model: params.byok.model,
+                    base_url: params.byok.baseUrl,
+                }
+                : undefined,
+        }),
+    });
 }
 
 function buildRecordingFormData(params: TranscribeParams): FormData {

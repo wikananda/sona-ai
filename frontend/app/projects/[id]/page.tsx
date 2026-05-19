@@ -11,11 +11,13 @@ import {
     Project,
     Recording,
     renameRecording,
+    RecordingSummaryParams,
     RetranscribeParams,
     RuntimeDevice,
     RuntimeDevices,
     renameTranscriptSpeakers,
     retranscribeRecording,
+    summarizeRecording,
     TranscriptionModel,
     uploadProjectRecording,
 } from "@/src/api/sonaApi";
@@ -36,6 +38,7 @@ export default function ProjectDetailPage() {
     const [renamingRecordingId, setRenamingRecordingId] = useState<string>();
     const [retranscribingId, setRetranscribingId] = useState<string>();
     const [renamingSpeakerId, setRenamingSpeakerId] = useState<string>();
+    const [summarizingId, setSummarizingId] = useState<string>();
     const [runtimeDevices, setRuntimeDevices] = useState<RuntimeDevices>({
         default: "auto",
         available: ["auto", "cpu"],
@@ -213,6 +216,25 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleSummarizeRecording = async (
+        recordingId: string,
+        params: RecordingSummaryParams,
+    ) => {
+        setError("");
+        setSummarizingId(recordingId);
+        try {
+            const recording = await summarizeRecording(recordingId, params);
+            setSelectedRecording((current) =>
+                current?.id === recordingId ? recording : current,
+            );
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to summarize recording");
+            throw err;
+        } finally {
+            setSummarizingId(undefined);
+        }
+    };
+
     if (isLoadingProject) {
         return (
             <main className="min-h-screen bg-zinc-100 p-6 text-sm text-zinc-500">
@@ -266,6 +288,7 @@ export default function ProjectDetailPage() {
                         isRenaming={renamingRecordingId}
                     />
                     <RecordingDetail
+                        key={selectedRecording?.id ?? "empty-recording"}
                         recording={selectedRecording}
                         isLoading={isLoadingRecording}
                         runtimeDevices={runtimeDevices}
@@ -273,6 +296,8 @@ export default function ProjectDetailPage() {
                         onRetranscribe={handleRetranscribeRecording}
                         isRenamingSpeakers={renamingSpeakerId === selectedRecording?.id}
                         onRenameSpeakers={handleRenameTranscriptSpeakers}
+                        isSummarizing={summarizingId === selectedRecording?.id}
+                        onSummarize={handleSummarizeRecording}
                     />
                 </div>
             </div>

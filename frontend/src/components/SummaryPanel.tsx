@@ -76,10 +76,6 @@ export default function SummaryPanel({
     onSummarize,
     canSummarize,
 }: Props) {
-    const selectedModelDescription = SUMMARY_MODELS.find(
-        (model) => model.value === selectedModel,
-    )?.description;
-
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-col items-start justify-between gap-4">
@@ -238,10 +234,6 @@ export default function SummaryPanel({
                     </div>
                 </div>
             </div>
-
-            {/* {selectedModelDescription && (
-                <p className="break-all text-xs text-zinc-500">{selectedModelDescription}</p>
-            )} */}
 
             {!summary && !isLoading && (
                 <div className="rounded-md border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-500">

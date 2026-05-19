@@ -15,3 +15,12 @@ class SummarizeRequest(BaseModel):
     device: Optional[str] = "auto"
     mode: Literal["local", "byok"] = "local"
     byok: Optional[BYOKSummarizeSettings] = None
+
+
+class RecordingSummaryRequest(BaseModel):
+    prompt: Optional[str] = None
+    max_length: Optional[int] = None
+    model: Optional[str] = "qwen"
+    device: Optional[str] = "auto"
+    mode: Literal["local", "byok"] = "local"
+    byok: Optional[BYOKSummarizeSettings] = None
