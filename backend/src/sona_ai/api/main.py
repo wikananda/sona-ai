@@ -53,8 +53,6 @@ async def startup_event():
         config=speech_config.get("summarization", {}).get("config", "llama"),
         use_pretrained=True,
         device="auto",
-        max_new_tokens=256,
-        num_beams=4,
     )
     
     logger.info("Speech models loaded. Summarization model will load on first use.")

@@ -52,8 +52,13 @@ def _build_transcriber(
     )
 
     engine_config = deepcopy(load_config(resolved_config_name))
-    if device is not None:
-        resolved_device = device if resolved_engine == "faster_whisper" else resolve_device(device)
+    effective_device = device or transcription_config.get("device")
+    if effective_device is not None:
+        resolved_device = (
+            effective_device
+            if resolved_engine == "faster_whisper"
+            else resolve_device(effective_device)
+        )
         engine_config.setdefault("model", {})["device"] = resolved_device
     logger.info(f"Transcription engine: {resolved_engine}")
 
@@ -112,8 +117,9 @@ def _build_aligner(speech_config: dict, device: Optional[str]):
     
     config_name = alignment_config.get("config")
     aligner_config = deepcopy(load_config(config_name)) if config_name else {}
-    if device is not None:
-        aligner_config.setdefault("model", {})["device"] = resolve_device(device)
+    effective_device = device or alignment_config.get("device")
+    if effective_device is not None:
+        aligner_config.setdefault("model", {})["device"] = resolve_device(effective_device)
     
     if engine in {"wav2vec2", "wav2vec2_external"}:
         from sona_ai.alignment import ExternalWav2Vec2Aligner

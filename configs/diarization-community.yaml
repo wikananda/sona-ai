@@ -1,6 +1,3 @@
-model:
-    device: "cpu"
-
 input:
     min_speakers: 1
     max_speakers: 5

@@ -1,7 +1,6 @@
 model:
     model_name: "large-v3"
     language: null
-    device: "cpu"
     compute_type: null
     cpu_threads: 0
     num_workers: 1

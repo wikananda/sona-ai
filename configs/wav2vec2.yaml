@@ -4,7 +4,6 @@ model:
         en: "facebook/wav2vec2-base-960h"
         id: "indonesian-nlp/wav2vec2-large-xlsr-indonesian"
     language: null
-    device: "cpu"
 
 cp_dir:
     hf_cache: "cp/hf_cache"
