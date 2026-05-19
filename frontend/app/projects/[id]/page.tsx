@@ -285,7 +285,7 @@ export default function ProjectDetailPage() {
                         onSelect={setSelectedRecordingId}
                         onDelete={handleDeleteRecording}
                         onRename={handleRenameRecording}
-                        isRenaming={renamingRecordingId}
+                        renamingId={renamingRecordingId}
                     />
                     <RecordingDetail
                         key={selectedRecording?.id ?? "empty-recording"}
