@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
     recordingAudioUrl,
     Recording,
@@ -53,6 +53,7 @@ export default function RecordingDetail({
     onRenameSpeakers,
 }: Props) {
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const activeRecordingIdRef = useRef<string | undefined>(undefined);
     const [activeTab, setActiveTab] = useState<DetailTab>("transcript");
     const [currentTime, setCurrentTime] = useState(0);
     const [isSpeakerEditorOpen, setIsSpeakerEditorOpen] = useState(false);
@@ -79,6 +80,15 @@ export default function RecordingDetail({
         ? summaryDevice
         : runtimeDevices.default;
 
+    useEffect(() => {
+        activeRecordingIdRef.current = recording?.id;
+        setSummary("");
+        setCurrentTime(0);
+        setIsSummarizing(false);
+        setIsSpeakerEditorOpen(false);
+        setIsRetranscribeEditorOpen(false);
+    }, [recording?.id]);
+
     if (isLoading && !recording) {
         return <div className="p-6 text-sm text-zinc-500">Loading recording...</div>;
     }
@@ -101,6 +111,7 @@ export default function RecordingDetail({
     const handleSummarize = async () => {
         if (!segments.length) return;
 
+        const recordingId = recording.id;
         setIsSummarizing(true);
         setSummary("");
         try {
@@ -116,9 +127,13 @@ export default function RecordingDetail({
                     baseUrl: byokBaseUrl,
                 } : undefined,
             });
-            setSummary(nextSummary);
+            if (activeRecordingIdRef.current === recordingId) {
+                setSummary(nextSummary);
+            }
         } finally {
-            setIsSummarizing(false);
+            if (activeRecordingIdRef.current === recordingId) {
+                setIsSummarizing(false);
+            }
         }
     };
 

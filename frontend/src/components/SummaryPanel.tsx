@@ -239,9 +239,9 @@ export default function SummaryPanel({
                 </div>
             </div>
 
-            {selectedModelDescription && (
+            {/* {selectedModelDescription && (
                 <p className="break-all text-xs text-zinc-500">{selectedModelDescription}</p>
-            )}
+            )} */}
 
             {!summary && !isLoading && (
                 <div className="rounded-md border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-500">
