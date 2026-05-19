@@ -6,7 +6,10 @@ export interface SpeakerSegment {
 }
 
 export type RecordingStatus = "pending" | "processing" | "done" | "failed";
-export type TranscriptionModel = "parakeet";
+export type TranscriptionModel =
+    | "parakeet"
+    | "faster-whisper-large-v3"
+    | "faster-whisper-turbo";
 export type SummaryModel = "qwen" | "llama" | "gemma";
 export type RuntimeDevice = "auto" | "cpu" | "mps" | "cuda";
 

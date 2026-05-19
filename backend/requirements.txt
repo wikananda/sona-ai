@@ -11,6 +11,7 @@ pyannote-core==6.0.1
 pyannote-metrics==3.2.1
 pyyaml
 fastapi
+faster-whisper==1.2.1
 uvicorn
 python-multipart
 python-dotenv

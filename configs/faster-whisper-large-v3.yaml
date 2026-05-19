@@ -1,0 +1,14 @@
+model:
+    model_name: "large-v3"
+    language: null
+    device: "cpu"
+    compute_type: null
+    cpu_threads: 0
+    num_workers: 1
+    task: "transcribe"
+    beam_size: 5
+    vad_filter: false
+    word_timestamps: false
+
+cp_dir:
+    hf_cache: "cp/hf_cache"

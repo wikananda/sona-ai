@@ -17,6 +17,7 @@ import TranscriptPanel from "@/src/components/TranscriptPanel";
 import sanitizeTranscript from "@/src/utils/sanitizeTranscript";
 import {
     deviceLabel,
+    isTranscriptionModel,
     numberOrEmpty,
     TRANSCRIPTION_LANGUAGES,
     TRANSCRIPTION_MODELS,
@@ -128,7 +129,9 @@ export default function RecordingDetail({
             : runtimeDevices.default;
 
         setRetranscribeLanguage(recording.language_hint ?? "auto");
-        setRetranscribeModel("parakeet");
+        setRetranscribeModel(
+            isTranscriptionModel(recording.model) ? recording.model : "parakeet",
+        );
         setRetranscribeDevice(recordingDevice);
         setRetranscribeMinSpeakers(recording.min_speakers ?? "");
         setRetranscribeMaxSpeakers(recording.max_speakers ?? "");

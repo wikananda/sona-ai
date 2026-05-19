@@ -4,6 +4,14 @@ from copy import deepcopy
 
 from sona_ai.core import resolve_device
 
+
+TRANSCRIPTION_MODEL_PROFILES = {
+    "parakeet": ("parakeet", "parakeet"),
+    "faster-whisper-large-v3": ("faster_whisper", "faster-whisper-large-v3"),
+    "faster-whisper-turbo": ("faster_whisper", "faster-whisper-turbo"),
+}
+
+
 @dataclass(frozen=True)
 class PipelineProfile:
     transcription_engine: str
@@ -66,11 +74,12 @@ def resolve_pipeline_profile(
     alignment = config.get("alignment", {})
     diarization = config.get("diarization", {})
 
-    transcription_engine = (model or transcription.get("engine", "parakeet")).lower()
-    transcription_config = transcription.get("config", transcription_engine)
-
-    if model is not None:
-        transcription_config = transcription_engine
+    requested_model = (model or transcription.get("engine", "parakeet")).lower()
+    if requested_model in TRANSCRIPTION_MODEL_PROFILES:
+        transcription_engine, transcription_config = TRANSCRIPTION_MODEL_PROFILES[requested_model]
+    else:
+        transcription_engine = requested_model
+        transcription_config = transcription.get("config", transcription_engine)
 
     alignment_enabled = bool(alignment.get("enabled", False))
     alignment_engine = alignment.get("engine", "none").lower()

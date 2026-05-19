@@ -5,12 +5,13 @@ from sona_ai.core import load_config, validate_device_available, setup_logging
 from sona_ai.pipelines import SpeechPipeline, build_speech_pipeline
 from sona_ai.services.pipeline_profile import (
     PipelineProfile,
+    TRANSCRIPTION_MODEL_PROFILES,
     resolve_pipeline_profile,
     speech_config_for_profile,
 )
 
 
-SUPPORTED_TRANSCRIPTION_MODELS = {"parakeet"}
+SUPPORTED_TRANSCRIPTION_MODELS = set(TRANSCRIPTION_MODEL_PROFILES)
 
 logger = setup_logging()
 

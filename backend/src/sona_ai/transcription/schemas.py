@@ -104,6 +104,30 @@ class TranscriptionResult:
             raw=raw,
         )
 
+    @classmethod
+    def from_faster_whisper_result(
+        cls,
+        segments: list[Any],
+        info: Any,
+        language: Optional[str] = None,
+    ) -> "TranscriptionResult":
+        transcript_segments = [
+            _segment_from_faster_whisper(segment)
+            for segment in segments
+        ]
+        detected_language = language or getattr(info, "language", None)
+        raw = {
+            "language": detected_language,
+            "language_probability": getattr(info, "language_probability", None),
+            "duration": getattr(info, "duration", None),
+            "segments": [segment.to_dict() for segment in transcript_segments],
+        }
+        return cls(
+            segments=transcript_segments,
+            language=detected_language,
+            raw=raw,
+        )
+
     def to_segment_dicts(self) -> list[dict[str, Any]]:
         return [segment.to_dict() for segment in self.segments]
 
@@ -175,6 +199,24 @@ def _segment_from_stamp(
         start=start,
         end=end,
         words=segment_words,
+    )
+
+
+def _segment_from_faster_whisper(segment: Any) -> TranscriptSegment:
+    words = [
+        WordSegment(
+            word=str(getattr(word, "word", "")),
+            start=getattr(word, "start", None),
+            end=getattr(word, "end", None),
+            score=getattr(word, "probability", None),
+        )
+        for word in (getattr(segment, "words", None) or [])
+    ]
+    return TranscriptSegment(
+        text=str(getattr(segment, "text", "")).strip(),
+        start=float(getattr(segment, "start", 0.0) or 0.0),
+        end=float(getattr(segment, "end", 0.0) or 0.0),
+        words=words,
     )
 
 

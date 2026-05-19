@@ -19,7 +19,13 @@ export const TRANSCRIPTION_MODELS: {
     value: TranscriptionModel;
 }[] = [
     { label: "Parakeet", value: "parakeet" },
+    { label: "Whisper Large-v3", value: "faster-whisper-large-v3" },
+    { label: "Whisper Large-v3 Turbo", value: "faster-whisper-turbo" },
 ];
+
+export function isTranscriptionModel(value: string): value is TranscriptionModel {
+    return TRANSCRIPTION_MODELS.some((item) => item.value === value);
+}
 
 export function numberOrEmpty(value: string): number | "" {
     if (!value) return "";
