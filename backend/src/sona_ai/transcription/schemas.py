@@ -69,7 +69,7 @@ class TranscriptionResult:
     raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_whisperx_result(cls, result: dict[str, Any]) -> "TranscriptionResult":
+    def from_aligned_result(cls, result: dict[str, Any]) -> "TranscriptionResult":
         return cls(
             segments=[
                 TranscriptSegment.from_dict(segment)
@@ -101,6 +101,30 @@ class TranscriptionResult:
         return cls(
             segments=segments,
             language=language,
+            raw=raw,
+        )
+
+    @classmethod
+    def from_faster_whisper_result(
+        cls,
+        segments: list[Any],
+        info: Any,
+        language: Optional[str] = None,
+    ) -> "TranscriptionResult":
+        transcript_segments = [
+            _segment_from_faster_whisper(segment)
+            for segment in segments
+        ]
+        detected_language = language or getattr(info, "language", None)
+        raw = {
+            "language": detected_language,
+            "language_probability": getattr(info, "language_probability", None),
+            "duration": getattr(info, "duration", None),
+            "segments": [segment.to_dict() for segment in transcript_segments],
+        }
+        return cls(
+            segments=transcript_segments,
+            language=detected_language,
             raw=raw,
         )
 
@@ -175,6 +199,24 @@ def _segment_from_stamp(
         start=start,
         end=end,
         words=segment_words,
+    )
+
+
+def _segment_from_faster_whisper(segment: Any) -> TranscriptSegment:
+    words = [
+        WordSegment(
+            word=str(getattr(word, "word", "")),
+            start=getattr(word, "start", None),
+            end=getattr(word, "end", None),
+            score=getattr(word, "probability", None),
+        )
+        for word in (getattr(segment, "words", None) or [])
+    ]
+    return TranscriptSegment(
+        text=str(getattr(segment, "text", "")).strip(),
+        start=float(getattr(segment, "start", 0.0) or 0.0),
+        end=float(getattr(segment, "end", 0.0) or 0.0),
+        words=words,
     )
 
 

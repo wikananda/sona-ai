@@ -90,6 +90,12 @@ class Recording(Base):
         passive_deletes=True,
         uselist=False,
     )
+    summary: Mapped[Optional["RecordingSummary"]] = relationship(
+        back_populates="recording",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
 
 
 class Transcript(Base):
@@ -121,3 +127,35 @@ class Transcript(Base):
     )
 
     recording: Mapped[Recording] = relationship(back_populates="transcript")
+
+
+class RecordingSummary(Base):
+    __tablename__ = "recording_summaries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    recording_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("recordings.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    mode: Mapped[str] = mapped_column(String(32), nullable=False, default="local")
+    model: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    device: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    provider: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    provider_model: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+
+    recording: Mapped[Recording] = relationship(back_populates="summary")

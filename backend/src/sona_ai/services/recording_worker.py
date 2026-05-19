@@ -21,6 +21,11 @@ def run_transcription(recording_id: str, transcription_service: TranscriptionSer
 
         _set_status(db, recording, RecordingStatus.PROCESSING)
 
+        profile = transcription_service.resolve_profile(
+            model=recording.model,
+            device=recording.device,
+        )
+
         result = transcription_service.transcribe(
             str(PROJECT_ROOT / recording.stored_path),
             language=recording.language_hint,
@@ -31,20 +36,32 @@ def run_transcription(recording_id: str, transcription_service: TranscriptionSer
         )
 
         transcript_segments = sanitize_for_json(result.get("transcript", []))
+        # transcript = Transcript(
+        #     id=str(uuid.uuid4()),
+        #     recording_id=recording.id,
+        #     segments_json=json.dumps(transcript_segments),
+        #     language=recording.language_hint,
+        #     transcription_engine=recording.model,
+        #     diarization_engine="pyannote",
+        #     model_config_json=json.dumps({
+        #         "model": recording.model,
+        #         "device": recording.device,
+        #         "language": recording.language_hint,
+        #         "min_speakers": recording.min_speakers,
+        #         "max_speakers": recording.max_speakers,
+        #     }),
+        # )
         transcript = Transcript(
             id=str(uuid.uuid4()),
             recording_id=recording.id,
             segments_json=json.dumps(transcript_segments),
             language=recording.language_hint,
-            transcription_engine=recording.model,
-            diarization_engine="pyannote",
-            model_config_json=json.dumps({
-                "model": recording.model,
-                "device": recording.device,
-                "language": recording.language_hint,
-                "min_speakers": recording.min_speakers,
-                "max_speakers": recording.max_speakers,
-            }),
+            transcription_engine=profile.transcription_engine,
+            diarization_engine=(
+                profile.diarization_engine if profile.diarization_enabled
+                else None
+            ),
+            model_config_json=json.dumps(_transcript_metadata(profile, recording)),
         )
 
         if recording.transcript is not None:
@@ -78,3 +95,15 @@ def _mark_failed(db: Session, recording_id: str, error: str) -> None:
     recording.status = RecordingStatus.FAILED
     recording.error = error
     db.commit()
+
+def _transcript_metadata(
+    profile,
+    recording: Recording,
+) -> dict:
+    metadata = profile.to_metadata()
+    metadata["runtime"].update({
+        "language": recording.language_hint,
+        "min_speakers": recording.min_speakers,
+        "max_speakers": recording.max_speakers,
+    })
+    return metadata

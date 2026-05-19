@@ -41,7 +41,7 @@ async def startup_event():
     
     logger.info("Loading models...")
     
-    speech_pipeline = build_speech_pipeline(speech_config, device="auto")
+    speech_pipeline = build_speech_pipeline(speech_config)
     speech_pipeline.load_models()
     app.state.transcription_service = TranscriptionService(
         speech_pipeline,
@@ -53,8 +53,6 @@ async def startup_event():
         config=speech_config.get("summarization", {}).get("config", "llama"),
         use_pretrained=True,
         device="auto",
-        max_new_tokens=256,
-        num_beams=4,
     )
     
     logger.info("Speech models loaded. Summarization model will load on first use.")

@@ -8,4 +8,10 @@ def __getattr__(name):
         from .pyannote_diarizer import PyannoteDiarizer
 
         return PyannoteDiarizer
+
+    if name == "ExternalCommunityDiarizer":
+        from .external_community_diarizer import ExternalCommunityDiarizer
+
+        return ExternalCommunityDiarizer
+        
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

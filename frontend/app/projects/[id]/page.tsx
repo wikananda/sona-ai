@@ -10,11 +10,14 @@ import {
     getRuntimeDevices,
     Project,
     Recording,
+    renameRecording,
+    RecordingSummaryParams,
     RetranscribeParams,
     RuntimeDevice,
     RuntimeDevices,
     renameTranscriptSpeakers,
     retranscribeRecording,
+    summarizeRecording,
     TranscriptionModel,
     uploadProjectRecording,
 } from "@/src/api/sonaApi";
@@ -32,8 +35,10 @@ export default function ProjectDetailPage() {
     const [isLoadingProject, setIsLoadingProject] = useState(true);
     const [isLoadingRecording, setIsLoadingRecording] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [renamingRecordingId, setRenamingRecordingId] = useState<string>();
     const [retranscribingId, setRetranscribingId] = useState<string>();
     const [renamingSpeakerId, setRenamingSpeakerId] = useState<string>();
+    const [summarizingId, setSummarizingId] = useState<string>();
     const [runtimeDevices, setRuntimeDevices] = useState<RuntimeDevices>({
         default: "auto",
         available: ["auto", "cpu"],
@@ -150,6 +155,32 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleRenameRecording = async (recordingId: string, name: string) => {
+        setError("");
+        setRenamingRecordingId(recordingId);
+        try {
+            const updated = await renameRecording(recordingId, name);
+            setProject((current) => {
+                if (!current?.recordings) return current;
+                return {
+                    ...current,
+                    recordings: current.recordings.map((recording) =>
+                        recording.id === recordingId ? { ...recording, ...updated} : recording,
+                    ),
+                };
+            });
+
+            setSelectedRecording((current) => 
+                current?.id === recordingId ? { ...current, ...updated } : current,
+            );
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to rename recording");
+            throw err;
+        } finally {
+            setRenamingRecordingId(undefined);
+        }
+    };
+
     const handleRetranscribeRecording = async (
         recordingId: string,
         settings: RetranscribeParams,
@@ -182,6 +213,25 @@ export default function ProjectDetailPage() {
             throw err;
         } finally {
             setRenamingSpeakerId(undefined);
+        }
+    };
+
+    const handleSummarizeRecording = async (
+        recordingId: string,
+        params: RecordingSummaryParams,
+    ) => {
+        setError("");
+        setSummarizingId(recordingId);
+        try {
+            const recording = await summarizeRecording(recordingId, params);
+            setSelectedRecording((current) =>
+                current?.id === recordingId ? recording : current,
+            );
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to summarize recording");
+            throw err;
+        } finally {
+            setSummarizingId(undefined);
         }
     };
 
@@ -234,8 +284,11 @@ export default function ProjectDetailPage() {
                         selectedId={selectedRecordingId}
                         onSelect={setSelectedRecordingId}
                         onDelete={handleDeleteRecording}
+                        onRename={handleRenameRecording}
+                        isRenaming={renamingRecordingId}
                     />
                     <RecordingDetail
+                        key={selectedRecording?.id ?? "empty-recording"}
                         recording={selectedRecording}
                         isLoading={isLoadingRecording}
                         runtimeDevices={runtimeDevices}
@@ -243,6 +296,8 @@ export default function ProjectDetailPage() {
                         onRetranscribe={handleRetranscribeRecording}
                         isRenamingSpeakers={renamingSpeakerId === selectedRecording?.id}
                         onRenameSpeakers={handleRenameTranscriptSpeakers}
+                        isSummarizing={summarizingId === selectedRecording?.id}
+                        onSummarize={handleSummarizeRecording}
                     />
                 </div>
             </div>

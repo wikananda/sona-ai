@@ -17,6 +17,8 @@ async def summarize(request: Request, body: SummarizeRequest):
             max_length=body.max_length,
             model=body.model,
             device=body.device,
+            mode=body.mode,
+            byok=body.byok.model_dump() if body.byok else None,
         )
         return {"summary": result}
     except ValueError as e:

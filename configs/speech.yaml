@@ -1,10 +1,19 @@
 transcription:
-    engine: "parakeet"  # "whisperx" | "parakeet"
+    engine: "parakeet"
     config: "parakeet"
+    device: "auto"
+
+alignment:
+    enabled: true
+    engine: "wav2vec2_external"
+    config: "wav2vec2"
+    device: "cpu"
 
 diarization:
     enabled: true
-    config: "whisperx"
+    engine: "community_external"
+    config: "diarization-community"
+    device: "cpu"
 
 summarization:
     config: "qwen"

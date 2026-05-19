@@ -19,7 +19,7 @@ def setup_logging():
 def sanitize_for_json(obj):
     """
     Make JSON safe and ready output.
-    Result from whisperx may contain numpy data or NaN type which is not JSON serializable.
+    Model outputs may contain numpy data or NaN type which is not JSON serializable.
     This function will convert numpy data to Python data and NaN to None.
 
     obj: object to make JSON safe (result['segments'])

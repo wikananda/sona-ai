@@ -1,21 +1,24 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import {
+    recordingAudioUrl,
     Recording,
+    RecordingSummaryParams,
     RetranscribeParams,
     RuntimeDevice,
     RuntimeDevices,
-    summarizeTranscript,
     SummaryModel,
     TranscriptionModel,
+    SummaryMode,
+    BYOKProvider,
 } from "@/src/api/sonaApi";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import SummaryPanel from "@/src/components/SummaryPanel";
 import TranscriptPanel from "@/src/components/TranscriptPanel";
-import sanitizeTranscript from "@/src/utils/sanitizeTranscript";
 import {
     deviceLabel,
+    isTranscriptionModel,
     numberOrEmpty,
     TRANSCRIPTION_LANGUAGES,
     TRANSCRIPTION_MODELS,
@@ -37,6 +40,11 @@ interface Props {
         recordingId: string,
         speakers: Record<string, string>,
     ) => Promise<void>;
+    isSummarizing?: boolean;
+    onSummarize?: (
+        recordingId: string,
+        settings: RecordingSummaryParams,
+    ) => Promise<void>;
 }
 
 export default function RecordingDetail({
@@ -47,8 +55,12 @@ export default function RecordingDetail({
     onRetranscribe,
     isRenamingSpeakers = false,
     onRenameSpeakers,
+    isSummarizing = false,
+    onSummarize,
 }: Props) {
+    const audioRef = useRef<HTMLAudioElement | null>(null);
     const [activeTab, setActiveTab] = useState<DetailTab>("transcript");
+    const [currentTime, setCurrentTime] = useState(0);
     const [isSpeakerEditorOpen, setIsSpeakerEditorOpen] = useState(false);
     const [isRetranscribeEditorOpen, setIsRetranscribeEditorOpen] = useState(false);
     const [retranscribeLanguage, setRetranscribeLanguage] = useState("auto");
@@ -60,10 +72,13 @@ export default function RecordingDetail({
         useState<number | "">("");
     const [retranscribeMaxSpeakers, setRetranscribeMaxSpeakers] =
         useState<number | "">("");
-    const [summary, setSummary] = useState("");
     const [summaryModel, setSummaryModel] = useState<SummaryModel>("qwen");
     const [summaryDevice, setSummaryDevice] = useState<RuntimeDevice>(runtimeDevices.default);
-    const [isSummarizing, setIsSummarizing] = useState(false);
+    const [summaryMode, setSummaryMode] = useState<SummaryMode>("local");
+    const [byokProvider, setBYOKProvider] = useState<BYOKProvider>("openai");
+    const [byokApiKey, setBYOKApiKey] = useState("");
+    const [byokModel, setBYOKModel] = useState("gpt-4o-mini");
+    const [byokBaseUrl, setBYOKBaseUrl] = useState("");
     const selectedSummaryDevice = runtimeDevices.available.includes(summaryDevice)
         ? summaryDevice
         : runtimeDevices.default;
@@ -77,6 +92,10 @@ export default function RecordingDetail({
     }
 
     const segments = recording.transcript?.segments ?? [];
+    const summary = recording.summary?.text ?? "";
+    const activeSegmentIndex = segments.findIndex(
+        (segment) => currentTime >= segment.start && currentTime < segment.end,
+    );
     const canRetranscribe =
         Boolean(onRetranscribe) &&
         (recording.status === "done" || recording.status === "failed");
@@ -85,27 +104,33 @@ export default function RecordingDetail({
         segments.some((segment) => Boolean(segment.speaker));
 
     const handleSummarize = async () => {
-        if (!segments.length) return;
+        if (!onSummarize || !segments.length) return;
 
-        setIsSummarizing(true);
-        setSummary("");
-        try {
-            const nextSummary = await summarizeTranscript({
-                text: sanitizeTranscript(segments),
-                model: summaryModel,
-                device: selectedSummaryDevice,
-            });
-            setSummary(nextSummary);
-        } finally {
-            setIsSummarizing(false);
-        }
+        await onSummarize(recording.id, {
+            model: summaryModel,
+            device: selectedSummaryDevice,
+            mode: summaryMode,
+            byok: summaryMode === "byok" ? {
+                provider: byokProvider,
+                apiKey: byokApiKey,
+                model: byokModel,
+                baseUrl: byokBaseUrl,
+            } : undefined,
+        });
     };
 
     const handleRenameSpeakers = async (speakers: Record<string, string>) => {
         if (!onRenameSpeakers) return;
 
         await onRenameSpeakers(recording.id, speakers);
-        setSummary("");
+    };
+
+    const handleSeekToSegment = async (start: number) => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        audio.currentTime = start;
+        await audio.play().catch(() => undefined);
     };
 
     const openRetranscribeEditor = () => {
@@ -114,7 +139,9 @@ export default function RecordingDetail({
             : runtimeDevices.default;
 
         setRetranscribeLanguage(recording.language_hint ?? "auto");
-        setRetranscribeModel(recording.model);
+        setRetranscribeModel(
+            isTranscriptionModel(recording.model) ? recording.model : "parakeet",
+        );
         setRetranscribeDevice(recordingDevice);
         setRetranscribeMinSpeakers(recording.min_speakers ?? "");
         setRetranscribeMaxSpeakers(recording.max_speakers ?? "");
@@ -141,7 +168,6 @@ export default function RecordingDetail({
             minSpeakers: retranscribeMinSpeakers,
             maxSpeakers: retranscribeMaxSpeakers,
         });
-        setSummary("");
         setIsRetranscribeEditorOpen(false);
     };
 
@@ -189,6 +215,18 @@ export default function RecordingDetail({
                 )}
                 {recording.status === "done" && (
                     <div className="flex flex-col gap-5">
+                        <audio
+                            key={recording.id}
+                            ref={audioRef}
+                            controls
+                            src={recordingAudioUrl(recording.id)}
+                            onTimeUpdate={(event) => {
+                                setCurrentTime(event.currentTarget.currentTime);
+                            }}
+                            onLoadedMetadata={() => setCurrentTime(0)}
+                            className="w-full"
+                        />
+
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200">
                             <div className="flex">
                                 <TabButton
@@ -235,6 +273,8 @@ export default function RecordingDetail({
                                 onRenameSpeakers={handleRenameSpeakers}
                                 isSpeakerEditorOpen={isSpeakerEditorOpen}
                                 onSpeakerEditorClose={() => setIsSpeakerEditorOpen(false)}
+                                activeSegmentIndex={activeSegmentIndex}
+                                onSeekToSegment={handleSeekToSegment}
                             />
                         )}
 
@@ -247,8 +287,18 @@ export default function RecordingDetail({
                                 selectedDevice={selectedSummaryDevice}
                                 onDeviceChange={setSummaryDevice}
                                 runtimeDevices={runtimeDevices}
+                                selectedMode={summaryMode}
+                                onModeChange={setSummaryMode}
+                                byokProvider={byokProvider}
+                                onBYOKProviderChange={setBYOKProvider}
+                                byokApiKey={byokApiKey}
+                                onBYOKApiKeyChange={setBYOKApiKey}
+                                byokModel={byokModel}
+                                onBYOKModelChange={setBYOKModel}
+                                byokBaseUrl={byokBaseUrl}
+                                onBYOKBaseUrlChange={setBYOKBaseUrl}
                                 onSummarize={handleSummarize}
-                                canSummarize={segments.length > 0}
+                                canSummarize={Boolean(onSummarize) && segments.length > 0}
                             />
                         )}
                     </div>
@@ -412,11 +462,10 @@ function TabButton({
         <button
             type="button"
             onClick={onClick}
-            className={`min-h-11 border-b-2 px-4 text-sm font-medium transition-colors ${
-                isActive
-                    ? "border-zinc-950 text-zinc-950"
-                    : "border-transparent text-zinc-500 hover:text-zinc-950"
-            }`}
+            className={`min-h-11 border-b-2 px-4 text-sm font-medium transition-colors ${isActive
+                ? "border-zinc-950 text-zinc-950"
+                : "border-transparent text-zinc-500 hover:text-zinc-950"
+                }`}
         >
             {label}
         </button>

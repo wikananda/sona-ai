@@ -9,7 +9,7 @@ from sona_ai.transcription.schemas import TranscriptSegment, TranscriptionResult
 logger = setup_logging()
 
 
-class WhisperXSpeakerAssigner:
+class SpeakerAssigner:
     def assign(
         self,
         transcription: TranscriptionResult,
