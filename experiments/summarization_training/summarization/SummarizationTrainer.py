@@ -21,7 +21,7 @@ class SummarizationTrainer(SummarizationBase):
     Supports both Seq2Seq (T5, BART, etc.) and CausalLM (LLaMA, GPT-2, etc.) via LoRA.
     """
 
-    def __init__(self, config: Union[str, Dict] = "flan-t5"):
+    def __init__(self, config: Union[str, Dict] = "llama"):
         """
         config: str or dict, name of the config, path to YAML, or the config dict.
         """
