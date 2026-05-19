@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from sona_ai.api.schemas.projects import (
     ProjectCreate,
+    RecordingRename,
     RecordingRetranscribe,
     TranscriptSpeakerRename,
 )
@@ -158,6 +159,25 @@ def upload_project_recording(
     )
     return _serialize_recording(recording, include_transcript=False)
 
+@router.patch("/recordings/{recording_id}")
+def rename_recording(
+    recording_id: str,
+    body: RecordingRename,
+    db: Session = Depends(get_db),
+):
+    recording = db.get(Recording, recording_id)
+    if recording is None:
+        raise HTTPException(status_code=404, detail="Recording not found")
+
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=404, detail="Recording name is required")
+
+    recording.original_name = name
+    db.commit()
+    db.refresh(recording)
+
+    return _serialize_recording(recording, include_transcript=True)
 
 @router.get("/recordings/{recording_id}")
 def get_recording(recording_id: str, db: Session = Depends(get_db)):

@@ -18,3 +18,6 @@ class RecordingRetranscribe(BaseModel):
 
 class TranscriptSpeakerRename(BaseModel):
     speakers: dict[str, str]
+
+class RecordingRename(BaseModel):
+    name: str

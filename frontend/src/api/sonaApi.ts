@@ -142,6 +142,17 @@ export async function deleteRecording(recordingId: string): Promise<void> {
     await requestJson(`/recordings/${recordingId}`, { method: "DELETE" });
 }
 
+export async function renameRecording(
+    recordingId: string,
+    name: string,
+): Promise<Recording> {
+    return requestJson(`/recordings/${recordingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+    });
+}
+
 export async function retranscribeRecording(
     recordingId: string,
     params?: RetranscribeParams,
