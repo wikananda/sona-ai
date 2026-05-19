@@ -10,6 +10,8 @@ import {
     summarizeTranscript,
     SummaryModel,
     TranscriptionModel,
+    SummaryMode,
+    BYOKProvider,
 } from "@/src/api/sonaApi";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import SummaryPanel from "@/src/components/SummaryPanel";
@@ -67,6 +69,11 @@ export default function RecordingDetail({
     const [summary, setSummary] = useState("");
     const [summaryModel, setSummaryModel] = useState<SummaryModel>("qwen");
     const [summaryDevice, setSummaryDevice] = useState<RuntimeDevice>(runtimeDevices.default);
+    const [summaryMode, setSummaryMode] = useState<SummaryMode>("local");
+    const [byokProvider, setBYOKProvider] = useState<BYOKProvider>("openai");
+    const [byokApiKey, setBYOKApiKey] = useState("");
+    const [byokModel, setBYOKModel] = useState("gpt-4o-mini");
+    const [byokBaseUrl, setBYOKBaseUrl] = useState("");
     const [isSummarizing, setIsSummarizing] = useState(false);
     const selectedSummaryDevice = runtimeDevices.available.includes(summaryDevice)
         ? summaryDevice
@@ -101,6 +108,13 @@ export default function RecordingDetail({
                 text: sanitizeTranscript(segments),
                 model: summaryModel,
                 device: selectedSummaryDevice,
+                mode: summaryMode,
+                byok: summaryMode === "byok" ? {
+                    provider: byokProvider,
+                    apiKey: byokApiKey,
+                    model: byokModel,
+                    baseUrl: byokBaseUrl,
+                } : undefined,
             });
             setSummary(nextSummary);
         } finally {
@@ -278,6 +292,16 @@ export default function RecordingDetail({
                                 selectedDevice={selectedSummaryDevice}
                                 onDeviceChange={setSummaryDevice}
                                 runtimeDevices={runtimeDevices}
+                                selectedMode={summaryMode}
+                                onModeChange={setSummaryMode}
+                                byokProvider={byokProvider}
+                                onBYOKProviderChange={setBYOKProvider}
+                                byokApiKey={byokApiKey}
+                                onBYOKApiKeyChange={setBYOKApiKey}
+                                byokModel={byokModel}
+                                onBYOKModelChange={setBYOKModel}
+                                byokBaseUrl={byokBaseUrl}
+                                onBYOKBaseUrlChange={setBYOKBaseUrl}
                                 onSummarize={handleSummarize}
                                 canSummarize={segments.length > 0}
                             />
@@ -443,11 +467,10 @@ function TabButton({
         <button
             type="button"
             onClick={onClick}
-            className={`min-h-11 border-b-2 px-4 text-sm font-medium transition-colors ${
-                isActive
-                    ? "border-zinc-950 text-zinc-950"
-                    : "border-transparent text-zinc-500 hover:text-zinc-950"
-            }`}
+            className={`min-h-11 border-b-2 px-4 text-sm font-medium transition-colors ${isActive
+                ? "border-zinc-950 text-zinc-950"
+                : "border-transparent text-zinc-500 hover:text-zinc-950"
+                }`}
         >
             {label}
         </button>

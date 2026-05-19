@@ -10,6 +10,8 @@ export type TranscriptionModel =
     | "parakeet"
     | "faster-whisper-large-v3"
     | "faster-whisper-turbo";
+export type SummaryMode = "local" | "byok";
+export type BYOKProvider = "openai" | "groq" | "openrouter" | "custom";
 export type SummaryModel = "qwen" | "llama" | "gemma";
 export type RuntimeDevice = "auto" | "cpu" | "mps" | "cuda";
 
@@ -83,12 +85,21 @@ export interface RetranscribeParams {
     maxSpeakers?: number | "";
 }
 
+export interface BYOKSummarySettings {
+    provider: BYOKProvider;
+    apiKey: string;
+    model: string;
+    baseUrl?: string;
+}
+
 export interface SummarizeParams {
     text: string;
     prompt?: string;
     maxLength?: number;
+    mode?: SummaryMode;
     model?: SummaryModel;
     device?: RuntimeDevice;
+    byok?: BYOKSummarySettings;
 }
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -215,8 +226,17 @@ export async function summarizeTranscript(params: SummarizeParams): Promise<stri
             text: params.text,
             prompt: params.prompt,
             max_length: params.maxLength,
+            mode: params.mode ?? "local",
             model: params.model ?? "qwen",
             device: params.device ?? "auto",
+            byok: params.byok
+                ? {
+                    provider: params.byok.provider,
+                    api_key: params.byok.apiKey,
+                    model: params.byok.model,
+                    base_url: params.byok.baseUrl,
+                }
+                : undefined,
         }),
     });
 
@@ -270,8 +290,34 @@ function emptyToNull(value?: string | number | ""): number | null {
 async function errorMessage(response: Response, label: string): Promise<string> {
     try {
         const data = await response.json();
-        return `${label} API error: ${data.detail ?? response.status}`;
+        return `${label} API error: ${formatApiErrorDetail(data.detail ?? response.status)}`;
     } catch {
         return `${label} API error: ${response.status}`;
     }
+}
+
+function formatApiErrorDetail(detail: unknown): string {
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+        return detail
+            .map((item) => {
+                if (
+                    item &&
+                    typeof item === "object" &&
+                    "msg" in item &&
+                    typeof item.msg === "string"
+                ) {
+                    const location = "loc" in item && Array.isArray(item.loc)
+                        ? item.loc.join(".")
+                        : "";
+                    return location ? `${location}: ${item.msg}` : item.msg;
+                }
+                return JSON.stringify(item);
+            })
+            .join("; ");
+    }
+    if (detail && typeof detail === "object") {
+        return JSON.stringify(detail);
+    }
+    return String(detail);
 }

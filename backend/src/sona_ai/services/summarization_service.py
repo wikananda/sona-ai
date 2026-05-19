@@ -35,7 +35,17 @@ class SummarizationService:
         max_length: Optional[int] = None,
         model: Optional[str] = None,
         device: Optional[str] = None,
+        mode: str = "local",
+        byok: Optional[dict] = None,
     ) -> str:
+        if mode == "byok":
+            return self._summarize_byok(
+                text=text,
+                prompt=prompt,
+                max_length=max_length,
+                byok=byok,
+            )
+
         model_name = self._normalize_model(model or self.config)
         summarizer = self._get_summarizer(model_name, device)
         input_limit = (
@@ -44,6 +54,40 @@ class SummarizationService:
             else self._model_input_limit(model_name)
         )
         return summarizer.generate(text, prompt, max_length=input_limit)
+
+    def _summarize_byok(
+        self,
+        text: str,
+        prompt: Optional[str],
+        max_length: Optional[int],
+        byok: Optional[dict],
+    ) -> str:
+        if byok is None:
+            raise ValueError("BYOK settings are required")
+
+        api_key = (byok.get("api_key") or "").strip()
+        model = (byok.get("model") or "").strip()
+        provider = (byok.get("provider", "") or "").strip()
+        base_url = (byok.get("base_url") or "").strip()
+
+        if not api_key:
+            raise ValueError("BYOK: api_key is required")
+        if not model:
+            raise ValueError("BYOK: model is required")
+
+        from sona_ai.summarization import OpenAICompatibleSummarizer
+
+        summarizer = OpenAICompatibleSummarizer()
+        return summarizer.generate(
+            text=text,
+            prompt=prompt,
+            api_key=api_key,
+            model=model,
+            provider=provider,
+            base_url=base_url,
+            max_length=max_length or 2048,
+            max_tokens=256,
+        )
 
     def close(self):
         for summarizer in self._summarizers.values():
