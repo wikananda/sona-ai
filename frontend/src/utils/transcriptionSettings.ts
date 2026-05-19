@@ -19,7 +19,6 @@ export const TRANSCRIPTION_MODELS: {
     value: TranscriptionModel;
 }[] = [
     { label: "Parakeet", value: "parakeet" },
-    { label: "WhisperX", value: "whisperx" },
 ];
 
 export function numberOrEmpty(value: string): number | "" {

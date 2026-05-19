@@ -1,0 +1,14 @@
+model:
+    align_model: "facebook/wav2vec2-base-960h"
+    align_models:
+        en: "facebook/wav2vec2-base-960h"
+        id: "indonesian-nlp/wav2vec2-large-xlsr-indonesian"
+    language: null
+    device: "cpu"
+
+cp_dir:
+    hf_cache: "cp/hf_cache"
+
+alignment:
+    conda_env: "sona-aligner"
+    tool_path: "tools/alignment/align_whisperx_wav2vec2.py"

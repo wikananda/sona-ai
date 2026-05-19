@@ -69,7 +69,7 @@ class TranscriptionResult:
     raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_whisperx_result(cls, result: dict[str, Any]) -> "TranscriptionResult":
+    def from_aligned_result(cls, result: dict[str, Any]) -> "TranscriptionResult":
         return cls(
             segments=[
                 TranscriptSegment.from_dict(segment)

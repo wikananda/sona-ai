@@ -128,7 +128,7 @@ export default function RecordingDetail({
             : runtimeDevices.default;
 
         setRetranscribeLanguage(recording.language_hint ?? "auto");
-        setRetranscribeModel(recording.model);
+        setRetranscribeModel("parakeet");
         setRetranscribeDevice(recordingDevice);
         setRetranscribeMinSpeakers(recording.min_speakers ?? "");
         setRetranscribeMaxSpeakers(recording.max_speakers ?? "");

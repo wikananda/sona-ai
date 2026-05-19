@@ -1,4 +1,4 @@
-__all__ = ["NoOpAligner", "Wav2Vec2Aligner"]
+__all__ = ["ExternalWav2Vec2Aligner", "NoOpAligner", "Wav2Vec2Aligner"]
 
 
 def __getattr__(name):
@@ -6,6 +6,11 @@ def __getattr__(name):
         from .noop_aligner import NoOpAligner
 
         return NoOpAligner
+
+    if name == "ExternalWav2Vec2Aligner":
+        from .external_wav2vec2_aligner import ExternalWav2Vec2Aligner
+
+        return ExternalWav2Vec2Aligner
 
     if name == "Wav2Vec2Aligner":
         from .wav2vec2_aligner import Wav2Vec2Aligner

@@ -52,18 +52,11 @@ class PyannoteDiarizer:
             raise ReferenceError("Diarization model is not initialized.")
 
         min_s, max_s = self._resolve_speaker_bounds(min_speakers, max_speakers)
-        import whisperx
-
-        audio = whisperx.load_audio(audio_path)
-        audio_data = {
-            "waveform": torch.from_numpy(audio[None, :]),
-            "sample_rate": 16000,
-        }
 
         logger.info("Running diarization...")
         with Timer("Diarization"):
             diarization = self.model(
-                audio_data,
+                audio_path,
                 min_speakers=min_s,
                 max_speakers=max_s,
             )

@@ -1,11 +1,7 @@
-__all__ = ["ParakeetTranscriber", "WhisperXTranscriber"]
+__all__ = ["ParakeetTranscriber"]
 
 
 def __getattr__(name):
-    if name == "WhisperXTranscriber":
-        from .whisperx_transcriber import WhisperXTranscriber
-
-        return WhisperXTranscriber
     if name == "ParakeetTranscriber":
         from .parakeet_transcriber import ParakeetTranscriber
 

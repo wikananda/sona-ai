@@ -51,19 +51,18 @@ def _build_transcriber(
         transcription_config.get("config", resolved_engine),
     )
 
+    if resolved_engine != "parakeet":
+        raise ValueError(
+            f"Unsupported transcription engine: {resolved_engine}. "
+            "Use parakeet for transcription and the external alignment tool for Wav2Vec2 alignment."
+        )
+
     engine_config = deepcopy(load_config(resolved_config_name))
     if device is not None:
         engine_config.setdefault("model", {})["device"] = resolve_device(device)
     logger.info(f"Transcription engine: {resolved_engine}")
-    if resolved_engine == "whisperx":
-        from sona_ai.transcription import WhisperXTranscriber
-        return WhisperXTranscriber(engine_config), engine_config
-
-    if resolved_engine == "parakeet":
-        from sona_ai.transcription import ParakeetTranscriber
-        return ParakeetTranscriber(engine_config), engine_config
-    
-    raise ValueError(f"Unsupported transcription engine: {resolved_engine}")
+    from sona_ai.transcription import ParakeetTranscriber
+    return ParakeetTranscriber(engine_config), engine_config
 
 
 def _build_diarizer(speech_config: dict):
@@ -111,9 +110,9 @@ def _build_aligner(speech_config: dict, device: Optional[str]):
     if device is not None:
         aligner_config.setdefault("model", {})["device"] = resolve_device(device)
     
-    if engine == "wav2vec2":
-        from sona_ai.alignment import Wav2Vec2Aligner
-        return Wav2Vec2Aligner(aligner_config)
+    if engine in {"wav2vec2", "wav2vec2_external"}:
+        from sona_ai.alignment import ExternalWav2Vec2Aligner
+        return ExternalWav2Vec2Aligner(aligner_config)
 
     raise ValueError(f"Unsupported alignment engine: {engine}")
 

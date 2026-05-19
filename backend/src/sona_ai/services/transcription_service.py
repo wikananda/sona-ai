@@ -1,7 +1,7 @@
 import threading
 from typing import Optional
 
-from sona_ai.core import load_config, resolve_device, validate_device_available, setup_logging
+from sona_ai.core import load_config, validate_device_available, setup_logging
 from sona_ai.pipelines import SpeechPipeline, build_speech_pipeline
 from sona_ai.services.pipeline_profile import (
     PipelineProfile,
@@ -10,7 +10,7 @@ from sona_ai.services.pipeline_profile import (
 )
 
 
-SUPPORTED_TRANSCRIPTION_MODELS = {"whisperx", "parakeet"}
+SUPPORTED_TRANSCRIPTION_MODELS = {"parakeet"}
 
 logger = setup_logging()
 
@@ -69,7 +69,7 @@ class TranscriptionService:
         profile = self.resolve_profile(model, device)
         key = profile.cache_key()
         logger.info(
-            "Building speech pipeline: transcription=%s/%s alignment=%s/%s/%s "
+            "Using speech pipeline: transcription=%s/%s alignment=%s/%s/%s "
             "diarization=%s/%s/%s device=%s",
             profile.transcription_engine,
             profile.transcription_config,
@@ -81,7 +81,6 @@ class TranscriptionService:
             profile.diarization_config,
             profile.device,
         )
-        # key = self._cache_key(model_name, device_name)
         if key in self._pipelines:
             return self._pipelines[key]
 
@@ -89,12 +88,6 @@ class TranscriptionService:
             if key in self._pipelines:
                 return self._pipelines[key]
 
-            # pipeline = build_speech_pipeline(
-            #     self.speech_config,
-            #     engine=model_name,
-            #     engine_config_name=model_name,
-            #     device=device_name,
-            # )
             profile_config = speech_config_for_profile(self.speech_config, profile)
             pipeline = build_speech_pipeline(
                 profile_config,
@@ -123,6 +116,3 @@ class TranscriptionService:
             model=model_name,
             device=device_name,
         )
-
-    # def _cache_key(self, model: str, device: str) -> tuple[str, str]:
-    #     return (model, resolve_device(device))

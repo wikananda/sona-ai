@@ -119,7 +119,6 @@ class SpeechPipeline:
     def setup_environment(config: dict = None, quiet=False):
         if quiet:
             warnings.filterwarnings("ignore")
-            logging.getLogger("whisperx").setLevel(logging.ERROR)
             logging.getLogger("faster_whisper").setLevel(logging.ERROR)
 
         os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
@@ -136,6 +135,7 @@ class SpeechPipeline:
             os.environ["NEMO_HOME"] = str(cache_dir / "nemo")
             os.environ["NEMO_CACHE_DIR"] = str(cache_dir / "nemo")
             os.environ["XDG_CACHE_HOME"] = str(cache_dir / "xdg")
+            os.environ["MPLCONFIGDIR"] = str(cache_dir / "matplotlib")
 
     def close(self):
         self.cleanup_models()

@@ -6,7 +6,7 @@ export interface SpeakerSegment {
 }
 
 export type RecordingStatus = "pending" | "processing" | "done" | "failed";
-export type TranscriptionModel = "parakeet" | "whisperx";
+export type TranscriptionModel = "parakeet";
 export type SummaryModel = "qwen" | "llama" | "gemma";
 export type RuntimeDevice = "auto" | "cpu" | "mps" | "cuda";
 
@@ -48,7 +48,7 @@ export interface Recording {
     mime_type?: string | null;
     file_size_bytes?: number | null;
     language_hint?: string | null;
-    model: TranscriptionModel;
+    model: string;
     device: RuntimeDevice;
     min_speakers?: number | null;
     max_speakers?: number | null;

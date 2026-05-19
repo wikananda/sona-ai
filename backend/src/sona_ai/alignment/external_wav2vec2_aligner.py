@@ -1,0 +1,101 @@
+import json
+import subprocess
+import tempfile
+from pathlib import Path
+
+from sona_ai.core import PROJECT_ROOT, resolve_device, setup_logging
+from sona_ai.transcription.schemas import TranscriptionResult
+
+
+logger = setup_logging()
+
+
+class ExternalWav2Vec2Aligner:
+    def __init__(self, config: dict):
+        self.config = config
+        alignment_config = config.get("alignment", {})
+        self.conda_env = alignment_config.get("conda_env", "sona-aligner")
+        self.tool_path = PROJECT_ROOT / alignment_config.get(
+            "tool_path",
+            "tools/alignment/align_whisperx_wav2vec2.py",
+        )
+        self.device = resolve_device(config.get("model", {}).get("device", "cpu"))
+        cache_root = PROJECT_ROOT / config.get("cp_dir", {}).get("hf_cache", "cp/hf_cache")
+        self.cache_dir = cache_root / "wav2vec2-align"
+
+    def load_models(self) -> None:
+        if not self.tool_path.is_file():
+            raise FileNotFoundError(f"Wav2Vec2 alignment tool not found: {self.tool_path}")
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def align(
+        self,
+        transcription: TranscriptionResult,
+        audio_path: str,
+    ) -> TranscriptionResult:
+        language = self._resolve_language(transcription.language)
+        model_name = self._align_model_name(language)
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as input_file:
+            input_path = Path(input_file.name)
+            json.dump(
+                {
+                    "language": transcription.language,
+                    "segments": transcription.to_segment_dicts(),
+                },
+                input_file,
+            )
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as output_file:
+            output_path = Path(output_file.name)
+
+        cmd = [
+            "conda",
+            "run",
+            "-n",
+            self.conda_env,
+            "python",
+            str(self.tool_path),
+            audio_path,
+            str(input_path),
+            str(output_path),
+            "--language",
+            language,
+            "--device",
+            self.device,
+            "--model-name",
+            model_name,
+            "--cache-dir",
+            str(self.cache_dir),
+        ]
+
+        logger.info("Running external Wav2Vec2 alignment with %s model: %s", language, model_name)
+        try:
+            subprocess.run(cmd, check=True, cwd=PROJECT_ROOT)
+            with output_path.open("r") as f:
+                aligned = json.load(f)
+        finally:
+            input_path.unlink(missing_ok=True)
+            output_path.unlink(missing_ok=True)
+
+        aligned.setdefault("language", transcription.language or language)
+        return TranscriptionResult.from_aligned_result(aligned)
+
+    def _align_model_name(self, language: str) -> str:
+        model_config = self.config["model"]
+        align_models = model_config.get("align_models", {})
+        return align_models.get(language) or model_config["align_model"]
+
+    def _resolve_language(self, language: str | None) -> str:
+        resolved = (language or self.config["model"].get("language") or "en").lower()
+        aliases = {
+            "eng": "en",
+            "english": "en",
+            "indonesian": "id",
+            "indonesia": "id",
+            "ind": "id",
+        }
+        return aliases.get(resolved, resolved)
+
+    def cleanup_models(self) -> None:
+        return None

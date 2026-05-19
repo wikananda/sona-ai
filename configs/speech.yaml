@@ -1,16 +1,16 @@
 transcription:
-    engine: "whisperx" # whisperx, parakeet
-    config: "whisperx" # whisperx, parakeet
+    engine: "parakeet"
+    config: "parakeet"
 
 alignment:
     enabled: true
-    engine: "wav2vec2" # wav2vec2, none
-    config: "whisperx" # whisperx
+    engine: "wav2vec2_external"
+    config: "wav2vec2"
 
 diarization:
     enabled: true
-    engine: "community_external" # pyannote, community_external
-    config: "diarization-community" # whisperx, diarization-community
+    engine: "community_external"
+    config: "diarization-community"
 
 summarization:
     config: "qwen"
