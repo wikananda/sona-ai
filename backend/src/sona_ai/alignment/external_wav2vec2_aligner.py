@@ -1,6 +1,8 @@
 import json
+import os
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 from sona_ai.core import PROJECT_ROOT, resolve_device, setup_logging
@@ -19,9 +21,10 @@ class ExternalWav2Vec2Aligner:
             "tool_path",
             "tools/alignment/align_whisperx_wav2vec2.py",
         )
-        self.device = resolve_device(config.get("model", {}).get("device", "cpu"))
+        self.device = resolve_device(config.get("model", {}).get("device", "cpu"), no_mps=True)
         cache_root = PROJECT_ROOT / config.get("cp_dir", {}).get("hf_cache", "cp/hf_cache")
         self.cache_dir = cache_root / "wav2vec2-align"
+        self.timeout_seconds = int(alignment_config.get("timeout_seconds", 900))
 
     def load_models(self) -> None:
         if not self.tool_path.is_file():
@@ -52,6 +55,7 @@ class ExternalWav2Vec2Aligner:
         cmd = [
             "conda",
             "run",
+            "--no-capture-output",
             "-n",
             self.conda_env,
             "python",
@@ -70,14 +74,30 @@ class ExternalWav2Vec2Aligner:
         ]
 
         logger.info("Running external Wav2Vec2 alignment with %s model: %s", language, model_name)
+        started_at = time.time()
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
         try:
-            subprocess.run(cmd, check=True, cwd=PROJECT_ROOT)
+            subprocess.run(
+                cmd,
+                check=True,
+                cwd=PROJECT_ROOT,
+                env=env,
+                timeout=self.timeout_seconds,
+            )
             with output_path.open("r") as f:
                 aligned = json.load(f)
+        except subprocess.TimeoutExpired as exc:
+            raise TimeoutError(
+                "External Wav2Vec2 alignment timed out after "
+                f"{self.timeout_seconds} seconds. The aligner may still be "
+                "downloading/loading the model or stuck in the external environment."
+            ) from exc
         finally:
             input_path.unlink(missing_ok=True)
             output_path.unlink(missing_ok=True)
 
+        logger.info("External Wav2Vec2 alignment finished in %.2f seconds", time.time() - started_at)
         aligned.setdefault("language", transcription.language or language)
         return TranscriptionResult.from_aligned_result(aligned)
 

@@ -11,3 +11,4 @@ cp_dir:
 alignment:
     conda_env: "sona-aligner"
     tool_path: "tools/alignment/align_whisperx_wav2vec2.py"
+    timeout_seconds: 900
