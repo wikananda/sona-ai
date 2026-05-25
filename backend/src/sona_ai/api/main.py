@@ -12,6 +12,7 @@ from sona_ai.api.routes.projects import router as projects_router
 from sona_ai.api.routes.runtime import router as runtime_router
 from sona_ai.api.routes.transcribe import router as transcribe_router
 from sona_ai.api.routes.summarize import router as summarize_router
+from sona_ai.api.routes.chat import router as chat_router
 
 logger = setup_logging()
 app = FastAPI(title="Sona AI API")
@@ -29,6 +30,8 @@ app.include_router(transcribe_router)
 app.include_router(summarize_router)
 app.include_router(projects_router)
 app.include_router(runtime_router)
+app.include_router(chat_router)
+
 
 @app.on_event("startup")
 async def startup_event():

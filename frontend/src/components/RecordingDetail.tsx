@@ -8,12 +8,13 @@ import {
     RetranscribeParams,
     RuntimeDevice,
     RuntimeDevices,
-    SummaryModel,
+    LocalLLMModel,
     TranscriptionModel,
     SummaryMode,
     BYOKProvider,
 } from "@/src/api/sonaApi";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
+import RecordingChatPanel from "@/src/components/RecordingChatPanel";
 import SummaryPanel from "@/src/components/SummaryPanel";
 import TranscriptPanel from "@/src/components/TranscriptPanel";
 import {
@@ -24,7 +25,7 @@ import {
     TRANSCRIPTION_MODELS,
 } from "@/src/utils/transcriptionSettings";
 
-type DetailTab = "transcript" | "summary";
+type DetailTab = "transcript" | "summary" | "chat";
 
 interface Props {
     recording?: Recording | null;
@@ -72,7 +73,7 @@ export default function RecordingDetail({
         useState<number | "">("");
     const [retranscribeMaxSpeakers, setRetranscribeMaxSpeakers] =
         useState<number | "">("");
-    const [summaryModel, setSummaryModel] = useState<SummaryModel>("qwen");
+    const [localLLMModel, setLocalLLMModel] = useState<LocalLLMModel>("qwen");
     const [summaryDevice, setSummaryDevice] = useState<RuntimeDevice>(runtimeDevices.default);
     const [summaryMode, setSummaryMode] = useState<SummaryMode>("local");
     const [byokProvider, setBYOKProvider] = useState<BYOKProvider>("openai");
@@ -107,7 +108,7 @@ export default function RecordingDetail({
         if (!onSummarize || !segments.length) return;
 
         await onSummarize(recording.id, {
-            model: summaryModel,
+            model: localLLMModel,
             device: selectedSummaryDevice,
             mode: summaryMode,
             byok: summaryMode === "byok" ? {
@@ -239,6 +240,11 @@ export default function RecordingDetail({
                                     isActive={activeTab === "summary"}
                                     onClick={() => setActiveTab("summary")}
                                 />
+                                <TabButton
+                                    label="Chat"
+                                    isActive={activeTab === "chat"}
+                                    onClick={() => setActiveTab("chat")}
+                                />
                             </div>
                             {activeTab === "transcript" && (canRenameSpeakers || canRetranscribe) && (
                                 <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -282,8 +288,8 @@ export default function RecordingDetail({
                             <SummaryPanel
                                 summary={summary}
                                 isLoading={isSummarizing}
-                                selectedModel={summaryModel}
-                                onModelChange={setSummaryModel}
+                                selectedModel={localLLMModel}
+                                onModelChange={setLocalLLMModel}
                                 selectedDevice={selectedSummaryDevice}
                                 onDeviceChange={setSummaryDevice}
                                 runtimeDevices={runtimeDevices}
@@ -299,6 +305,12 @@ export default function RecordingDetail({
                                 onBYOKBaseUrlChange={setBYOKBaseUrl}
                                 onSummarize={handleSummarize}
                                 canSummarize={Boolean(onSummarize) && segments.length > 0}
+                            />
+                        )}
+                        {activeTab === "chat" && (
+                            <RecordingChatPanel
+                                recordingId={recording.id}
+                                canChat={segments.length > 0}
                             />
                         )}
                     </div>

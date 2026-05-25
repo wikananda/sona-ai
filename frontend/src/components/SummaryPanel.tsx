@@ -5,14 +5,19 @@ import {
     RuntimeDevice,
     RuntimeDevices,
     SummaryMode,
-    SummaryModel
+    LocalLLMModel
 } from "@/src/api/sonaApi";
+
+import {
+    LOCAL_LLM_MODELS,
+    BYOK_PROVIDERS
+} from "@/src/utils/constants";
 
 interface Props {
     summary: string;
     isLoading: boolean;
-    selectedModel: SummaryModel;
-    onModelChange: (model: SummaryModel) => void;
+    selectedModel: LocalLLMModel;
+    onModelChange: (model: LocalLLMModel) => void;
     selectedDevice: RuntimeDevice;
     onDeviceChange: (device: RuntimeDevice) => void;
     runtimeDevices: RuntimeDevices;
@@ -29,31 +34,6 @@ interface Props {
     onSummarize: () => void;
     canSummarize: boolean;
 }
-
-const SUMMARY_MODELS: { value: SummaryModel; label: string; description: string }[] = [
-    {
-        value: "qwen",
-        label: "Qwen",
-        description: "khazarai/Qwen3-4B-Qwen3.6-plus-Reasoning-Distilled-GGUF",
-    },
-    {
-        value: "llama",
-        label: "Llama",
-        description: "meta-llama/Llama-3.2-3B-Instruct",
-    },
-    {
-        value: "gemma",
-        label: "Gemma",
-        description: "google/gemma-4-E2B-it",
-    },
-];
-
-const BYOK_PROVIDERS = [
-    { value: "openai", label: "OpenAI", defaultModel: "gpt-4o-mini" },
-    { value: "groq", label: "Groq", defaultModel: "llama-3.1-8b-instant" },
-    { value: "openrouter", label: "OpenRouter", defaultModel: "openai/gpt-4o-mini" },
-    { value: "custom", label: "Custom", defaultModel: "" },
-] as const;
 
 export default function SummaryPanel({
     summary,
@@ -113,11 +93,11 @@ export default function SummaryPanel({
                                         <select
                                             id="summary-model"
                                             value={selectedModel}
-                                            onChange={(event) => onModelChange(event.target.value as SummaryModel)}
+                                            onChange={(event) => onModelChange(event.target.value as LocalLLMModel)}
                                             disabled={isLoading}
                                             className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
-                                            {SUMMARY_MODELS.map((model) => (
+                                            {LOCAL_LLM_MODELS.map((model) => (
                                                 <option key={model.value} value={model.value}>
                                                     {model.label}
                                                 </option>

@@ -4,7 +4,7 @@ from typing import Optional
 from sona_ai.core import resolve_device, validate_device_available
 
 
-SUPPORTED_SUMMARY_MODELS = {
+SUPPORTED_LOCAL_LLM_MODELS = {
     "qwen": "qwen",
     "llama": "llama",
     "gemma": "gemma",
@@ -150,10 +150,10 @@ class SummarizationService:
 
     def _normalize_model(self, model: str) -> str:
         model_name = model.lower().strip()
-        if model_name not in SUPPORTED_SUMMARY_MODELS:
-            allowed = ", ".join(sorted(SUPPORTED_SUMMARY_MODELS))
+        if model_name not in SUPPORTED_LOCAL_LLM_MODELS:
+            allowed = ", ".join(sorted(SUPPORTED_LOCAL_LLM_MODELS))
             raise ValueError(f"Unsupported summarization model: {model}. Use one of: {allowed}")
-        return SUPPORTED_SUMMARY_MODELS[model_name]
+        return SUPPORTED_LOCAL_LLM_MODELS[model_name]
 
     def _cache_key(self, model: str, device: str) -> tuple[str, str]:
         return (model, resolve_device(device))
