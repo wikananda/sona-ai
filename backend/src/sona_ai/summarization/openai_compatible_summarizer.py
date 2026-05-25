@@ -1,12 +1,7 @@
 from typing import Optional
 import httpx
 from sona_ai.summarization.prompts import build_prompt
-
-PROVIDER_BASE_URLS = {
-    "openai": "https://api.openai.com/v1",
-    "groq": "https://api.groq.com/openai/v1",
-    "openrouter": "https://openrouter.ai/api/v1",
-}
+from sona_ai.core import PROVIDER_BASE_URLS
 
 class OpenAICompatibleSummarizer:
     def generate(

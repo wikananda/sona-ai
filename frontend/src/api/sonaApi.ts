@@ -12,8 +12,9 @@ export type TranscriptionModel =
     | "faster-whisper-turbo";
 export type SummaryMode = "local" | "byok";
 export type BYOKProvider = "openai" | "groq" | "openrouter" | "custom";
-export type SummaryModel = "qwen" | "llama" | "gemma";
+export type LocalLLMModel = "qwen" | "llama" | "gemma";
 export type RuntimeDevice = "auto" | "cpu" | "mps" | "cuda";
+export type RecordingChatRole = "user" | "assistant";
 
 export interface RuntimeDevices {
     default: RuntimeDevice;
@@ -78,6 +79,17 @@ export interface Recording {
     summary?: RecordingSummary | null;
 }
 
+export interface RecordingChatMessage {
+    role: RecordingChatRole;
+    content: string;
+}
+
+export interface RecordingChatParams {
+    question: string;
+    history: RecordingChatMessage[];
+    byok: BYOKSummarySettings;
+}
+
 export interface TranscribeParams {
     file: File;
     language?: string;
@@ -111,7 +123,7 @@ export interface SummarizeParams {
     prompt?: string;
     maxLength?: number;
     mode?: SummaryMode;
-    model?: SummaryModel;
+    model?: LocalLLMModel;
     device?: RuntimeDevice;
     byok?: BYOKSummarySettings;
 }
@@ -120,7 +132,7 @@ export interface RecordingSummaryParams {
     prompt?: string;
     maxLength?: number;
     mode?: SummaryMode;
-    model?: SummaryModel;
+    model?: LocalLLMModel;
     device?: RuntimeDevice;
     byok?: BYOKSummarySettings;
 }
@@ -204,6 +216,28 @@ export async function retranscribeRecording(
             })
             : undefined,
     });
+}
+
+export async function chatWithRecording(
+    recordingId: string,
+    params: RecordingChatParams,
+): Promise<string> {
+    const data = await requestJson(`/recordings/${recordingId}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            question: params.question,
+            history: params.history,
+            byok_settings: {
+                provider: params.byok.provider,
+                api_key: params.byok.apiKey,
+                model: params.byok.model,
+                base_url: params.byok.baseUrl,
+            },
+        }),
+    });
+
+    return data.answer;
 }
 
 export async function renameTranscriptSpeakers(
