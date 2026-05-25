@@ -50,7 +50,9 @@ class TranscriptionService:
         max_speakers: Optional[int] = None,
     ):
         pipeline = self._get_pipeline(model, device)
+        logger.info("Waiting for transcription lock...")
         with self._transcription_lock:
+            logger.info("Transcription lock acquired.")
             return pipeline.transcribe(
                 audio_path,
                 language=language,

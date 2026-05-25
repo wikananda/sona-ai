@@ -34,12 +34,12 @@ def normalize_device(device: Optional[str]) -> str:
     return device_name
 
 
-def resolve_device(device: Optional[str]) -> str:
+def resolve_device(device: Optional[str], no_mps: bool = False) -> str:
     device_name = normalize_device(device)
     if device_name == "auto":
         if torch.cuda.is_available():
             return "cuda"
-        if torch.backends.mps.is_available():
+        if not no_mps and torch.backends.mps.is_available():
             return "mps"
         return "cpu"
     return device_name

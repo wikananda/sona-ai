@@ -13,17 +13,34 @@ logger = setup_logging()
 
 
 def run_transcription(recording_id: str, transcription_service: TranscriptionService) -> None:
+    logger.info("Recording worker started for recording_id=%s", recording_id)
     db = SessionLocal()
     try:
         recording = db.get(Recording, recording_id)
         if recording is None:
+            logger.warning("Recording worker skipped missing recording_id=%s", recording_id)
             return
 
         _set_status(db, recording, RecordingStatus.PROCESSING)
+        logger.info(
+            "Recording %s marked processing: file=%s model=%s device=%s language=%s",
+            recording.id,
+            recording.stored_path,
+            recording.model,
+            recording.device,
+            recording.language_hint,
+        )
 
         profile = transcription_service.resolve_profile(
             model=recording.model,
             device=recording.device,
+        )
+        logger.info(
+            "Resolved recording %s profile: transcription=%s alignment=%s diarization=%s",
+            recording.id,
+            profile.transcription_engine,
+            profile.alignment_engine if profile.alignment_enabled else "disabled",
+            profile.diarization_engine if profile.diarization_enabled else "disabled",
         )
 
         result = transcription_service.transcribe(
@@ -72,6 +89,7 @@ def run_transcription(recording_id: str, transcription_service: TranscriptionSer
         recording.status = RecordingStatus.DONE
         recording.error = None
         db.commit()
+        logger.info("Recording worker finished recording_id=%s", recording_id)
     except Exception as exc:
         logger.exception("Recording transcription failed: %s", exc)
         db.rollback()

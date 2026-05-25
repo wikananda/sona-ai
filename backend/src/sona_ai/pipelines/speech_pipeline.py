@@ -43,9 +43,19 @@ class SpeechPipeline:
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
     ):
+        logger.info("Speech pipeline stage started: transcription")
         transcription = self.transcriber.transcribe(audio_path, language=language)
+        logger.info(
+            "Speech pipeline stage finished: transcription (%d segments)",
+            len(transcription.segments),
+        )
         if self.aligner is not None:
+            logger.info("Speech pipeline stage started: alignment")
             transcription = self.aligner.align(transcription, audio_path)
+            logger.info(
+                "Speech pipeline stage finished: alignment (%d segments)",
+                len(transcription.segments),
+            )
 
         if self.diarizer is None:
             segments = transcription.to_segment_dicts()
@@ -58,11 +68,17 @@ class SpeechPipeline:
             self._write_result(result)
             return result
 
+        logger.info("Speech pipeline stage started: diarization")
         diarization = self.diarizer.diarize(
             audio_path,
             min_speakers=min_speakers,
             max_speakers=max_speakers,
         )
+        logger.info(
+            "Speech pipeline stage finished: diarization (%d turns)",
+            len(diarization.turns),
+        )
+        logger.info("Speech pipeline stage started: speaker assignment")
         segments = self.speaker_assigner.assign(transcription, diarization)
         speakers = sorted({
             segment.get("speaker")
@@ -75,6 +91,7 @@ class SpeechPipeline:
             len(segments),
             speakers,
         )
+        logger.info("Speech pipeline stage finished: speaker assignment")
         conversations = self._build_conversations(segments)
 
         result = {

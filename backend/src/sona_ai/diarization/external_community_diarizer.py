@@ -1,6 +1,8 @@
 import json
+import os
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -21,6 +23,7 @@ class ExternalCommunityDiarizer:
         self.device = config.get("model", {}).get("device", "cpu")
         cache_root = PROJECT_ROOT / config.get("cp_dir", {}).get("hf_cache", "cp/hf_cache")
         self.cache_dir = cache_root / "pyannote-community"
+        self.timeout_seconds = int(diarization_config.get("timeout_seconds", 1800))
 
     def load_models(self) -> None:
         if not self.tool_path.is_file():
@@ -38,6 +41,7 @@ class ExternalCommunityDiarizer:
         cmd = [
             "conda",
             "run",
+            "--no-capture-output",
             "-n",
             self.conda_env,
             "python",
@@ -56,7 +60,24 @@ class ExternalCommunityDiarizer:
             cmd.extend(["--max-speakers", str(max_speakers)])
 
         logger.info("Running external Community-1 diarizer...")
-        subprocess.run(cmd, check=True, cwd=PROJECT_ROOT)
+        started_at = time.time()
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
+        try:
+            subprocess.run(
+                cmd,
+                check=True,
+                cwd=PROJECT_ROOT,
+                env=env,
+                timeout=self.timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise TimeoutError(
+                "External Community-1 diarization timed out after "
+                f"{self.timeout_seconds} seconds. The diarizer may still be "
+                "downloading/loading the model or stuck in the external environment."
+            ) from exc
+        logger.info("External Community-1 diarizer finished in %.2f seconds", time.time() - started_at)
 
         with output_path.open("r") as f:
             rows = json.load(f)
