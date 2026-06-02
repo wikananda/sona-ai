@@ -31,6 +31,9 @@ interface Props {
     onBYOKModelChange: (model: string) => void;
     byokBaseUrl: string;
     onBYOKBaseUrlChange: (baseUrl: string) => void;
+    customInstruction: string;
+    onCustomInstructionChange: (instruction: string) => void;
+    formatName?: string | null;
     onSummarize: () => void;
     canSummarize: boolean;
 }
@@ -53,6 +56,9 @@ export default function SummaryPanel({
     onBYOKModelChange,
     byokBaseUrl,
     onBYOKBaseUrlChange,
+    customInstruction,
+    onCustomInstructionChange,
+    formatName,
     onSummarize,
     canSummarize,
 }: Props) {
@@ -124,6 +130,24 @@ export default function SummaryPanel({
                                     </div>
                                 </>
                             )}
+                            <label className="flex w-full flex-col gap-1">
+                                <span className="text-xs font-medium text-zinc-500">
+                                    Custom instruction
+                                </span>
+                                {formatName && (
+                                    <p className="text-xs font-medium text-zinc-500">
+                                        Format: <span className="text-zinc-800">{formatName}</span>
+                                    </p>
+                                )}
+                                <textarea
+                                    value={customInstruction}
+                                    onChange={(event) => onCustomInstructionChange(event.target.value)}
+                                    disabled={isLoading}
+                                    rows={3}
+                                    placeholder="Example: summarize this as meeting notes with decisions and action items."
+                                    className="w-full resize-y rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                            </label>
 
                             {selectedMode === "byok" && (
                                 <>

@@ -55,6 +55,8 @@ export interface RecordingSummary {
     device?: RuntimeDevice | null;
     provider?: BYOKProvider | null;
     provider_model?: string | null;
+    format_name?: string | null;
+    plan?: Record<string, unknown> | null;
     created_at: string;
     updated_at: string;
 }

@@ -224,7 +224,7 @@ async def summarize_recording(
 
     try:
         result = await run_in_threadpool(
-            request.app.state.summarization_service.summarize,
+            request.app.state.summarization_service.summarize_adaptive,
             transcript_text,
             body.prompt,
             max_length=body.max_length,
@@ -248,7 +248,10 @@ async def summarize_recording(
         recording.summary = summary
         db.add(summary)
 
-    summary.text = result
+    summary.text = result["summary"]
+    summary.format_name = result["format_name"]
+    summary.plan_json = json.dumps(result["plan"]) if result["plan"] else None
+    summary.strategy = "adaptive"
     summary.mode = body.mode
     summary.model = body.model if body.mode == "local" else None
     summary.device = body.device if body.mode == "local" else None
@@ -473,6 +476,9 @@ def _serialize_summary(recording: Recording) -> Optional[dict]:
         "device": summary.device,
         "provider": summary.provider,
         "provider_model": summary.provider_model,
+        "format_name": summary.format_name,
+        "plan": json.loads(summary.plan_json) if summary.plan_json else None,
+        "strategy": summary.strategy,
         "created_at": summary.created_at.isoformat(),
         "updated_at": summary.updated_at.isoformat(),
     }

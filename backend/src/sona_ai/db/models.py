@@ -146,6 +146,9 @@ class RecordingSummary(Base):
     device: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     provider: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     provider_model: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    format_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    plan_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    strategy: Mapped[str] = mapped_column(String(32), nullable=False, default="adaptive")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,

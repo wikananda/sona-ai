@@ -83,6 +83,7 @@ export default function RecordingDetail({
     const selectedSummaryDevice = runtimeDevices.available.includes(summaryDevice)
         ? summaryDevice
         : runtimeDevices.default;
+    const [summaryInstruction, setSummaryInstruction] = useState("");
 
     if (isLoading && !recording) {
         return <div className="p-6 text-sm text-zinc-500">Loading recording...</div>;
@@ -111,6 +112,7 @@ export default function RecordingDetail({
             model: localLLMModel,
             device: selectedSummaryDevice,
             mode: summaryMode,
+            prompt: summaryInstruction.trim() || undefined,
             byok: summaryMode === "byok" ? {
                 provider: byokProvider,
                 apiKey: byokApiKey,
@@ -303,6 +305,9 @@ export default function RecordingDetail({
                                 onBYOKModelChange={setBYOKModel}
                                 byokBaseUrl={byokBaseUrl}
                                 onBYOKBaseUrlChange={setBYOKBaseUrl}
+                                customInstruction={summaryInstruction}
+                                onCustomInstructionChange={setSummaryInstruction}
+                                formatName={recording.summary?.format_name}
                                 onSummarize={handleSummarize}
                                 canSummarize={Boolean(onSummarize) && segments.length > 0}
                             />

@@ -2,6 +2,11 @@ import threading
 from typing import Optional
 
 from sona_ai.core import resolve_device, validate_device_available
+from sona_ai.summarization.prompts import (
+    build_adaptive_summary_prompt,
+    build_summary_planner_prompt,
+    parse_summary_plan
+)
 
 
 SUPPORTED_LOCAL_LLM_MODELS = {
@@ -54,6 +59,46 @@ class SummarizationService:
             else self._model_input_limit(model_name)
         )
         return summarizer.generate(text, prompt, max_length=input_limit)
+    
+    def summarize_adaptive(
+        self,
+        text: str,
+        prompt: Optional[str] = None,
+        max_length: Optional[int] = None,
+        model: Optional[str] = None,
+        device: Optional[str] = None,
+        mode: str = "local",
+        byok: Optional[dict] = None,
+    ) -> dict:
+        planner_prompt = build_summary_planner_prompt(text, prompt)
+        raw_plan = self.summarize(
+            text=text,
+            prompt=planner_prompt,
+            max_length=max_length,
+            model=model,
+            device=device,
+            mode=mode,
+            byok=byok,
+        )
+        plan = parse_summary_plan(raw_plan)
+
+        final_prompt = build_adaptive_summary_prompt(text, plan, prompt)
+        summary = self.summarize(
+            text=text,
+            prompt=final_prompt,
+            max_length=max_length,
+            model=model,
+            device=device,
+            mode=mode,
+            byok=byok,
+        )
+
+        return {
+            "summary": summary,
+            "plan": plan,
+            "format_name": plan.get("format_name"),
+        }
+
 
     def _summarize_byok(
         self,
