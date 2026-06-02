@@ -1,4 +1,5 @@
 import json
+import httpx
 import uuid
 from typing import Optional
 
@@ -234,6 +235,14 @@ async def summarize_recording(
             byok=body.byok.model_dump() if body.byok else None,
         )
     except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        if status == 401:
+            raise HTTPException(
+                status_code=400,
+                detail="BYOK authentication failed. Check provider, API key, and model.",
+            ) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Error summarizing recording: %s", exc)
