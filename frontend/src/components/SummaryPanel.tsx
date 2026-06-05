@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 import {
     BYOKProvider,
     RuntimeDevice,
@@ -226,7 +229,7 @@ export default function SummaryPanel({
                 </button>
             </div>
 
-            <div className="flex w-full flex-col gap-2">
+            <div className="flex w-full border-b border-zinc-200 pb-5 flex-col gap-2">
                 <button
                     type="button"
                     onClick={() => setIsInstructionOpen((current) => !current)}
@@ -254,7 +257,7 @@ export default function SummaryPanel({
                 )}
             </div>
 
-            
+
 
             {!summary && !isLoading && (
                 <div className="rounded-md border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-500">
@@ -270,8 +273,69 @@ export default function SummaryPanel({
             )}
 
             {summary && !isLoading && (
-                <div className="text-zinc-700 leading-relaxed">
-                    {summary}
+                <div className="text-zinc-700">
+                    <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                            h1: ({ children }) => (
+                                <h1 className="mb-3 mt-5 text-xl font-semibold text-zinc-950">
+                                    {children}
+                                </h1>
+                            ),
+                            h2: ({ children }) => (
+                                <h2 className="mb-2 mt-5 text-lg font-semibold text-zinc-950">
+                                    {children}
+                                </h2>
+                            ),
+                            h3: ({ children }) => (
+                                <h3 className="mb-2 mt-4 text-base font-semibold text-zinc-950">
+                                    {children}
+                                </h3>
+                            ),
+                            p: ({ children }) => (
+                                <p className="mb-3 leading-relaxed text-zinc-700">
+                                    {children}
+                                </p>
+                            ),
+                            ul: ({ children }) => (
+                                <ul className="mb-3 list-disc space-y-1 pl-5">
+                                    {children}
+                                </ul>
+                            ),
+                            ol: ({ children }) => (
+                                <ol className="mb-3 list-decimal space-y-1 pl-5">
+                                    {children}
+                                </ol>
+                            ),
+                            li: ({ children }) => (
+                                <li className="leading-relaxed text-zinc-700">
+                                    {children}
+                                </li>
+                            ),
+                            strong: ({ children }) => (
+                                <strong className="font-semibold text-zinc-950">
+                                    {children}
+                                </strong>
+                            ),
+                            a: ({ children, href }) => (
+                                <a
+                                    href={href}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-medium text-zinc-950 underline"
+                                >
+                                    {children}
+                                </a>
+                            ),
+                            code: ({ children }) => (
+                                <code className="rounded bg-zinc-100 px-1 py-0.5 text-sm text-zinc-900">
+                                    {children}
+                                </code>
+                            ),
+                        }}
+                    >
+                        {summary}
+                    </ReactMarkdown>
                 </div>
             )}
         </div>
