@@ -6,6 +6,7 @@ import {
     Recording,
     RecordingSummaryParams,
     RetranscribeParams,
+    SpeakerExtractionParams,
     RuntimeDevice,
     RuntimeDevices,
     LocalLLMModel,
@@ -41,6 +42,11 @@ interface Props {
         recordingId: string,
         speakers: Record<string, string>,
     ) => Promise<void>;
+    isExtractingSpeakers?: boolean;
+    onExtractSpeakers?: (
+        recordingId: string,
+        settings: SpeakerExtractionParams,
+    ) => Promise<void>;
     isSummarizing?: boolean;
     onSummarize?: (
         recordingId: string,
@@ -56,6 +62,8 @@ export default function RecordingDetail({
     onRetranscribe,
     isRenamingSpeakers = false,
     onRenameSpeakers,
+    isExtractingSpeakers = false,
+    onExtractSpeakers,
     isSummarizing = false,
     onSummarize,
 }: Props) {
@@ -64,6 +72,7 @@ export default function RecordingDetail({
     const [currentTime, setCurrentTime] = useState(0);
     const [isSpeakerEditorOpen, setIsSpeakerEditorOpen] = useState(false);
     const [isRetranscribeEditorOpen, setIsRetranscribeEditorOpen] = useState(false);
+    const [isSpeakerExtractionEditorOpen, setIsSpeakerExtractionEditorOpen] = useState(false);
     const [retranscribeLanguage, setRetranscribeLanguage] = useState("auto");
     const [retranscribeModel, setRetranscribeModel] =
         useState<TranscriptionModel>("parakeet");
@@ -73,6 +82,9 @@ export default function RecordingDetail({
         useState<number | "">("");
     const [retranscribeMaxSpeakers, setRetranscribeMaxSpeakers] =
         useState<number | "">("");
+    const [retranscribeExtractSpeakers, setRetranscribeExtractSpeakers] = useState(true);
+    const [extractMinSpeakers, setExtractMinSpeakers] = useState<number | "">("");
+    const [extractMaxSpeakers, setExtractMaxSpeakers] = useState<number | "">("");
     const [localLLMModel, setLocalLLMModel] = useState<LocalLLMModel>("qwen");
     const [summaryDevice, setSummaryDevice] = useState<RuntimeDevice>(runtimeDevices.default);
     const [summaryMode, setSummaryMode] = useState<SummaryMode>("local");
@@ -95,6 +107,11 @@ export default function RecordingDetail({
 
     const segments = recording.transcript?.segments ?? [];
     const summary = recording.summary?.text ?? "";
+    const hasTranscript = segments.length > 0;
+    const hasDiarization = Boolean(recording.transcript?.diarization_engine);
+    const isProcessingRecording =
+        recording.status === "pending" || recording.status === "processing";
+    const isSpeakerExtractionRunning = isProcessingRecording && hasTranscript && !hasDiarization;
     const activeSegmentIndex = segments.findIndex(
         (segment) => currentTime >= segment.start && currentTime < segment.end,
     );
@@ -103,7 +120,13 @@ export default function RecordingDetail({
         (recording.status === "done" || recording.status === "failed");
     const canRenameSpeakers =
         Boolean(onRenameSpeakers) &&
+        !isProcessingRecording &&
         segments.some((segment) => Boolean(segment.speaker));
+    const canExtractSpeakers =
+        Boolean(onExtractSpeakers) &&
+        hasTranscript &&
+        !hasDiarization &&
+        !isProcessingRecording;
 
     const handleSummarize = async () => {
         if (!onSummarize || !segments.length) return;
@@ -148,12 +171,24 @@ export default function RecordingDetail({
         setRetranscribeDevice(recordingDevice);
         setRetranscribeMinSpeakers(recording.min_speakers ?? "");
         setRetranscribeMaxSpeakers(recording.max_speakers ?? "");
+        setRetranscribeExtractSpeakers(true);
         setIsRetranscribeEditorOpen(true);
     };
 
     const closeRetranscribeEditor = () => {
         if (isRetranscribing) return;
         setIsRetranscribeEditorOpen(false);
+    };
+
+    const openSpeakerExtractionEditor = () => {
+        setExtractMinSpeakers(recording.min_speakers ?? "");
+        setExtractMaxSpeakers(recording.max_speakers ?? "");
+        setIsSpeakerExtractionEditorOpen(true);
+    };
+
+    const closeSpeakerExtractionEditor = () => {
+        if (isExtractingSpeakers) return;
+        setIsSpeakerExtractionEditorOpen(false);
     };
 
     const handleRetranscribeSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -170,8 +205,20 @@ export default function RecordingDetail({
             device: selectedDevice,
             minSpeakers: retranscribeMinSpeakers,
             maxSpeakers: retranscribeMaxSpeakers,
+            extractSpeakers: retranscribeExtractSpeakers,
         });
         setIsRetranscribeEditorOpen(false);
+    };
+
+    const handleSpeakerExtractionSubmit = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!onExtractSpeakers) return;
+
+        await onExtractSpeakers(recording.id, {
+            minSpeakers: extractMinSpeakers,
+            maxSpeakers: extractMaxSpeakers,
+        });
+        setIsSpeakerExtractionEditorOpen(false);
     };
 
     return (
@@ -191,13 +238,13 @@ export default function RecordingDetail({
             </div>
 
             <div className="flex-1 p-6">
-                {recording.status === "pending" && (
+                {recording.status === "pending" && !hasTranscript && (
                     <p className="text-sm text-zinc-500">Waiting to start transcription.</p>
                 )}
-                {recording.status === "processing" && (
+                {recording.status === "processing" && !hasTranscript && (
                     <p className="text-sm text-zinc-500">Transcription is running.</p>
                 )}
-                {recording.status === "failed" && (
+                {recording.status === "failed" && !hasTranscript && (
                     <div className="flex flex-col gap-4">
                         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
                             {recording.error ?? "Transcription failed."}
@@ -216,8 +263,18 @@ export default function RecordingDetail({
                         )}
                     </div>
                 )}
-                {recording.status === "done" && (
+                {(recording.status === "done" || hasTranscript) && (
                     <div className="flex flex-col gap-5">
+                        {isSpeakerExtractionRunning && (
+                            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                                Speaker extraction is running. You can keep reviewing the transcript while diarization finishes.
+                            </div>
+                        )}
+                        {recording.status === "failed" && hasTranscript && (
+                            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                                {recording.error ?? "Processing failed, but the transcript is still available."}
+                            </div>
+                        )}
                         <audio
                             key={recording.id}
                             ref={audioRef}
@@ -248,7 +305,12 @@ export default function RecordingDetail({
                                     onClick={() => setActiveTab("chat")}
                                 />
                             </div>
-                            {activeTab === "transcript" && (canRenameSpeakers || canRetranscribe) && (
+                            {activeTab === "transcript" && (
+                                canRenameSpeakers ||
+                                canRetranscribe ||
+                                canExtractSpeakers ||
+                                isSpeakerExtractionRunning
+                            ) && (
                                 <div className="mb-2 flex flex-wrap items-center gap-2">
                                     {canRenameSpeakers && (
                                         <button
@@ -259,6 +321,21 @@ export default function RecordingDetail({
                                         >
                                             {isRenamingSpeakers ? "Saving speakers..." : "Edit speakers"}
                                         </button>
+                                    )}
+                                    {canExtractSpeakers && (
+                                        <button
+                                            type="button"
+                                            onClick={openSpeakerExtractionEditor}
+                                            disabled={isExtractingSpeakers}
+                                            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {isExtractingSpeakers ? "Extracting speakers..." : "Extract speakers"}
+                                        </button>
+                                    )}
+                                    {isSpeakerExtractionRunning && (
+                                        <span className="text-sm text-amber-700">
+                                            Extracting speakers...
+                                        </span>
                                     )}
                                     {canRetranscribe && (
                                         <button
@@ -309,7 +386,11 @@ export default function RecordingDetail({
                                 onCustomInstructionChange={setSummaryInstruction}
                                 formatName={recording.summary?.format_name}
                                 onSummarize={handleSummarize}
-                                canSummarize={Boolean(onSummarize) && segments.length > 0}
+                                canSummarize={
+                                    Boolean(onSummarize) &&
+                                    segments.length > 0 &&
+                                    !isProcessingRecording
+                                }
                             />
                         )}
                         {activeTab === "chat" && (
@@ -440,6 +521,22 @@ export default function RecordingDetail({
                                     />
                                 </label>
                             </div>
+
+                            <label className="flex items-start gap-2 md:col-span-2">
+                                <input
+                                    type="checkbox"
+                                    checked={retranscribeExtractSpeakers}
+                                    onChange={(event) => setRetranscribeExtractSpeakers(event.target.checked)}
+                                    disabled={isRetranscribing}
+                                    className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-950 focus:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                                <span className="text-sm text-zinc-600">
+                                    Extract speakers during re-transcribe
+                                    <span className="block text-xs text-zinc-500">
+                                        Uncheck this to re-run ASR now and extract speakers later.
+                                    </span>
+                                </span>
+                            </label>
                         </div>
 
                         <div className="mt-6 flex justify-end gap-3">
@@ -457,6 +554,88 @@ export default function RecordingDetail({
                                 className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {isRetranscribing ? "Starting..." : "Start re-transcribe"}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {isSpeakerExtractionEditorOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+                    <form
+                        onSubmit={handleSpeakerExtractionSubmit}
+                        className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl"
+                    >
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <h3 className="text-base font-semibold text-zinc-950">
+                                    Extract speaker settings
+                                </h3>
+                                <p className="mt-1 text-sm text-zinc-500">
+                                    Set speaker bounds for diarization.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={closeSpeakerExtractionEditor}
+                                disabled={isExtractingSpeakers}
+                                className="text-sm font-medium text-zinc-500 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Close
+                            </button>
+                        </div>
+
+                        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                            <label className="flex flex-col gap-1">
+                                <span className="text-xs font-medium text-zinc-500">
+                                    Min speakers
+                                </span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={extractMinSpeakers}
+                                    onChange={(event) => setExtractMinSpeakers(
+                                        numberOrEmpty(event.target.value),
+                                    )}
+                                    disabled={isExtractingSpeakers}
+                                    placeholder="Auto"
+                                    className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                            </label>
+
+                            <label className="flex flex-col gap-1">
+                                <span className="text-xs font-medium text-zinc-500">
+                                    Max speakers
+                                </span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={extractMaxSpeakers}
+                                    onChange={(event) => setExtractMaxSpeakers(
+                                        numberOrEmpty(event.target.value),
+                                    )}
+                                    disabled={isExtractingSpeakers}
+                                    placeholder="Auto"
+                                    className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                            </label>
+                        </div>
+
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={closeSpeakerExtractionEditor}
+                                disabled={isExtractingSpeakers}
+                                className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isExtractingSpeakers}
+                                className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {isExtractingSpeakers ? "Starting..." : "Start extraction"}
                             </button>
                         </div>
                     </form>

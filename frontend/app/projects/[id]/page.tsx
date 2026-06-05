@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     deleteRecording,
+    extractRecordingSpeakers,
     getProject,
     getRecording,
     getRuntimeDevices,
@@ -13,6 +14,7 @@ import {
     renameRecording,
     RecordingSummaryParams,
     RetranscribeParams,
+    SpeakerExtractionParams,
     RuntimeDevice,
     RuntimeDevices,
     renameTranscriptSpeakers,
@@ -38,6 +40,7 @@ export default function ProjectDetailPage() {
     const [renamingRecordingId, setRenamingRecordingId] = useState<string>();
     const [retranscribingId, setRetranscribingId] = useState<string>();
     const [renamingSpeakerId, setRenamingSpeakerId] = useState<string>();
+    const [extractingSpeakerId, setExtractingSpeakerId] = useState<string>();
     const [summarizingId, setSummarizingId] = useState<string>();
     const [runtimeDevices, setRuntimeDevices] = useState<RuntimeDevices>({
         default: "auto",
@@ -111,6 +114,7 @@ export default function ProjectDetailPage() {
         device: RuntimeDevice;
         minSpeakers?: number | "";
         maxSpeakers?: number | "";
+        extractSpeakers?: boolean;
     }) => {
         setIsUploading(true);
         setError("");
@@ -125,6 +129,7 @@ export default function ProjectDetailPage() {
                     device: params.device,
                     minSpeakers: params.minSpeakers,
                     maxSpeakers: params.maxSpeakers,
+                    extractSpeakers: params.extractSpeakers,
                 });
                 firstRecording = firstRecording ?? recording;
             }
@@ -216,6 +221,24 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleExtractSpeakers = async (
+        recordingId: string,
+        params: SpeakerExtractionParams,
+    ) => {
+        setError("");
+        setExtractingSpeakerId(recordingId);
+        try {
+            const recording = await extractRecordingSpeakers(recordingId, params);
+            setSelectedRecording(recording);
+            await refreshProject();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to extract speakers");
+            throw err;
+        } finally {
+            setExtractingSpeakerId(undefined);
+        }
+    };
+
     const handleSummarizeRecording = async (
         recordingId: string,
         params: RecordingSummaryParams,
@@ -296,6 +319,8 @@ export default function ProjectDetailPage() {
                         onRetranscribe={handleRetranscribeRecording}
                         isRenamingSpeakers={renamingSpeakerId === selectedRecording?.id}
                         onRenameSpeakers={handleRenameTranscriptSpeakers}
+                        isExtractingSpeakers={extractingSpeakerId === selectedRecording?.id}
+                        onExtractSpeakers={handleExtractSpeakers}
                         isSummarizing={summarizingId === selectedRecording?.id}
                         onSummarize={handleSummarizeRecording}
                     />

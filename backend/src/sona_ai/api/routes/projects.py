@@ -23,13 +23,14 @@ from sona_ai.api.schemas.projects import (
     ProjectCreate,
     RecordingRename,
     RecordingRetranscribe,
+    RecordingSpeakerExtraction,
     TranscriptSpeakerRename,
 )
 from sona_ai.api.schemas.summarize import RecordingSummaryRequest
 from sona_ai.core import PROJECT_ROOT, setup_logging, validate_device_available
 from sona_ai.db.models import Project, Recording, RecordingStatus, RecordingSummary
 from sona_ai.db.session import get_db
-from sona_ai.services.recording_worker import run_transcription
+from sona_ai.services.recording_worker import run_speaker_extraction, run_transcription
 from sona_ai.services.transcription_service import SUPPORTED_TRANSCRIPTION_MODELS
 from sona_ai.storage import delete_project_dir, delete_recording_file, save_upload
 
@@ -114,6 +115,7 @@ def upload_project_recording(
     device: str = Form(default="auto"),
     min_speakers: Optional[int] = Form(default=None),
     max_speakers: Optional[int] = Form(default=None),
+    extract_speakers: bool = Form(default=True),
     db: Session = Depends(get_db),
 ):
     project = db.get(Project, project_id)
@@ -159,6 +161,7 @@ def upload_project_recording(
         run_transcription,
         recording.id,
         request.app.state.transcription_service,
+        extract_speakers,
     )
     return _serialize_recording(recording, include_transcript=False)
 
@@ -336,8 +339,57 @@ def retranscribe_recording(
         run_transcription,
         recording.id,
         request.app.state.transcription_service,
+        body.extract_speakers if body is not None else True,
     )
     return _serialize_recording(recording, include_transcript=False)
+
+
+@router.post("/recordings/{recording_id}/speakers/extract")
+def extract_recording_speakers(
+    recording_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    body: RecordingSpeakerExtraction | None = Body(default=None),
+    db: Session = Depends(get_db),
+):
+    recording = db.scalar(
+        select(Recording)
+        .where(Recording.id == recording_id)
+        .options(selectinload(Recording.transcript))
+    )
+    if recording is None:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    if recording.status in {RecordingStatus.PENDING, RecordingStatus.PROCESSING}:
+        raise HTTPException(
+            status_code=409,
+            detail="Recording processing is already running",
+        )
+    if recording.transcript is None:
+        raise HTTPException(status_code=404, detail="Transcript not found")
+    if recording.transcript.diarization_engine:
+        raise HTTPException(status_code=409, detail="Speakers have already been extracted")
+    if not (PROJECT_ROOT / recording.stored_path).is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="Recording audio file is missing. Re-upload the audio before extracting speakers.",
+        )
+
+    if body is not None:
+        recording.min_speakers = body.min_speakers
+        recording.max_speakers = body.max_speakers
+        _validate_speakers(recording.min_speakers, recording.max_speakers)
+
+    recording.status = RecordingStatus.PENDING
+    recording.error = None
+    db.commit()
+    db.refresh(recording)
+
+    background_tasks.add_task(
+        run_speaker_extraction,
+        recording.id,
+        request.app.state.transcription_service,
+    )
+    return _serialize_recording(recording, include_transcript=True)
 
 
 @router.patch("/recordings/{recording_id}/transcript/speakers")
@@ -503,8 +555,11 @@ def _summary_text_from_segments(segments: list) -> str:
         if not text:
             continue
 
-        speaker = str(segment.get("speaker") or "Speaker").strip()
-        lines.append(f"{speaker}: {text}")
+        speaker = str(segment.get("speaker") or "").strip()
+        if speaker:
+            lines.append(f"{speaker}: {text}")
+        else:
+            lines.append(text)
 
     return "\n".join(lines)
 

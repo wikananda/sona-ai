@@ -239,11 +239,11 @@ export default function SummaryPanel({
                     Custom instruction
                 </button>
 
-                {/* {formatName && (
+                {formatName && (
                     <p className="text-xs font-medium text-zinc-500">
                         Format: <span className="text-zinc-800">{formatName}</span>
                     </p>
-                )} */}
+                )}
 
                 {isInstructionOpen && (
                     <textarea

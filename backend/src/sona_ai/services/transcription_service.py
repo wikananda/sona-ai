@@ -3,6 +3,7 @@ from typing import Optional
 
 from sona_ai.core import load_config, validate_device_available, setup_logging
 from sona_ai.pipelines import SpeechPipeline, build_speech_pipeline
+from sona_ai.transcription.schemas import TranscriptionResult
 from sona_ai.services.pipeline_profile import (
     PipelineProfile,
     TRANSCRIPTION_MODEL_PROFILES,
@@ -48,14 +49,35 @@ class TranscriptionService:
         device: Optional[str] = None,
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
+        extract_speakers: bool = True,
     ):
-        pipeline = self._get_pipeline(model, device)
+        pipeline = self._get_pipeline(model, device, extract_speakers=extract_speakers)
         logger.info("Waiting for transcription lock...")
         with self._transcription_lock:
             logger.info("Transcription lock acquired.")
             return pipeline.transcribe(
                 audio_path,
                 language=language,
+                min_speakers=min_speakers,
+                max_speakers=max_speakers,
+            )
+
+    def extract_speakers(
+        self,
+        audio_path: str,
+        transcription: TranscriptionResult,
+        model: Optional[str] = None,
+        device: Optional[str] = None,
+        min_speakers: Optional[int] = None,
+        max_speakers: Optional[int] = None,
+    ):
+        pipeline = self._get_pipeline(model, device, extract_speakers=True)
+        logger.info("Waiting for transcription lock...")
+        with self._transcription_lock:
+            logger.info("Transcription lock acquired for speaker extraction.")
+            return pipeline.extract_speakers(
+                audio_path,
+                transcription,
                 min_speakers=min_speakers,
                 max_speakers=max_speakers,
             )
@@ -68,8 +90,9 @@ class TranscriptionService:
         self,
         model: Optional[str],
         device: Optional[str],
+        extract_speakers: bool = True,
     ) -> SpeechPipeline:
-        profile = self.resolve_profile(model, device)
+        profile = self.resolve_profile(model, device, extract_speakers=extract_speakers)
         key = profile.cache_key()
         logger.info(
             "Using speech pipeline: transcription=%s/%s alignment=%s/%s/%s "
@@ -111,6 +134,7 @@ class TranscriptionService:
         self,
         model: Optional[str] = None,
         device: Optional[str] = None,
+        extract_speakers: bool = True,
     ) -> PipelineProfile:
         model_name = self._normalize_model(model or self.default_model)
         device_name = validate_device_available(device or self.default_device)
@@ -118,4 +142,5 @@ class TranscriptionService:
             self.speech_config,
             model=model_name,
             device=device_name,
+            diarization_enabled=extract_speakers,
         )

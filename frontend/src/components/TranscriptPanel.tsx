@@ -90,7 +90,9 @@ export default function TranscriptPanel({
                         onClick={() => onSeekToSegment?.(segment.start)}
                         disabled={!onSeekToSegment}
                         style={{
-                            gridTemplateColumns: `${speakerColumnCh}ch minmax(0, 1fr)`,
+                            gridTemplateColumns: speakers.length
+                                ? `${speakerColumnCh}ch minmax(0, 1fr)`
+                                : "minmax(0, 1fr)",
                         }}
                         className={`grid w-full items-start gap-3 border-b border-zinc-100 py-3 text-left transition-colors last:border-b-0 ${
                             activeSegmentIndex === index
@@ -100,9 +102,11 @@ export default function TranscriptPanel({
                                   : ""
                         } ${onSeekToSegment ? "cursor-pointer" : "cursor-default"}`}
                     >
-                        <span className="min-w-0 break-words text-sm font-bold leading-relaxed text-zinc-700">
-                            {segment.speaker}
-                        </span>
+                        {speakers.length > 0 && (
+                            <span className="min-w-0 break-words text-sm font-bold leading-relaxed text-zinc-700">
+                                {segment.speaker}
+                            </span>
+                        )}
                         <p className="text-sm leading-relaxed text-zinc-700">
                             {segment.text}
                         </p>

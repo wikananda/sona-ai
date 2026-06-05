@@ -17,6 +17,7 @@ interface Props {
         device: RuntimeDevice;
         minSpeakers?: number | "";
         maxSpeakers?: number | "";
+        extractSpeakers?: boolean;
     }) => Promise<void>;
     isUploading: boolean;
     runtimeDevices: RuntimeDevices;
@@ -29,6 +30,7 @@ export default function RecordingUploader({ onUpload, isUploading, runtimeDevice
     const [device, setDevice] = useState<RuntimeDevice>(runtimeDevices.default);
     const [minSpeakers, setMinSpeakers] = useState<number | "">("");
     const [maxSpeakers, setMaxSpeakers] = useState<number | "">("");
+    const [extractSpeakers, setExtractSpeakers] = useState(true);
     const selectedDevice = runtimeDevices.available.includes(device)
         ? device
         : runtimeDevices.default;
@@ -44,13 +46,14 @@ export default function RecordingUploader({ onUpload, isUploading, runtimeDevice
             device: selectedDevice,
             minSpeakers,
             maxSpeakers,
+            extractSpeakers,
         });
         setFiles([]);
     };
 
     return (
         <form onSubmit={handleSubmit} className="rounded-lg border border-zinc-200 bg-white p-4">
-            <div className="grid gap-4 xl:grid-cols-[1.5fr_0.8fr_0.8fr_0.7fr_0.7fr_0.7fr_auto]">
+            <div className="grid gap-4 xl:grid-cols-[1.5fr_0.8fr_0.8fr_0.7fr_auto]">
                 <label className="flex min-h-11 cursor-pointer items-center rounded-md border border-dashed border-zinc-300 px-3 text-sm text-zinc-600">
                     <input
                         type="file"
@@ -100,24 +103,6 @@ export default function RecordingUploader({ onUpload, isUploading, runtimeDevice
                     ))}
                 </select>
 
-                <input
-                    type="number"
-                    min="1"
-                    value={minSpeakers}
-                    onChange={(event) => setMinSpeakers(numberOrEmpty(event.target.value))}
-                    placeholder="Min speakers"
-                    className="min-h-11 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
-                />
-
-                <input
-                    type="number"
-                    min="1"
-                    value={maxSpeakers}
-                    onChange={(event) => setMaxSpeakers(numberOrEmpty(event.target.value))}
-                    placeholder="Max speakers"
-                    className="min-h-11 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
-                />
-
                 <button
                     type="submit"
                     disabled={isUploading || !files.length}
@@ -126,6 +111,44 @@ export default function RecordingUploader({ onUpload, isUploading, runtimeDevice
                     {isUploading ? "Uploading" : "Upload"}
                 </button>
             </div>
+
+            <label className="mt-3 flex w-fit items-start gap-2 text-sm text-zinc-600">
+                <input
+                    type="checkbox"
+                    checked={extractSpeakers}
+                    onChange={(event) => setExtractSpeakers(event.target.checked)}
+                    disabled={isUploading}
+                    className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-950 focus:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+                <span>
+                    Extract speakers
+                    <span className="block text-xs text-zinc-500">
+                        Uncheck to transcribe first and run diarization from the transcript tab later.
+                    </span>
+                </span>
+            </label>
+
+            {extractSpeakers && (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:max-w-md">
+                    <input
+                        type="number"
+                        min="1"
+                        value={minSpeakers}
+                        onChange={(event) => setMinSpeakers(numberOrEmpty(event.target.value))}
+                        placeholder="Min speakers"
+                        className="min-h-11 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
+                    />
+
+                    <input
+                        type="number"
+                        min="1"
+                        value={maxSpeakers}
+                        onChange={(event) => setMaxSpeakers(numberOrEmpty(event.target.value))}
+                        placeholder="Max speakers"
+                        className="min-h-11 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
+                    />
+                </div>
+            )}
 
             {files.length > 0 && (
                 <div className="mt-4 border-t border-zinc-200 pt-3">

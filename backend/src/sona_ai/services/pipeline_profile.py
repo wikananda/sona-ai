@@ -67,6 +67,7 @@ def resolve_pipeline_profile(
     speech_config: dict,
     model: Optional[str] = None,
     device: str= "auto",
+    diarization_enabled: Optional[bool] = None,
 ) -> PipelineProfile:
     config = deepcopy(speech_config)
 
@@ -85,7 +86,10 @@ def resolve_pipeline_profile(
     alignment_engine = alignment.get("engine", "none").lower()
     alignment_config = alignment.get("config")
 
-    diarization_enabled = bool(diarization.get("enabled", True))
+    if diarization_enabled is None:
+        resolved_diarization_enabled = bool(diarization.get("enabled", True))
+    else:
+        resolved_diarization_enabled = diarization_enabled
     diarization_engine = diarization.get("engine", "community_external").lower()
     diarization_config = diarization.get("config")
 
@@ -95,7 +99,7 @@ def resolve_pipeline_profile(
         alignment_enabled=alignment_enabled,
         alignment_engine=alignment_engine,
         alignment_config=alignment_config,
-        diarization_enabled=diarization_enabled,
+        diarization_enabled=resolved_diarization_enabled,
         diarization_engine=diarization_engine,
         diarization_config=diarization_config,
         device=device,

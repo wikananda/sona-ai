@@ -19,6 +19,8 @@ interface Props {
     onMinSpeakersChange: (value: number | "") => void;
     onMaxSpeakersChange: (value: number | "") => void;
     onAutoDetectChange: (value: boolean) => void;
+    extractSpeakersLater?: boolean;
+    onExtractSpeakersLaterChange?: (value: boolean) => void;
     onSubmit: () => void;
     isLoading: boolean;
 }
@@ -34,10 +36,26 @@ export default function AudioUploader({
     selectedLang, onLangChange,
     minSpeakers, maxSpeakers, autoDetect,
     onMinSpeakersChange, onMaxSpeakersChange, onAutoDetectChange,
+    extractSpeakersLater = false,
+    onExtractSpeakersLaterChange,
     onSubmit, isLoading,
 }: Props) {
     // State for Language Menu
     const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
+    const [localExtractSpeakersLater, setLocalExtractSpeakersLater] = useState(false);
+    const resolvedExtractSpeakersLater = onExtractSpeakersLaterChange
+        ? extractSpeakersLater
+        : localExtractSpeakersLater;
+    const shouldExtractSpeakers = !resolvedExtractSpeakersLater;
+
+    const handleExtractSpeakersChange = (checked: boolean) => {
+        const nextExtractSpeakersLater = !checked;
+        if (onExtractSpeakersLaterChange) {
+            onExtractSpeakersLaterChange(nextExtractSpeakersLater);
+        } else {
+            setLocalExtractSpeakersLater(nextExtractSpeakersLater);
+        }
+    };
 
     return (
         <div className="flex flex-col gap-4 w-full max-w-full bg-white p-6 rounded-xl shadow-lg border border-zinc-100">
@@ -104,44 +122,64 @@ export default function AudioUploader({
 
             {/* Speaker Detection settings */}
             <div className="flex flex-col gap-4 text-sm text-gray-700">
-                <div className="flex flex-row gap-4">
-                    <div className="flex-1 flex flex-col gap-1">
-                        <label htmlFor="minSpeakers" className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Min Speakers</label>
-                        <input
-                            type="number"
-                            id="minSpeakers"
-                            min="1"
-                            disabled={autoDetect}
-                            value={minSpeakers}
-                            onChange={(e) => onMinSpeakersChange(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value)))}
-                            placeholder="Optional"
-                            className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-200 transition-all disabled:cursor-not-allowed disabled:opacity-50"
-                        />
-                    </div>
-                    <div className="flex-1 flex flex-col gap-1">
-                        <label htmlFor="maxSpeakers" className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Max Speakers</label>
-                        <input
-                            type="number"
-                            id="maxSpeakers"
-                            min="1"
-                            disabled={autoDetect}
-                            value={maxSpeakers}
-                            onChange={(e) => onMaxSpeakersChange(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value)))}
-                            placeholder="Optional"
-                            className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-200 transition-all disabled:cursor-not-allowed disabled:opacity-50"
-                        />
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-2">
                     <input
                         type="checkbox"
-                        id="autoDetect"
-                        checked={autoDetect}
-                        onChange={(e) => onAutoDetectChange(e.target.checked)}
-                        className="w-4 h-4 rounded border-zinc-300 text-black focus:ring-black"
+                        id="extractSpeakers"
+                        checked={shouldExtractSpeakers}
+                        onChange={(e) => handleExtractSpeakersChange(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 rounded border-zinc-300 text-black focus:ring-black"
                     />
-                    <label htmlFor="autoDetect" className="text-sm text-zinc-500">Auto-detect number of speakers</label>
+                    <label htmlFor="extractSpeakers" className="text-sm text-zinc-500">
+                        Extract speakers
+                        <span className="block text-xs text-zinc-400">
+                            Uncheck to transcribe first and run diarization manually later.
+                        </span>
+                    </label>
                 </div>
+
+                {shouldExtractSpeakers && (
+                    <>
+                        <div className="flex flex-row gap-4">
+                            <div className="flex-1 flex flex-col gap-1">
+                                <label htmlFor="minSpeakers" className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Min Speakers</label>
+                                <input
+                                    type="number"
+                                    id="minSpeakers"
+                                    min="1"
+                                    disabled={autoDetect}
+                                    value={minSpeakers}
+                                    onChange={(e) => onMinSpeakersChange(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value)))}
+                                    placeholder="Optional"
+                                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-200 transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                            </div>
+                            <div className="flex-1 flex flex-col gap-1">
+                                <label htmlFor="maxSpeakers" className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Max Speakers</label>
+                                <input
+                                    type="number"
+                                    id="maxSpeakers"
+                                    min="1"
+                                    disabled={autoDetect}
+                                    value={maxSpeakers}
+                                    onChange={(e) => onMaxSpeakersChange(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value)))}
+                                    placeholder="Optional"
+                                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-200 transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="autoDetect"
+                                checked={autoDetect}
+                                onChange={(e) => onAutoDetectChange(e.target.checked)}
+                                className="w-4 h-4 rounded border-zinc-300 text-black focus:ring-black"
+                            />
+                            <label htmlFor="autoDetect" className="text-sm text-zinc-500">Auto-detect number of speakers</label>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Upload Button */}

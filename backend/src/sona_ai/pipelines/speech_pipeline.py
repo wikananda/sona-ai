@@ -8,6 +8,7 @@ from sona_ai.core import PROJECT_ROOT, setup_logging, write_json
 from sona_ai.diarization.base import Diarizer
 from sona_ai.pipelines.speaker_assignment import SpeakerAssigner
 from sona_ai.transcription.base import Transcriber
+from sona_ai.transcription.schemas import TranscriptionResult
 
 
 logger = setup_logging()
@@ -68,6 +69,23 @@ class SpeechPipeline:
             self._write_result(result)
             return result
 
+        return self.extract_speakers(
+            audio_path,
+            transcription,
+            min_speakers=min_speakers,
+            max_speakers=max_speakers,
+        )
+
+    def extract_speakers(
+        self,
+        audio_path: str,
+        transcription: TranscriptionResult,
+        min_speakers: Optional[int] = None,
+        max_speakers: Optional[int] = None,
+    ):
+        if self.diarizer is None:
+            raise ValueError("Speaker extraction is not available because diarization is disabled")
+
         logger.info("Speech pipeline stage started: diarization")
         diarization = self.diarizer.diarize(
             audio_path,
@@ -104,17 +122,16 @@ class SpeechPipeline:
 
     def _build_conversations(self, result_segments):
         conversations = []
-        previous_speaker = "Unknown"
 
         for segment in result_segments:
-            current_speaker = segment.get("speaker", previous_speaker)
-            conversations.append({
-                "speaker": current_speaker,
+            conversation = {
                 "text": segment["text"],
                 "start": segment["start"],
                 "end": segment["end"],
-            })
-            previous_speaker = current_speaker
+            }
+            if segment.get("speaker"):
+                conversation["speaker"] = segment["speaker"]
+            conversations.append(conversation)
 
         return conversations
 

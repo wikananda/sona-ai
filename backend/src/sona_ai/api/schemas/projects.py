@@ -14,6 +14,12 @@ class RecordingRetranscribe(BaseModel):
     device: Optional[str] = None
     min_speakers: Optional[int] = None
     max_speakers: Optional[int] = None
+    extract_speakers: bool = True
+
+
+class RecordingSpeakerExtraction(BaseModel):
+    min_speakers: Optional[int] = None
+    max_speakers: Optional[int] = None
 
 
 class TranscriptSpeakerRename(BaseModel):

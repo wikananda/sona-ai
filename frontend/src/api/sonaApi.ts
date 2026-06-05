@@ -1,5 +1,5 @@
 export interface SpeakerSegment {
-    speaker: string;
+    speaker?: string;
     text: string;
     start: number;
     end: number;
@@ -99,6 +99,7 @@ export interface TranscribeParams {
     device?: RuntimeDevice;
     minSpeakers?: number | "";
     maxSpeakers?: number | "";
+    extractSpeakers?: boolean;
 }
 
 export interface UploadProjectRecordingParams extends TranscribeParams {
@@ -109,6 +110,12 @@ export interface RetranscribeParams {
     language?: string;
     model: TranscriptionModel;
     device: RuntimeDevice;
+    minSpeakers?: number | "";
+    maxSpeakers?: number | "";
+    extractSpeakers?: boolean;
+}
+
+export interface SpeakerExtractionParams {
     minSpeakers?: number | "";
     maxSpeakers?: number | "";
 }
@@ -215,6 +222,23 @@ export async function retranscribeRecording(
                 device: params.device,
                 min_speakers: emptyToNull(params.minSpeakers),
                 max_speakers: emptyToNull(params.maxSpeakers),
+                extract_speakers: params.extractSpeakers ?? true,
+            })
+            : undefined,
+    });
+}
+
+export async function extractRecordingSpeakers(
+    recordingId: string,
+    params?: SpeakerExtractionParams,
+): Promise<Recording> {
+    return requestJson(`/recordings/${recordingId}/speakers/extract`, {
+        method: "POST",
+        headers: params ? { "Content-Type": "application/json" } : undefined,
+        body: params
+            ? JSON.stringify({
+                min_speakers: emptyToNull(params.minSpeakers),
+                max_speakers: emptyToNull(params.maxSpeakers),
             })
             : undefined,
     });
@@ -263,6 +287,7 @@ export async function transcribeAudio(params: TranscribeParams): Promise<Speaker
     appendSearchParam(url, "device", params.device);
     appendSearchParam(url, "min_speakers", params.minSpeakers);
     appendSearchParam(url, "max_speakers", params.maxSpeakers);
+    appendSearchParam(url, "extract_speakers", params.extractSpeakers);
 
     const response = await fetch(url.toString(), {
         method: "POST",
@@ -335,6 +360,7 @@ function buildRecordingFormData(params: TranscribeParams): FormData {
     appendFormValue(formData, "device", params.device ?? "auto");
     appendFormValue(formData, "min_speakers", params.minSpeakers);
     appendFormValue(formData, "max_speakers", params.maxSpeakers);
+    appendFormValue(formData, "extract_speakers", params.extractSpeakers ?? true);
     return formData;
 }
 
@@ -349,7 +375,7 @@ async function requestJson(path: string, init?: RequestInit) {
 function appendFormValue(
     formData: FormData,
     key: string,
-    value?: string | number | "",
+    value?: string | number | boolean | "",
 ) {
     if (value !== undefined && value !== "") {
         formData.append(key, String(value));
@@ -359,7 +385,7 @@ function appendFormValue(
 function appendSearchParam(
     url: URL,
     key: string,
-    value?: string | number | "",
+    value?: string | number | boolean | "",
 ) {
     if (value !== undefined && value !== "") {
         url.searchParams.append(key, String(value));
