@@ -47,15 +47,19 @@ class SpeechPipeline:
         logger.info("Speech pipeline stage started: transcription")
         transcription = self.transcriber.transcribe(audio_path, language=language)
         logger.info(
-            "Speech pipeline stage finished: transcription (%d segments)",
+            "Speech pipeline stage finished: transcription (%d segments, %d timed segments, %d timed words)",
             len(transcription.segments),
+            self._timed_segment_count(transcription),
+            self._timed_word_count(transcription),
         )
         if self.aligner is not None:
             logger.info("Speech pipeline stage started: alignment")
             transcription = self.aligner.align(transcription, audio_path)
             logger.info(
-                "Speech pipeline stage finished: alignment (%d segments)",
+                "Speech pipeline stage finished: alignment (%d segments, %d timed segments, %d timed words)",
                 len(transcription.segments),
+                self._timed_segment_count(transcription),
+                self._timed_word_count(transcription),
             )
 
         if self.diarizer is None:
@@ -85,6 +89,11 @@ class SpeechPipeline:
     ):
         if self.diarizer is None:
             raise ValueError("Speaker extraction is not available because diarization is disabled")
+        if not self._has_usable_timestamps(transcription):
+            raise ValueError(
+                "Cannot assign speakers because transcript has no usable timestamps. "
+                "Re-transcribe with alignment enabled."
+            )
 
         logger.info("Speech pipeline stage started: diarization")
         diarization = self.diarizer.diarize(
@@ -93,22 +102,26 @@ class SpeechPipeline:
             max_speakers=max_speakers,
         )
         logger.info(
-            "Speech pipeline stage finished: diarization (%d turns)",
+            "Speech pipeline stage finished: diarization (%d turns, %d speakers, min_speakers=%s max_speakers=%s)",
             len(diarization.turns),
+            len({turn.speaker for turn in diarization.turns}),
+            min_speakers,
+            max_speakers,
         )
         logger.info("Speech pipeline stage started: speaker assignment")
         segments = self.speaker_assigner.assign(transcription, diarization)
-        speakers = sorted({
-            segment.get("speaker")
-            for segment in segments
-            if segment.get("speaker")
-        })
+        speakers = sorted(self._real_speakers(segments))
         logger.info(
             "Final transcript has %d speakers across %d segments: %s",
             len(speakers),
             len(segments),
             speakers,
         )
+        if not speakers:
+            raise ValueError(
+                "Speaker extraction did not assign any speakers. The transcript may "
+                "not have enough timing detail. Re-transcribe with alignment enabled."
+            )
         logger.info("Speech pipeline stage finished: speaker assignment")
         conversations = self._build_conversations(segments)
 
@@ -141,6 +154,40 @@ class SpeechPipeline:
 
         write_json(output_dir / "conversations.json", result["transcript"])
         write_json(output_dir / "result_raw.json", result["result_raw"])
+
+    def _has_usable_timestamps(self, transcription: TranscriptionResult) -> bool:
+        return (
+            self._timed_word_count(transcription) > 0
+            or self._timed_segment_count(transcription) > 0
+        )
+
+    def _timed_segment_count(self, transcription: TranscriptionResult) -> int:
+        return sum(
+            1
+            for segment in transcription.segments
+            if segment.end > segment.start
+        )
+
+    def _timed_word_count(self, transcription: TranscriptionResult) -> int:
+        return sum(
+            1
+            for segment in transcription.segments
+            for word in segment.words
+            if (
+                word.start is not None
+                and word.end is not None
+                and word.end > word.start
+            )
+        )
+
+    def _real_speakers(self, segments: list[dict]) -> set[str]:
+        return {
+            str(segment.get("speaker")).strip()
+            for segment in segments
+            if isinstance(segment, dict)
+            and segment.get("speaker")
+            and str(segment.get("speaker")).strip().lower() != "unknown"
+        }
 
     def cleanup_models(self):
         self.transcriber.cleanup_models()
