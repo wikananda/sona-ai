@@ -126,8 +126,15 @@ def upload_project_recording(
     device = _normalize_device(device)
     language = _normalize_language(language)
     _validate_speaker_settings(extract_speakers, min_speakers, max_speakers)
+    profile = request.app.state.transcription_service.resolve_profile(
+        model=model,
+        device=device,
+        extract_speakers=extract_speakers,
+    )
+    progress_total_steps = _transcription_step_count(profile)
 
     recording_id = str(uuid.uuid4())
+    job_id = str(uuid.uuid4())
     saved_audio = None
     try:
         saved_audio = save_upload(project_id, recording_id, file)
@@ -144,6 +151,10 @@ def upload_project_recording(
             min_speakers=min_speakers,
             max_speakers=max_speakers,
             status=RecordingStatus.PENDING,
+            processing_stage="queued",
+            processing_job_id=job_id,
+            progress_completed_steps=0,
+            progress_total_steps=progress_total_steps,
         )
         db.add(recording)
         db.commit()
@@ -160,6 +171,7 @@ def upload_project_recording(
     background_tasks.add_task(
         run_transcription,
         recording.id,
+        job_id,
         request.app.state.transcription_service,
         extract_speakers,
     )
@@ -330,8 +342,18 @@ def retranscribe_recording(
         recording.min_speakers,
         recording.max_speakers,
     )
+    profile = request.app.state.transcription_service.resolve_profile(
+        model=recording.model,
+        device=recording.device,
+        extract_speakers=extract_speakers,
+    )
+    job_id = str(uuid.uuid4())
 
     recording.status = RecordingStatus.PENDING
+    recording.processing_stage = "queued"
+    recording.processing_job_id = job_id
+    recording.progress_completed_steps = 0
+    recording.progress_total_steps = _transcription_step_count(profile)
     recording.error = None
     if recording.summary is not None:
         summary = recording.summary
@@ -343,6 +365,7 @@ def retranscribe_recording(
     background_tasks.add_task(
         run_transcription,
         recording.id,
+        job_id,
         request.app.state.transcription_service,
         extract_speakers,
     )
@@ -387,8 +410,13 @@ def extract_recording_speakers(
         recording.min_speakers,
         recording.max_speakers,
     )
+    job_id = str(uuid.uuid4())
 
     recording.status = RecordingStatus.PENDING
+    recording.processing_stage = "queued"
+    recording.processing_job_id = job_id
+    recording.progress_completed_steps = 0
+    recording.progress_total_steps = 2
     recording.error = None
     db.commit()
     db.refresh(recording)
@@ -396,8 +424,36 @@ def extract_recording_speakers(
     background_tasks.add_task(
         run_speaker_extraction,
         recording.id,
+        job_id,
         request.app.state.transcription_service,
     )
+    return _serialize_recording(recording, include_transcript=True)
+
+
+@router.post("/recordings/{recording_id}/cancel")
+def cancel_recording(recording_id: str, db: Session = Depends(get_db)):
+    recording = db.scalar(
+        select(Recording)
+        .where(Recording.id == recording_id)
+        .options(
+            selectinload(Recording.transcript),
+            selectinload(Recording.summary),
+        )
+    )
+    if recording is None:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    if recording.status not in {RecordingStatus.PENDING, RecordingStatus.PROCESSING}:
+        raise HTTPException(
+            status_code=409,
+            detail="Recording is not currently processing",
+        )
+
+    recording.status = RecordingStatus.CANCELED
+    recording.processing_stage = "canceled"
+    recording.processing_job_id = None
+    recording.error = None
+    db.commit()
+    db.refresh(recording)
     return _serialize_recording(recording, include_transcript=True)
 
 
@@ -484,6 +540,25 @@ def _serialize_project(project: Project) -> dict:
     }
 
 
+def _serialize_progress(recording: Recording) -> dict:
+    total_steps = max(int(recording.progress_total_steps or 0), 0)
+    completed_steps = max(int(recording.progress_completed_steps or 0), 0)
+    if total_steps > 0:
+        completed_steps = min(completed_steps, total_steps)
+        percent = round((completed_steps / total_steps) * 100)
+    else:
+        percent = 100 if recording.status == RecordingStatus.DONE else 0
+
+    stage = recording.processing_stage or _stage_for_status(recording.status)
+    return {
+        "stage": stage,
+        "label": _progress_label(stage),
+        "completed_steps": completed_steps,
+        "total_steps": total_steps,
+        "percent": percent,
+    }
+
+
 def _serialize_recording(recording: Recording, include_transcript: bool) -> dict:
     data = {
         "id": recording.id,
@@ -498,6 +573,7 @@ def _serialize_recording(recording: Recording, include_transcript: bool) -> dict
         "min_speakers": recording.min_speakers,
         "max_speakers": recording.max_speakers,
         "status": recording.status,
+        "progress": _serialize_progress(recording),
         "error": recording.error,
         "created_at": recording.created_at.isoformat(),
         "updated_at": recording.updated_at.isoformat(),
@@ -508,6 +584,42 @@ def _serialize_recording(recording: Recording, include_transcript: bool) -> dict
         data["summary"] = _serialize_summary(recording)
 
     return data
+
+
+def _stage_for_status(status: str) -> str:
+    if status == RecordingStatus.DONE:
+        return "done"
+    if status == RecordingStatus.FAILED:
+        return "failed"
+    if status == RecordingStatus.CANCELED:
+        return "canceled"
+    if status == RecordingStatus.PENDING:
+        return "queued"
+    return "processing"
+
+
+def _progress_label(stage: str) -> str:
+    return {
+        "queued": "Waiting to start",
+        "preparing": "Preparing models",
+        "transcribing": "Transcribing",
+        "aligning": "Aligning",
+        "diarizing": "Diarizing",
+        "assigning_speakers": "Assigning speakers",
+        "done": "Done",
+        "failed": "Failed",
+        "canceled": "Canceled",
+        "processing": "Processing",
+    }.get(stage, "Processing")
+
+
+def _transcription_step_count(profile) -> int:
+    total_steps = 1
+    if profile.alignment_enabled:
+        total_steps += 1
+    if profile.diarization_enabled:
+        total_steps += 2
+    return total_steps
 
 
 def _serialize_transcript(recording: Recording) -> Optional[dict]:

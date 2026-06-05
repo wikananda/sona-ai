@@ -5,7 +5,7 @@ export interface SpeakerSegment {
     end: number;
 }
 
-export type RecordingStatus = "pending" | "processing" | "done" | "failed";
+export type RecordingStatus = "pending" | "processing" | "done" | "failed" | "canceled";
 export type TranscriptionModel =
     | "parakeet"
     | "faster-whisper-large-v3"
@@ -15,6 +15,17 @@ export type BYOKProvider = "openai" | "groq" | "openrouter" | "custom";
 export type LocalLLMModel = "qwen" | "llama" | "gemma";
 export type RuntimeDevice = "auto" | "cpu" | "mps" | "cuda";
 export type RecordingChatRole = "user" | "assistant";
+export type RecordingProgressStage =
+    | "queued"
+    | "preparing"
+    | "transcribing"
+    | "aligning"
+    | "diarizing"
+    | "assigning_speakers"
+    | "done"
+    | "failed"
+    | "canceled"
+    | "processing";
 
 export interface RuntimeDevices {
     default: RuntimeDevice;
@@ -61,6 +72,14 @@ export interface RecordingSummary {
     updated_at: string;
 }
 
+export interface RecordingProgress {
+    stage: RecordingProgressStage | string;
+    label: string;
+    completed_steps: number;
+    total_steps: number;
+    percent: number;
+}
+
 export interface Recording {
     id: string;
     project_id: string;
@@ -74,6 +93,7 @@ export interface Recording {
     min_speakers?: number | null;
     max_speakers?: number | null;
     status: RecordingStatus;
+    progress: RecordingProgress;
     error?: string | null;
     created_at: string;
     updated_at: string;
@@ -225,6 +245,12 @@ export async function retranscribeRecording(
                 extract_speakers: params.extractSpeakers ?? true,
             })
             : undefined,
+    });
+}
+
+export async function cancelRecording(recordingId: string): Promise<Recording> {
+    return requestJson(`/recordings/${recordingId}/cancel`, {
+        method: "POST",
     });
 }
 

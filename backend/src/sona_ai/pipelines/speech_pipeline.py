@@ -2,6 +2,7 @@ import logging
 import os
 import warnings
 from typing import Optional
+from collections.abc import Callable
 
 from sona_ai.alignment.base import Aligner
 from sona_ai.core import PROJECT_ROOT, setup_logging, write_json
@@ -13,6 +14,7 @@ from sona_ai.transcription.schemas import TranscriptionResult
 
 logger = setup_logging()
 output_dir = PROJECT_ROOT / "outputs" / "transcription"
+ProgressCallback = Callable[[str, bool], None]
 
 
 class SpeechPipeline:
@@ -43,8 +45,10 @@ class SpeechPipeline:
         language: Optional[str] = None,
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
+        progress_callback: Optional[ProgressCallback] = None,
     ):
         logger.info("Speech pipeline stage started: transcription")
+        self._emit_progress(progress_callback, "transcribing", finished=False)
         transcription = self.transcriber.transcribe(audio_path, language=language)
         logger.info(
             "Speech pipeline stage finished: transcription (%d segments, %d timed segments, %d timed words)",
@@ -52,8 +56,10 @@ class SpeechPipeline:
             self._timed_segment_count(transcription),
             self._timed_word_count(transcription),
         )
+        self._emit_progress(progress_callback, "transcribing", finished=True)
         if self.aligner is not None:
             logger.info("Speech pipeline stage started: alignment")
+            self._emit_progress(progress_callback, "aligning", finished=False)
             transcription = self.aligner.align(transcription, audio_path)
             logger.info(
                 "Speech pipeline stage finished: alignment (%d segments, %d timed segments, %d timed words)",
@@ -61,6 +67,7 @@ class SpeechPipeline:
                 self._timed_segment_count(transcription),
                 self._timed_word_count(transcription),
             )
+            self._emit_progress(progress_callback, "aligning", finished=True)
 
         if self.diarizer is None:
             segments = transcription.to_segment_dicts()
@@ -78,6 +85,7 @@ class SpeechPipeline:
             transcription,
             min_speakers=min_speakers,
             max_speakers=max_speakers,
+            progress_callback=progress_callback,
         )
 
     def extract_speakers(
@@ -86,6 +94,7 @@ class SpeechPipeline:
         transcription: TranscriptionResult,
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
+        progress_callback: Optional[ProgressCallback] = None,
     ):
         if self.diarizer is None:
             raise ValueError("Speaker extraction is not available because diarization is disabled")
@@ -96,6 +105,7 @@ class SpeechPipeline:
             )
 
         logger.info("Speech pipeline stage started: diarization")
+        self._emit_progress(progress_callback, "diarizing", finished=False)
         diarization = self.diarizer.diarize(
             audio_path,
             min_speakers=min_speakers,
@@ -108,7 +118,9 @@ class SpeechPipeline:
             min_speakers,
             max_speakers,
         )
+        self._emit_progress(progress_callback, "diarizing", finished=True)
         logger.info("Speech pipeline stage started: speaker assignment")
+        self._emit_progress(progress_callback, "assigning_speakers", finished=False)
         segments = self.speaker_assigner.assign(transcription, diarization)
         speakers = sorted(self._real_speakers(segments))
         logger.info(
@@ -123,6 +135,7 @@ class SpeechPipeline:
                 "not have enough timing detail. Re-transcribe with alignment enabled."
             )
         logger.info("Speech pipeline stage finished: speaker assignment")
+        self._emit_progress(progress_callback, "assigning_speakers", finished=True)
         conversations = self._build_conversations(segments)
 
         result = {
@@ -154,6 +167,16 @@ class SpeechPipeline:
 
         write_json(output_dir / "conversations.json", result["transcript"])
         write_json(output_dir / "result_raw.json", result["result_raw"])
+
+    def _emit_progress(
+        self,
+        progress_callback: Optional[ProgressCallback],
+        stage: str,
+        finished: bool,
+    ) -> None:
+        if progress_callback is None:
+            return
+        progress_callback(stage, finished)
 
     def _has_usable_timestamps(self, transcription: TranscriptionResult) -> bool:
         return (

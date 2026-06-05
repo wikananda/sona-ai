@@ -37,6 +37,8 @@ interface Props {
         recordingId: string,
         settings: RetranscribeParams,
     ) => Promise<void>;
+    isCanceling?: boolean;
+    onCancel?: (recordingId: string) => Promise<void>;
     isRenamingSpeakers?: boolean;
     onRenameSpeakers?: (
         recordingId: string,
@@ -60,6 +62,8 @@ export default function RecordingDetail({
     runtimeDevices,
     isRetranscribing = false,
     onRetranscribe,
+    isCanceling = false,
+    onCancel,
     isRenamingSpeakers = false,
     onRenameSpeakers,
     isExtractingSpeakers = false,
@@ -113,13 +117,19 @@ export default function RecordingDetail({
     const hasDiarization = Boolean(recording.transcript?.diarization_engine);
     const isProcessingRecording =
         recording.status === "pending" || recording.status === "processing";
-    const isSpeakerExtractionRunning = isProcessingRecording && hasTranscript && !hasDiarization;
+    const isSpeakerExtractionRunning =
+        isProcessingRecording &&
+        ["diarizing", "assigning_speakers"].includes(recording.progress?.stage ?? "");
     const activeSegmentIndex = segments.findIndex(
         (segment) => currentTime >= segment.start && currentTime < segment.end,
     );
     const canRetranscribe =
         Boolean(onRetranscribe) &&
-        (recording.status === "done" || recording.status === "failed");
+        (
+            recording.status === "done" ||
+            recording.status === "failed" ||
+            recording.status === "canceled"
+        );
     const canRenameSpeakers =
         Boolean(onRenameSpeakers) &&
         !isProcessingRecording &&
@@ -240,6 +250,11 @@ export default function RecordingDetail({
         setIsSpeakerExtractionEditorOpen(false);
     };
 
+    const handleCancelProcessing = async () => {
+        if (!onCancel) return;
+        await onCancel(recording.id);
+    };
+
     return (
         <section className="flex min-h-[520px] flex-col bg-white">
             <div className="border-b border-zinc-200 px-6 py-4">
@@ -258,10 +273,18 @@ export default function RecordingDetail({
 
             <div className="flex-1 p-6">
                 {recording.status === "pending" && !hasTranscript && (
-                    <p className="text-sm text-zinc-500">Waiting to start transcription.</p>
+                    <RecordingProgressPanel
+                        recording={recording}
+                        isCanceling={isCanceling}
+                        onCancel={onCancel ? handleCancelProcessing : undefined}
+                    />
                 )}
                 {recording.status === "processing" && !hasTranscript && (
-                    <p className="text-sm text-zinc-500">Transcription is running.</p>
+                    <RecordingProgressPanel
+                        recording={recording}
+                        isCanceling={isCanceling}
+                        onCancel={onCancel ? handleCancelProcessing : undefined}
+                    />
                 )}
                 {recording.status === "failed" && !hasTranscript && (
                     <div className="flex flex-col gap-4">
@@ -282,16 +305,43 @@ export default function RecordingDetail({
                         )}
                     </div>
                 )}
+                {recording.status === "canceled" && !hasTranscript && (
+                    <div className="flex flex-col gap-4">
+                        <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
+                            Transcription was canceled.
+                        </div>
+                        {canRetranscribe && (
+                            <div>
+                                <button
+                                    type="button"
+                                    onClick={openRetranscribeEditor}
+                                    disabled={isRetranscribing}
+                                    className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
                 {(recording.status === "done" || hasTranscript) && (
                     <div className="flex flex-col gap-5">
-                        {isSpeakerExtractionRunning && (
-                            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                                Speaker extraction is running. You can keep reviewing the transcript while diarization finishes.
-                            </div>
+                        {isProcessingRecording && (
+                            <RecordingProgressPanel
+                                recording={recording}
+                                helperText="You can keep reviewing the current transcript while processing finishes."
+                                isCanceling={isCanceling}
+                                onCancel={onCancel ? handleCancelProcessing : undefined}
+                            />
                         )}
                         {recording.status === "failed" && hasTranscript && (
                             <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                                 {recording.error ?? "Processing failed, but the transcript is still available."}
+                            </div>
+                        )}
+                        {recording.status === "canceled" && hasTranscript && (
+                            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+                                Processing was canceled, but the previous transcript is still available.
                             </div>
                         )}
                         <audio
@@ -330,44 +380,44 @@ export default function RecordingDetail({
                                 canExtractSpeakers ||
                                 isSpeakerExtractionRunning
                             ) && (
-                                <div className="mb-2 flex flex-wrap items-center gap-2">
-                                    {canRenameSpeakers && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsSpeakerEditorOpen(true)}
-                                            disabled={isRenamingSpeakers}
-                                            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
-                                        >
-                                            {isRenamingSpeakers ? "Saving speakers..." : "Edit speakers"}
-                                        </button>
-                                    )}
-                                    {canExtractSpeakers && (
-                                        <button
-                                            type="button"
-                                            onClick={openSpeakerExtractionEditor}
-                                            disabled={isExtractingSpeakers}
-                                            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
-                                        >
-                                            {isExtractingSpeakers ? "Extracting speakers..." : "Extract speakers"}
-                                        </button>
-                                    )}
-                                    {isSpeakerExtractionRunning && (
-                                        <span className="text-sm text-amber-700">
-                                            Extracting speakers...
-                                        </span>
-                                    )}
-                                    {canRetranscribe && (
-                                        <button
-                                            type="button"
-                                            onClick={openRetranscribeEditor}
-                                            disabled={isRetranscribing}
-                                            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
-                                        >
-                                            {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
-                                        </button>
-                                    )}
-                                </div>
-                            )}
+                                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                                        {canRenameSpeakers && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsSpeakerEditorOpen(true)}
+                                                disabled={isRenamingSpeakers}
+                                                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                {isRenamingSpeakers ? "Saving speakers..." : "Edit speakers"}
+                                            </button>
+                                        )}
+                                        {canExtractSpeakers && (
+                                            <button
+                                                type="button"
+                                                onClick={openSpeakerExtractionEditor}
+                                                disabled={isExtractingSpeakers}
+                                                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                {isExtractingSpeakers ? "Extracting speakers..." : "Extract speakers"}
+                                            </button>
+                                        )}
+                                        {isSpeakerExtractionRunning && (
+                                            <span className="text-sm text-amber-700">
+                                                Extracting speakers...
+                                            </span>
+                                        )}
+                                        {canRetranscribe && (
+                                            <button
+                                                type="button"
+                                                onClick={openRetranscribeEditor}
+                                                disabled={isRetranscribing}
+                                                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                         </div>
 
                         {activeTab === "transcript" && (
@@ -709,5 +759,66 @@ function TabButton({
         >
             {label}
         </button>
+    );
+}
+
+function RecordingProgressPanel({
+    recording,
+    helperText,
+    isCanceling = false,
+    onCancel,
+}: {
+    recording: Recording;
+    helperText?: string;
+    isCanceling?: boolean;
+    onCancel?: () => Promise<void>;
+}) {
+    const progress = recording.progress;
+    const percent = Math.max(0, Math.min(100, Math.round(progress?.percent ?? 0)));
+    const totalSteps = progress?.total_steps ?? 0;
+    const completedSteps = progress?.completed_steps ?? 0;
+    const detail = totalSteps > 0
+        ? `Completed ${completedSteps} of ${totalSteps} stages`
+        : "Preparing progress details";
+
+    return (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="text-sm font-medium text-amber-950">
+                        {progress?.label ?? "Processing"}...
+                    </p>
+                    <p className="mt-1 text-xs text-amber-800">
+                        {helperText ?? detail}
+                    </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                    <span className="text-sm font-semibold tabular-nums text-amber-950">
+                        {percent}%
+                    </span>
+                    {onCancel && (
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            disabled={isCanceling}
+                            aria-label="Cancel processing"
+                            title="Cancel processing"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-amber-300 text-lg leading-none text-amber-950 transition-colors hover:border-amber-500 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            x
+                        </button>
+                    )}
+                </div>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-amber-100">
+                <div
+                    className="h-full rounded-full bg-amber-600 transition-[width] duration-300"
+                    style={{ width: `${percent}%` }}
+                />
+            </div>
+            {helperText && (
+                <p className="mt-2 text-xs text-amber-800">{detail}</p>
+            )}
+        </div>
     );
 }

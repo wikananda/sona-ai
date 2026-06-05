@@ -1,4 +1,5 @@
 import threading
+from collections.abc import Callable
 from typing import Optional
 
 from sona_ai.core import load_config, validate_device_available, setup_logging
@@ -15,6 +16,7 @@ from sona_ai.services.pipeline_profile import (
 SUPPORTED_TRANSCRIPTION_MODELS = set(TRANSCRIPTION_MODEL_PROFILES)
 
 logger = setup_logging()
+ProgressCallback = Callable[[str, bool], None]
 
 
 class TranscriptionService:
@@ -50,6 +52,7 @@ class TranscriptionService:
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
         extract_speakers: bool = True,
+        progress_callback: Optional[ProgressCallback] = None,
     ):
         pipeline = self._get_pipeline(model, device, extract_speakers=extract_speakers)
         logger.info("Waiting for transcription lock...")
@@ -60,6 +63,7 @@ class TranscriptionService:
                 language=language,
                 min_speakers=min_speakers,
                 max_speakers=max_speakers,
+                progress_callback=progress_callback,
             )
 
     def extract_speakers(
@@ -70,6 +74,7 @@ class TranscriptionService:
         device: Optional[str] = None,
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
+        progress_callback: Optional[ProgressCallback] = None,
     ):
         pipeline = self._get_pipeline(model, device, extract_speakers=True)
         logger.info("Waiting for transcription lock...")
@@ -80,6 +85,7 @@ class TranscriptionService:
                 transcription,
                 min_speakers=min_speakers,
                 max_speakers=max_speakers,
+                progress_callback=progress_callback,
             )
 
     def close(self):

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+    cancelRecording,
     deleteRecording,
     extractRecordingSpeakers,
     getProject,
@@ -39,6 +40,7 @@ export default function ProjectDetailPage() {
     const [isUploading, setIsUploading] = useState(false);
     const [renamingRecordingId, setRenamingRecordingId] = useState<string>();
     const [retranscribingId, setRetranscribingId] = useState<string>();
+    const [cancelingRecordingId, setCancelingRecordingId] = useState<string>();
     const [renamingSpeakerId, setRenamingSpeakerId] = useState<string>();
     const [extractingSpeakerId, setExtractingSpeakerId] = useState<string>();
     const [summarizingId, setSummarizingId] = useState<string>();
@@ -204,6 +206,23 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleCancelRecording = async (recordingId: string) => {
+        setError("");
+        setCancelingRecordingId(recordingId);
+        try {
+            const recording = await cancelRecording(recordingId);
+            setSelectedRecording((current) =>
+                current?.id === recordingId ? recording : current,
+            );
+            await refreshProject();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to cancel recording");
+            throw err;
+        } finally {
+            setCancelingRecordingId(undefined);
+        }
+    };
+
     const handleRenameTranscriptSpeakers = async (
         recordingId: string,
         speakers: Record<string, string>,
@@ -317,6 +336,8 @@ export default function ProjectDetailPage() {
                         runtimeDevices={runtimeDevices}
                         isRetranscribing={retranscribingId === selectedRecording?.id}
                         onRetranscribe={handleRetranscribeRecording}
+                        isCanceling={cancelingRecordingId === selectedRecording?.id}
+                        onCancel={handleCancelRecording}
                         isRenamingSpeakers={renamingSpeakerId === selectedRecording?.id}
                         onRenameSpeakers={handleRenameTranscriptSpeakers}
                         isExtractingSpeakers={extractingSpeakerId === selectedRecording?.id}
