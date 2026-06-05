@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import {
-    BYOKProvider,
+    BYOKSummarySettings,
     RuntimeDevice,
     RuntimeDevices,
     SummaryMode,
@@ -27,17 +27,11 @@ interface Props {
     runtimeDevices: RuntimeDevices;
     selectedMode: SummaryMode;
     onModeChange: (mode: SummaryMode) => void;
-    byokProvider: BYOKProvider;
-    onBYOKProviderChange: (provider: BYOKProvider) => void;
-    byokApiKey: string;
-    onBYOKApiKeyChange: (apiKey: string) => void;
-    byokModel: string;
-    onBYOKModelChange: (model: string) => void;
-    byokBaseUrl: string;
-    onBYOKBaseUrlChange: (baseUrl: string) => void;
+    byokSettings?: BYOKSummarySettings;
+    isBYOKConfigured: boolean;
+    onOpenSettings: () => void;
     customInstruction: string;
     onCustomInstructionChange: (instruction: string) => void;
-    formatName?: string | null;
     onSummarize: () => void;
     canSummarize: boolean;
 }
@@ -52,17 +46,11 @@ export default function SummaryPanel({
     runtimeDevices,
     selectedMode,
     onModeChange,
-    byokProvider,
-    onBYOKProviderChange,
-    byokApiKey,
-    onBYOKApiKeyChange,
-    byokModel,
-    onBYOKModelChange,
-    byokBaseUrl,
-    onBYOKBaseUrlChange,
+    byokSettings,
+    isBYOKConfigured,
+    onOpenSettings,
     customInstruction,
     onCustomInstructionChange,
-    formatName,
     onSummarize,
     canSummarize,
 }: Props) {
@@ -140,82 +128,21 @@ export default function SummaryPanel({
                     )}
 
                     {selectedMode === "byok" && (
-                        <>
-                            <div className="flex flex-col gap-1">
-                                <label htmlFor="byok-provider" className="text-xs font-medium text-zinc-500">
-                                    Provider
-                                </label>
-                                <select
-                                    id="byok-provider"
-                                    value={byokProvider}
-                                    onChange={(event) => {
-                                        const newProvider = event.target.value as BYOKProvider;
-                                        onBYOKProviderChange(newProvider);
-                                        const defaultModel = BYOK_PROVIDERS.find(
-                                            (provider) => provider.value === newProvider,
-                                        )?.defaultModel;
-                                        if (defaultModel !== undefined) {
-                                            onBYOKModelChange(defaultModel);
-                                        }
-                                    }}
-                                    disabled={isLoading}
-                                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    {BYOK_PROVIDERS.map((provider) => (
-                                        <option key={provider.value} value={provider.value}>
-                                            {provider.label}
-                                        </option>
-                                    ))}
-                                </select>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+                                {isBYOKConfigured && byokSettings
+                                    ? `${providerLabel(byokSettings.provider)} / ${byokSettings.model}`
+                                    : "BYOK settings required"}
                             </div>
-
-                            <div className="flex flex-col gap-1">
-                                <label htmlFor="byok-api-key" className="text-xs font-medium text-zinc-500">
-                                    API Key
-                                </label>
-                                <input
-                                    id="byok-api-key"
-                                    type="password"
-                                    value={byokApiKey}
-                                    onChange={(event) => onBYOKApiKeyChange(event.target.value)}
-                                    disabled={isLoading}
-                                    placeholder="sk-..."
-                                    className="min-h-10 w-48 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                />
-                            </div>
-
-                            <div className="flex flex-col gap-1">
-                                <label htmlFor="byok-model" className="text-xs font-medium text-zinc-500">
-                                    Model
-                                </label>
-                                <input
-                                    id="byok-model"
-                                    type="text"
-                                    value={byokModel}
-                                    onChange={(event) => onBYOKModelChange(event.target.value)}
-                                    disabled={isLoading}
-                                    placeholder="Model name"
-                                    className="min-h-10 w-44 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                />
-                            </div>
-
-                            {byokProvider === "custom" && (
-                                <div className="flex flex-col gap-1">
-                                    <label htmlFor="byok-base-url" className="text-xs font-medium text-zinc-500">
-                                        Base URL
-                                    </label>
-                                    <input
-                                        id="byok-base-url"
-                                        type="text"
-                                        value={byokBaseUrl}
-                                        onChange={(event) => onBYOKBaseUrlChange(event.target.value)}
-                                        disabled={isLoading}
-                                        placeholder="https://.../v1"
-                                        className="min-h-10 w-56 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                    />
-                                </div>
-                            )}
-                        </>
+                            <button
+                                type="button"
+                                onClick={onOpenSettings}
+                                disabled={isLoading}
+                                className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Settings
+                            </button>
+                        </div>
                     )}
                 </div>
 
@@ -229,6 +156,12 @@ export default function SummaryPanel({
                 </button>
             </div>
 
+            {selectedMode === "byok" && !isBYOKConfigured && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    Add API settings before running BYOK summary.
+                </div>
+            )}
+
             <div className="flex w-full border-b border-zinc-200 pb-5 flex-col gap-2">
                 <button
                     type="button"
@@ -238,12 +171,6 @@ export default function SummaryPanel({
                 >
                     Custom instruction
                 </button>
-
-                {/* {formatName && (
-                    <p className="text-xs font-medium text-zinc-500">
-                        Format: <span className="text-zinc-800">{formatName}</span>
-                    </p>
-                )} */}
 
                 {isInstructionOpen && (
                     <textarea
@@ -345,4 +272,8 @@ export default function SummaryPanel({
 function deviceLabel(device: RuntimeDevice): string {
     if (device === "auto") return "Auto";
     return device.toUpperCase();
+}
+
+function providerLabel(provider: BYOKSummarySettings["provider"]): string {
+    return BYOK_PROVIDERS.find((item) => item.value === provider)?.label ?? provider;
 }

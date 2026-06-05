@@ -12,7 +12,7 @@ import {
     LocalLLMModel,
     TranscriptionModel,
     SummaryMode,
-    BYOKProvider,
+    BYOKSummarySettings,
 } from "@/src/api/sonaApi";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import RecordingChatPanel from "@/src/components/RecordingChatPanel";
@@ -54,6 +54,9 @@ interface Props {
         recordingId: string,
         settings: RecordingSummaryParams,
     ) => Promise<void>;
+    byokSettings?: BYOKSummarySettings;
+    isBYOKConfigured: boolean;
+    onOpenSettings: () => void;
 }
 
 export default function RecordingDetail({
@@ -70,6 +73,9 @@ export default function RecordingDetail({
     onExtractSpeakers,
     isSummarizing = false,
     onSummarize,
+    byokSettings,
+    isBYOKConfigured,
+    onOpenSettings,
 }: Props) {
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [activeTab, setActiveTab] = useState<DetailTab>("transcript");
@@ -94,10 +100,6 @@ export default function RecordingDetail({
     const [localLLMModel, setLocalLLMModel] = useState<LocalLLMModel>("qwen");
     const [summaryDevice, setSummaryDevice] = useState<RuntimeDevice>(runtimeDevices.default);
     const [summaryMode, setSummaryMode] = useState<SummaryMode>("local");
-    const [byokProvider, setBYOKProvider] = useState<BYOKProvider>("openai");
-    const [byokApiKey, setBYOKApiKey] = useState("");
-    const [byokModel, setBYOKModel] = useState("gpt-4o-mini");
-    const [byokBaseUrl, setBYOKBaseUrl] = useState("");
     const selectedSummaryDevice = runtimeDevices.available.includes(summaryDevice)
         ? summaryDevice
         : runtimeDevices.default;
@@ -148,12 +150,7 @@ export default function RecordingDetail({
             device: selectedSummaryDevice,
             mode: summaryMode,
             prompt: summaryInstruction.trim() || undefined,
-            byok: summaryMode === "byok" ? {
-                provider: byokProvider,
-                apiKey: byokApiKey,
-                model: byokModel,
-                baseUrl: byokBaseUrl,
-            } : undefined,
+            byok: summaryMode === "byok" ? byokSettings : undefined,
         });
     };
 
@@ -443,22 +440,17 @@ export default function RecordingDetail({
                                 runtimeDevices={runtimeDevices}
                                 selectedMode={summaryMode}
                                 onModeChange={setSummaryMode}
-                                byokProvider={byokProvider}
-                                onBYOKProviderChange={setBYOKProvider}
-                                byokApiKey={byokApiKey}
-                                onBYOKApiKeyChange={setBYOKApiKey}
-                                byokModel={byokModel}
-                                onBYOKModelChange={setBYOKModel}
-                                byokBaseUrl={byokBaseUrl}
-                                onBYOKBaseUrlChange={setBYOKBaseUrl}
+                                byokSettings={byokSettings}
+                                isBYOKConfigured={isBYOKConfigured}
+                                onOpenSettings={onOpenSettings}
                                 customInstruction={summaryInstruction}
                                 onCustomInstructionChange={setSummaryInstruction}
-                                formatName={recording.summary?.format_name}
                                 onSummarize={handleSummarize}
                                 canSummarize={
                                     Boolean(onSummarize) &&
                                     segments.length > 0 &&
-                                    !isProcessingRecording
+                                    !isProcessingRecording &&
+                                    (summaryMode === "local" || isBYOKConfigured)
                                 }
                             />
                         )}
@@ -466,6 +458,9 @@ export default function RecordingDetail({
                             <RecordingChatPanel
                                 recordingId={recording.id}
                                 canChat={segments.length > 0}
+                                byokSettings={byokSettings}
+                                isBYOKConfigured={isBYOKConfigured}
+                                onOpenSettings={onOpenSettings}
                             />
                         )}
                     </div>

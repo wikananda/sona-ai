@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import {
-    BYOKProvider,
+    BYOKSummarySettings,
     chatWithRecording,
     RecordingChatMessage,
 } from "@/src/api/sonaApi";
@@ -11,40 +11,33 @@ import { BYOK_PROVIDERS } from "@/src/utils/constants";
 interface Props {
     recordingId: string;
     canChat: boolean;
+    byokSettings?: BYOKSummarySettings;
+    isBYOKConfigured: boolean;
+    onOpenSettings: () => void;
 }
 
-export default function RecordingChatPanel({ recordingId, canChat }: Props) {
+export default function RecordingChatPanel({
+    recordingId,
+    canChat,
+    byokSettings,
+    isBYOKConfigured,
+    onOpenSettings,
+}: Props) {
     const [messages, setMessages] = useState<RecordingChatMessage[]>([]);
     const [question, setQuestion] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [provider, setProvider] = useState<BYOKProvider>("openai");
-    const [apiKey, setApiKey] = useState("");
-    const [model, setModel] = useState("gpt-4o-mini");
-    const [baseUrl, setBaseUrl] = useState("");
     const [error, setError] = useState("");
 
     const canSend =
         canChat &&
         !isLoading &&
         Boolean(question.trim()) &&
-        Boolean(apiKey.trim()) &&
-        Boolean(model.trim()) &&
-        (provider !== "custom" || Boolean(baseUrl.trim()));
-
-    const handleProviderChange = (nextProvider: BYOKProvider) => {
-        setProvider(nextProvider);
-
-        const defaultModel = BYOK_PROVIDERS.find(
-            (item) => item.value === nextProvider,
-        )?.defaultModel;
-        if (defaultModel !== undefined) {
-            setModel(defaultModel);
-        }
-    };
+        isBYOKConfigured &&
+        Boolean(byokSettings);
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        if (!canSend) return;
+        if (!canSend || !byokSettings) return;
 
         const nextQuestion = question.trim();
         const userMessage: RecordingChatMessage = {
@@ -62,12 +55,7 @@ export default function RecordingChatPanel({ recordingId, canChat }: Props) {
             const answer = await chatWithRecording(recordingId, {
                 question: nextQuestion,
                 history: messages.slice(-8),
-                byok: {
-                    provider,
-                    apiKey: apiKey.trim(),
-                    model: model.trim(),
-                    baseUrl: baseUrl.trim() || undefined,
-                },
+                byok: byokSettings,
             });
 
             setMessages([
@@ -93,62 +81,27 @@ export default function RecordingChatPanel({ recordingId, canChat }: Props) {
                 </p>
             </div>
 
-            <div className="flex flex-wrap items-end gap-3">
-                <label className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-zinc-500">Provider</span>
-                    <select
-                        value={provider}
-                        onChange={(event) =>
-                            handleProviderChange(event.target.value as BYOKProvider)
-                        }
-                        disabled={isLoading}
-                        className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        {BYOK_PROVIDERS.map((item) => (
-                            <option key={item.value} value={item.value}>
-                                {item.label}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-
-                <label className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-zinc-500">API Key</span>
-                    <input
-                        type="password"
-                        value={apiKey}
-                        onChange={(event) => setApiKey(event.target.value)}
-                        disabled={isLoading}
-                        placeholder="sk-..."
-                        className="min-h-10 w-44 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                </label>
-
-                <label className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-zinc-500">Model</span>
-                    <input
-                        type="text"
-                        value={model}
-                        onChange={(event) => setModel(event.target.value)}
-                        disabled={isLoading}
-                        className="min-h-10 w-44 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                </label>
-
-                {provider === "custom" && (
-                    <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-zinc-500">Base URL</span>
-                        <input
-                            type="text"
-                            value={baseUrl}
-                            onChange={(event) => setBaseUrl(event.target.value)}
-                            disabled={isLoading}
-                            placeholder="https://.../v1"
-                            className="min-h-10 w-56 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                        />
-                    </label>
-                )}
+            <div className="flex flex-wrap items-center gap-3">
+                <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+                    {isBYOKConfigured && byokSettings
+                        ? `${providerLabel(byokSettings.provider)} / ${byokSettings.model}`
+                        : "API settings required"}
+                </div>
+                <button
+                    type="button"
+                    onClick={onOpenSettings}
+                    disabled={isLoading}
+                    className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    Settings
+                </button>
             </div>
+
+            {!isBYOKConfigured && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    Add API settings before chatting with this recording.
+                </div>
+            )}
 
             {error && (
                 <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -207,4 +160,8 @@ export default function RecordingChatPanel({ recordingId, canChat }: Props) {
             </form>
         </div>
     );
+}
+
+function providerLabel(provider: BYOKSummarySettings["provider"]): string {
+    return BYOK_PROVIDERS.find((item) => item.value === provider)?.label ?? provider;
 }
