@@ -31,6 +31,7 @@ export default function RecordingUploader({ onUpload, isUploading, runtimeDevice
     const [minSpeakers, setMinSpeakers] = useState<number | "">("");
     const [maxSpeakers, setMaxSpeakers] = useState<number | "">("");
     const [extractSpeakers, setExtractSpeakers] = useState(true);
+    const [speakerError, setSpeakerError] = useState("");
     const selectedDevice = runtimeDevices.available.includes(device)
         ? device
         : runtimeDevices.default;
@@ -38,14 +39,19 @@ export default function RecordingUploader({ onUpload, isUploading, runtimeDevice
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
         if (!files.length) return;
+        if (extractSpeakers && (minSpeakers === "" || maxSpeakers === "")) {
+            setSpeakerError("Min and max speakers are required when extracting speakers.");
+            return;
+        }
 
+        setSpeakerError("");
         await onUpload({
             files,
             language,
             model,
             device: selectedDevice,
-            minSpeakers,
-            maxSpeakers,
+            minSpeakers: extractSpeakers ? minSpeakers : "",
+            maxSpeakers: extractSpeakers ? maxSpeakers : "",
             extractSpeakers,
         });
         setFiles([]);
@@ -116,7 +122,10 @@ export default function RecordingUploader({ onUpload, isUploading, runtimeDevice
                 <input
                     type="checkbox"
                     checked={extractSpeakers}
-                    onChange={(event) => setExtractSpeakers(event.target.checked)}
+                    onChange={(event) => {
+                        setExtractSpeakers(event.target.checked);
+                        setSpeakerError("");
+                    }}
                     disabled={isUploading}
                     className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-950 focus:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                 />
@@ -148,6 +157,10 @@ export default function RecordingUploader({ onUpload, isUploading, runtimeDevice
                         className="min-h-11 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
                     />
                 </div>
+            )}
+
+            {speakerError && (
+                <p className="mt-3 text-sm text-red-700">{speakerError}</p>
             )}
 
             {files.length > 0 && (

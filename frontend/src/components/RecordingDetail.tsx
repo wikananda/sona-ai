@@ -85,6 +85,8 @@ export default function RecordingDetail({
     const [retranscribeExtractSpeakers, setRetranscribeExtractSpeakers] = useState(true);
     const [extractMinSpeakers, setExtractMinSpeakers] = useState<number | "">("");
     const [extractMaxSpeakers, setExtractMaxSpeakers] = useState<number | "">("");
+    const [retranscribeError, setRetranscribeError] = useState("");
+    const [speakerExtractionError, setSpeakerExtractionError] = useState("");
     const [localLLMModel, setLocalLLMModel] = useState<LocalLLMModel>("qwen");
     const [summaryDevice, setSummaryDevice] = useState<RuntimeDevice>(runtimeDevices.default);
     const [summaryMode, setSummaryMode] = useState<SummaryMode>("local");
@@ -172,22 +174,26 @@ export default function RecordingDetail({
         setRetranscribeMinSpeakers(recording.min_speakers ?? "");
         setRetranscribeMaxSpeakers(recording.max_speakers ?? "");
         setRetranscribeExtractSpeakers(true);
+        setRetranscribeError("");
         setIsRetranscribeEditorOpen(true);
     };
 
     const closeRetranscribeEditor = () => {
         if (isRetranscribing) return;
+        setRetranscribeError("");
         setIsRetranscribeEditorOpen(false);
     };
 
     const openSpeakerExtractionEditor = () => {
         setExtractMinSpeakers(recording.min_speakers ?? "");
         setExtractMaxSpeakers(recording.max_speakers ?? "");
+        setSpeakerExtractionError("");
         setIsSpeakerExtractionEditorOpen(true);
     };
 
     const closeSpeakerExtractionEditor = () => {
         if (isExtractingSpeakers) return;
+        setSpeakerExtractionError("");
         setIsSpeakerExtractionEditorOpen(false);
     };
 
@@ -198,13 +204,21 @@ export default function RecordingDetail({
         const selectedDevice = runtimeDevices.available.includes(retranscribeDevice)
             ? retranscribeDevice
             : runtimeDevices.default;
+        if (
+            retranscribeExtractSpeakers &&
+            (retranscribeMinSpeakers === "" || retranscribeMaxSpeakers === "")
+        ) {
+            setRetranscribeError("Min and max speakers are required when extracting speakers.");
+            return;
+        }
 
+        setRetranscribeError("");
         await onRetranscribe(recording.id, {
             language: retranscribeLanguage,
             model: retranscribeModel,
             device: selectedDevice,
-            minSpeakers: retranscribeMinSpeakers,
-            maxSpeakers: retranscribeMaxSpeakers,
+            minSpeakers: retranscribeExtractSpeakers ? retranscribeMinSpeakers : "",
+            maxSpeakers: retranscribeExtractSpeakers ? retranscribeMaxSpeakers : "",
             extractSpeakers: retranscribeExtractSpeakers,
         });
         setIsRetranscribeEditorOpen(false);
@@ -213,7 +227,12 @@ export default function RecordingDetail({
     const handleSpeakerExtractionSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         if (!onExtractSpeakers) return;
+        if (extractMinSpeakers === "" || extractMaxSpeakers === "") {
+            setSpeakerExtractionError("Min and max speakers are required.");
+            return;
+        }
 
+        setSpeakerExtractionError("");
         await onExtractSpeakers(recording.id, {
             minSpeakers: extractMinSpeakers,
             maxSpeakers: extractMaxSpeakers,
@@ -486,47 +505,14 @@ export default function RecordingDetail({
                                 </select>
                             </label>
 
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <label className="flex flex-col gap-1">
-                                    <span className="text-xs font-medium text-zinc-500">
-                                        Min speakers
-                                    </span>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={retranscribeMinSpeakers}
-                                        onChange={(event) => setRetranscribeMinSpeakers(
-                                            numberOrEmpty(event.target.value),
-                                        )}
-                                        disabled={isRetranscribing}
-                                        placeholder="Auto"
-                                        className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                    />
-                                </label>
-
-                                <label className="flex flex-col gap-1">
-                                    <span className="text-xs font-medium text-zinc-500">
-                                        Max speakers
-                                    </span>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={retranscribeMaxSpeakers}
-                                        onChange={(event) => setRetranscribeMaxSpeakers(
-                                            numberOrEmpty(event.target.value),
-                                        )}
-                                        disabled={isRetranscribing}
-                                        placeholder="Auto"
-                                        className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                    />
-                                </label>
-                            </div>
-
                             <label className="flex items-start gap-2 md:col-span-2">
                                 <input
                                     type="checkbox"
                                     checked={retranscribeExtractSpeakers}
-                                    onChange={(event) => setRetranscribeExtractSpeakers(event.target.checked)}
+                                    onChange={(event) => {
+                                        setRetranscribeExtractSpeakers(event.target.checked);
+                                        setRetranscribeError("");
+                                    }}
                                     disabled={isRetranscribing}
                                     className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-950 focus:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                                 />
@@ -537,7 +523,55 @@ export default function RecordingDetail({
                                     </span>
                                 </span>
                             </label>
+
+                            {retranscribeExtractSpeakers && (
+                                <div className="grid gap-4 sm:grid-cols-2 md:col-span-2">
+                                    <label className="flex flex-col gap-1">
+                                        <span className="text-xs font-medium text-zinc-500">
+                                            Min speakers
+                                        </span>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={retranscribeMinSpeakers}
+                                            onChange={(event) => {
+                                                setRetranscribeMinSpeakers(
+                                                    numberOrEmpty(event.target.value),
+                                                );
+                                                setRetranscribeError("");
+                                            }}
+                                            disabled={isRetranscribing}
+                                            placeholder="Required"
+                                            className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                        />
+                                    </label>
+
+                                    <label className="flex flex-col gap-1">
+                                        <span className="text-xs font-medium text-zinc-500">
+                                            Max speakers
+                                        </span>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={retranscribeMaxSpeakers}
+                                            onChange={(event) => {
+                                                setRetranscribeMaxSpeakers(
+                                                    numberOrEmpty(event.target.value),
+                                                );
+                                                setRetranscribeError("");
+                                            }}
+                                            disabled={isRetranscribing}
+                                            placeholder="Required"
+                                            className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                        />
+                                    </label>
+                                </div>
+                            )}
                         </div>
+
+                        {retranscribeError && (
+                            <p className="mt-4 text-sm text-red-700">{retranscribeError}</p>
+                        )}
 
                         <div className="mt-6 flex justify-end gap-3">
                             <button
@@ -594,11 +628,14 @@ export default function RecordingDetail({
                                     type="number"
                                     min="1"
                                     value={extractMinSpeakers}
-                                    onChange={(event) => setExtractMinSpeakers(
-                                        numberOrEmpty(event.target.value),
-                                    )}
+                                    onChange={(event) => {
+                                        setExtractMinSpeakers(
+                                            numberOrEmpty(event.target.value),
+                                        );
+                                        setSpeakerExtractionError("");
+                                    }}
                                     disabled={isExtractingSpeakers}
-                                    placeholder="Auto"
+                                    placeholder="Required"
                                     className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                                 />
                             </label>
@@ -611,15 +648,22 @@ export default function RecordingDetail({
                                     type="number"
                                     min="1"
                                     value={extractMaxSpeakers}
-                                    onChange={(event) => setExtractMaxSpeakers(
-                                        numberOrEmpty(event.target.value),
-                                    )}
+                                    onChange={(event) => {
+                                        setExtractMaxSpeakers(
+                                            numberOrEmpty(event.target.value),
+                                        );
+                                        setSpeakerExtractionError("");
+                                    }}
                                     disabled={isExtractingSpeakers}
-                                    placeholder="Auto"
+                                    placeholder="Required"
                                     className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                                 />
                             </label>
                         </div>
+
+                        {speakerExtractionError && (
+                            <p className="mt-4 text-sm text-red-700">{speakerExtractionError}</p>
+                        )}
 
                         <div className="mt-6 flex justify-end gap-3">
                             <button

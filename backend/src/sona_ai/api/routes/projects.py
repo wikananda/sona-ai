@@ -125,7 +125,7 @@ def upload_project_recording(
     model = _normalize_model(model)
     device = _normalize_device(device)
     language = _normalize_language(language)
-    _validate_speakers(min_speakers, max_speakers)
+    _validate_speaker_settings(extract_speakers, min_speakers, max_speakers)
 
     recording_id = str(uuid.uuid4())
     saved_audio = None
@@ -318,13 +318,18 @@ def retranscribe_recording(
             ),
         )
 
+    extract_speakers = body.extract_speakers if body is not None else True
     if body is not None:
         recording.language_hint = _normalize_language(body.language)
         recording.model = _normalize_model(body.model or recording.model)
         recording.device = _normalize_device(body.device or recording.device)
         recording.min_speakers = body.min_speakers
         recording.max_speakers = body.max_speakers
-        _validate_speakers(recording.min_speakers, recording.max_speakers)
+    _validate_speaker_settings(
+        extract_speakers,
+        recording.min_speakers,
+        recording.max_speakers,
+    )
 
     recording.status = RecordingStatus.PENDING
     recording.error = None
@@ -339,7 +344,7 @@ def retranscribe_recording(
         run_transcription,
         recording.id,
         request.app.state.transcription_service,
-        body.extract_speakers if body is not None else True,
+        extract_speakers,
     )
     return _serialize_recording(recording, include_transcript=False)
 
@@ -377,7 +382,11 @@ def extract_recording_speakers(
     if body is not None:
         recording.min_speakers = body.min_speakers
         recording.max_speakers = body.max_speakers
-        _validate_speakers(recording.min_speakers, recording.max_speakers)
+    _validate_speaker_settings(
+        True,
+        recording.min_speakers,
+        recording.max_speakers,
+    )
 
     recording.status = RecordingStatus.PENDING
     recording.error = None
@@ -608,3 +617,16 @@ def _validate_speakers(
             status_code=400,
             detail="min_speakers cannot be greater than max_speakers",
         )
+
+
+def _validate_speaker_settings(
+    extract_speakers: bool,
+    min_speakers: Optional[int],
+    max_speakers: Optional[int],
+) -> None:
+    if extract_speakers and (min_speakers is None or max_speakers is None):
+        raise HTTPException(
+            status_code=400,
+            detail="min_speakers and max_speakers are required when extracting speakers",
+        )
+    _validate_speakers(min_speakers, max_speakers)
