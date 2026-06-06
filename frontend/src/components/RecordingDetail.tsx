@@ -13,6 +13,7 @@ import {
     TranscriptionModel,
     SummaryMode,
     BYOKSummarySettings,
+    TranscriptSegmentUpdateParams,
 } from "@/src/api/sonaApi";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import RecordingChatPanel from "@/src/components/RecordingChatPanel";
@@ -44,6 +45,12 @@ interface Props {
         recordingId: string,
         speakers: Record<string, string>,
     ) => Promise<void>;
+    isEditingTranscript?: boolean;
+    onUpdateTranscriptSegment?: (
+        recordingId: string,
+        segmentIndex: number,
+        params: TranscriptSegmentUpdateParams,
+    ) => Promise<void>;
     isExtractingSpeakers?: boolean;
     onExtractSpeakers?: (
         recordingId: string,
@@ -69,6 +76,8 @@ export default function RecordingDetail({
     onCancel,
     isRenamingSpeakers = false,
     onRenameSpeakers,
+    isEditingTranscript = false,
+    onUpdateTranscriptSegment,
     isExtractingSpeakers = false,
     onExtractSpeakers,
     isSummarizing = false,
@@ -158,6 +167,15 @@ export default function RecordingDetail({
         if (!onRenameSpeakers) return;
 
         await onRenameSpeakers(recording.id, speakers);
+    };
+
+    const handleUpdateTranscriptSegment = async (
+        segmentIndex: number,
+        params: TranscriptSegmentUpdateParams,
+    ) => {
+        if (!onUpdateTranscriptSegment) return;
+
+        await onUpdateTranscriptSegment(recording.id, segmentIndex, params);
     };
 
     const handleSeekToSegment = async (start: number) => {
@@ -422,6 +440,8 @@ export default function RecordingDetail({
                                 segments={segments}
                                 isSavingSpeakers={isRenamingSpeakers}
                                 onRenameSpeakers={handleRenameSpeakers}
+                                isSavingSegment={isEditingTranscript}
+                                onUpdateSegment={handleUpdateTranscriptSegment}
                                 isSpeakerEditorOpen={isSpeakerEditorOpen}
                                 onSpeakerEditorClose={() => setIsSpeakerEditorOpen(false)}
                                 activeSegmentIndex={activeSegmentIndex}

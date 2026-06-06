@@ -22,7 +22,9 @@ import {
     retranscribeRecording,
     summarizeRecording,
     TranscriptionModel,
+    TranscriptSegmentUpdateParams,
     uploadProjectRecording,
+    updateTranscriptSegment,
 } from "@/src/api/sonaApi";
 import BYOKSettingsModal from "@/src/components/BYOKSettingsModal";
 import RecordingDetail from "@/src/components/RecordingDetail";
@@ -46,6 +48,7 @@ export default function ProjectDetailPage() {
     const [retranscribingId, setRetranscribingId] = useState<string>();
     const [cancelingRecordingId, setCancelingRecordingId] = useState<string>();
     const [renamingSpeakerId, setRenamingSpeakerId] = useState<string>();
+    const [editingTranscriptId, setEditingTranscriptId] = useState<string>();
     const [extractingSpeakerId, setExtractingSpeakerId] = useState<string>();
     const [summarizingId, setSummarizingId] = useState<string>();
     const [runtimeDevices, setRuntimeDevices] = useState<RuntimeDevices>({
@@ -244,6 +247,24 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleUpdateTranscriptSegment = async (
+        recordingId: string,
+        segmentIndex: number,
+        params: TranscriptSegmentUpdateParams,
+    ) => {
+        setError("");
+        setEditingTranscriptId(recordingId);
+        try {
+            const recording = await updateTranscriptSegment(recordingId, segmentIndex, params);
+            setSelectedRecording(recording);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to update transcript");
+            throw err;
+        } finally {
+            setEditingTranscriptId(undefined);
+        }
+    };
+
     const handleExtractSpeakers = async (
         recordingId: string,
         params: SpeakerExtractionParams,
@@ -353,6 +374,8 @@ export default function ProjectDetailPage() {
                         onCancel={handleCancelRecording}
                         isRenamingSpeakers={renamingSpeakerId === selectedRecording?.id}
                         onRenameSpeakers={handleRenameTranscriptSpeakers}
+                        isEditingTranscript={editingTranscriptId === selectedRecording?.id}
+                        onUpdateTranscriptSegment={handleUpdateTranscriptSegment}
                         isExtractingSpeakers={extractingSpeakerId === selectedRecording?.id}
                         onExtractSpeakers={handleExtractSpeakers}
                         isSummarizing={summarizingId === selectedRecording?.id}

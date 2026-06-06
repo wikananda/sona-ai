@@ -25,5 +25,11 @@ class RecordingSpeakerExtraction(BaseModel):
 class TranscriptSpeakerRename(BaseModel):
     speakers: dict[str, str]
 
+
+class TranscriptSegmentUpdate(BaseModel):
+    text: str
+    speaker: Optional[str] = None
+
+
 class RecordingRename(BaseModel):
     name: str

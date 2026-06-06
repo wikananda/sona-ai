@@ -140,6 +140,11 @@ export interface SpeakerExtractionParams {
     maxSpeakers?: number | "";
 }
 
+export interface TranscriptSegmentUpdateParams {
+    text: string;
+    speaker?: string | null;
+}
+
 export interface BYOKSummarySettings {
     provider: BYOKProvider;
     apiKey: string;
@@ -300,6 +305,21 @@ export async function renameTranscriptSpeakers(
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ speakers }),
+    });
+}
+
+export async function updateTranscriptSegment(
+    recordingId: string,
+    segmentIndex: number,
+    params: TranscriptSegmentUpdateParams,
+): Promise<Recording> {
+    return requestJson(`/recordings/${recordingId}/transcript/segments/${segmentIndex}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            text: params.text,
+            speaker: params.speaker,
+        }),
     });
 }
 
