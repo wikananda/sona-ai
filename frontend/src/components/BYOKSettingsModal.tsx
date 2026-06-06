@@ -6,24 +6,34 @@ import { BYOK_PROVIDERS } from "@/src/utils/constants";
 import {
     BYOKProviderSettings,
     BYOKSettingsState,
+    clearAllKeys,
     defaultBYOKSettings,
 } from "@/src/hooks/useBYOKSettings";
 
 interface Props {
     settings: BYOKSettingsState;
     onSave: (settings: BYOKSettingsState) => void;
+    onClearSavedKeys: () => void;
     onClose: () => void;
 }
 
 export default function BYOKSettingsModal({
     settings,
     onSave,
+    onClearSavedKeys,
     onClose,
 }: Props) {
     const [draft, setDraft] = useState<BYOKSettingsState>(settings);
 
     const selectedProvider = draft.selectedProvider;
     const selectedSettings = draft.providers[selectedProvider];
+
+    const updateRememberKeys = (rememberKeys: boolean) => {
+        setDraft((current) => ({
+            ...current,
+            rememberKeys,
+        }));
+    };
 
     const updateSelectedProvider = (provider: BYOKProvider) => {
         setDraft((current) => ({
@@ -61,9 +71,15 @@ export default function BYOKSettingsModal({
     const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         onSave({
+            rememberKeys: draft.rememberKeys,
             selectedProvider: draft.selectedProvider,
             providers: trimSettings(draft.providers),
         });
+    };
+
+    const handleClearSavedKeys = () => {
+        setDraft((current) => clearAllKeys(current));
+        onClearSavedKeys();
     };
 
     return (
@@ -78,7 +94,7 @@ export default function BYOKSettingsModal({
                             API settings
                         </h2>
                         <p className="mt-1 text-sm text-zinc-500">
-                            Stored only in this browser. Used for BYOK summary and chat.
+                            Used for BYOK summary and chat.
                         </p>
                     </div>
                     <button
@@ -158,20 +174,41 @@ export default function BYOKSettingsModal({
                         </label>
                     )}
 
-                    <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-                        The key is saved in browser localStorage on this device only. It is sent
-                        to the backend only when you run BYOK summary or chat.
-                    </div>
+                    <label className="flex items-start gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+                        <input
+                            type="checkbox"
+                            checked={draft.rememberKeys}
+                            onChange={(event) => updateRememberKeys(event.target.checked)}
+                            className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-950 focus:ring-zinc-950"
+                        />
+                        <span className="text-xs text-zinc-600">
+                            <span className="block font-medium text-zinc-800">
+                                Remember API keys on this browser
+                            </span>
+                            {draft.rememberKeys
+                                ? "Keys will be stored as browser localStorage on this device."
+                                : "Keys stay only in this tab session and disappear on refresh."}
+                        </span>
+                    </label>
                 </div>
 
                 <div className="flex flex-wrap justify-between gap-3 border-t border-zinc-200 px-5 py-4">
-                    <button
-                        type="button"
-                        onClick={clearSelectedProvider}
-                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
-                    >
-                        Clear provider
-                    </button>
+                    <div className="flex flex-wrap gap-3">
+                        <button
+                            type="button"
+                            onClick={clearSelectedProvider}
+                            className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                        >
+                            Clear provider
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleClearSavedKeys}
+                            className="min-h-10 rounded-md border border-red-200 px-4 text-sm font-medium text-red-700 hover:border-red-300 hover:text-red-800"
+                        >
+                            Clear saved keys
+                        </button>
+                    </div>
                     <div className="flex gap-3">
                         <button
                             type="button"

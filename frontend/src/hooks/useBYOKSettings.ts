@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { BYOKProvider, BYOKSummarySettings } from "@/src/api/sonaApi";
 import { BYOK_PROVIDERS } from "@/src/utils/constants";
 
-const STORAGE_KEY = "sona-ai.byok-settings.v1";
+const STORAGE_KEY_V1 = "sona-ai.byok-settings.v1";
+const STORAGE_KEY_V2 = "sona-ai.byok-settings.v2";
 
 export interface BYOKProviderSettings {
     apiKey: string;
@@ -13,6 +14,7 @@ export interface BYOKProviderSettings {
 }
 
 export interface BYOKSettingsState {
+    rememberKeys: boolean;
     selectedProvider: BYOKProvider;
     providers: Record<BYOKProvider, BYOKProviderSettings>;
 }
@@ -24,9 +26,7 @@ export function useBYOKSettings() {
         typeof window === "undefined" ? defaultBYOKSettings() : readStoredSettings(),
     );
 
-    useEffect(() => {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    }, [settings]);
+    useEffect(() => persistSettings(settings), [settings]);
 
     const selectedSettings = settings.providers[settings.selectedProvider];
     const isSelectedProviderConfigured = isProviderConfigured(
@@ -47,6 +47,7 @@ export function useBYOKSettings() {
     return {
         settings,
         setSettings,
+        clearSavedKeys: () => setSettings((current) => clearAllKeys(current)),
         selectedSettings,
         selectedBYOKSettings,
         isSelectedProviderConfigured,
@@ -55,12 +56,26 @@ export function useBYOKSettings() {
 
 export function defaultBYOKSettings(): BYOKSettingsState {
     return {
+        rememberKeys: false,
         selectedProvider: "openai",
         providers: {
             openai: providerDefaults("openai"),
             groq: providerDefaults("groq"),
             openrouter: providerDefaults("openrouter"),
             custom: providerDefaults("custom"),
+        },
+    };
+}
+
+export function clearAllKeys(settings: BYOKSettingsState): BYOKSettingsState {
+    return {
+        ...settings,
+        rememberKeys: false,
+        providers: {
+            openai: { ...settings.providers.openai, apiKey: "" },
+            groq: { ...settings.providers.groq, apiKey: "" },
+            openrouter: { ...settings.providers.openrouter, apiKey: "" },
+            custom: { ...settings.providers.custom, apiKey: "" },
         },
     };
 }
@@ -84,19 +99,40 @@ function providerDefaults(provider: BYOKProvider): BYOKProviderSettings {
 
 function readStoredSettings(): BYOKSettingsState {
     try {
-        const raw = window.localStorage.getItem(STORAGE_KEY);
-        if (!raw) return defaultBYOKSettings();
-        return normalizeSettings(JSON.parse(raw));
+        const v2 = window.localStorage.getItem(STORAGE_KEY_V2);
+        if (v2) return normalizeSettings(JSON.parse(v2), true);
+
+        const v1 = window.localStorage.getItem(STORAGE_KEY_V1);
+        if (v1) {
+            window.localStorage.removeItem(STORAGE_KEY_V1);
+            return normalizeSettings(JSON.parse(v1), false);
+        }
+
+        return defaultBYOKSettings();
     } catch {
         return defaultBYOKSettings();
     }
 }
 
-function normalizeSettings(value: unknown): BYOKSettingsState {
+function persistSettings(settings: BYOKSettingsState) {
+    if (typeof window === "undefined") return;
+
+    if (!settings.rememberKeys) {
+        window.localStorage.removeItem(STORAGE_KEY_V1);
+        window.localStorage.removeItem(STORAGE_KEY_V2);
+        return;
+    }
+
+    window.localStorage.removeItem(STORAGE_KEY_V1);
+    window.localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(settings));
+}
+
+function normalizeSettings(value: unknown, allowRememberKeys: boolean): BYOKSettingsState {
     const defaults = defaultBYOKSettings();
     if (!value || typeof value !== "object") return defaults;
 
     const candidate = value as Partial<BYOKSettingsState>;
+    const rememberKeys = allowRememberKeys && candidate.rememberKeys === true;
     const selectedProvider = isBYOKProvider(candidate.selectedProvider)
         ? candidate.selectedProvider
         : defaults.selectedProvider;
@@ -115,7 +151,7 @@ function normalizeSettings(value: unknown): BYOKSettingsState {
         }
     }
 
-    return { selectedProvider, providers };
+    return { rememberKeys, selectedProvider, providers };
 }
 
 function isBYOKProvider(value: unknown): value is BYOKProvider {

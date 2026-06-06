@@ -370,6 +370,7 @@ export default function ProjectDetailPage() {
                         byokSettings.setSettings(settings);
                         setIsSettingsOpen(false);
                     }}
+                    onClearSavedKeys={byokSettings.clearSavedKeys}
                     onClose={() => setIsSettingsOpen(false)}
                 />
             )}

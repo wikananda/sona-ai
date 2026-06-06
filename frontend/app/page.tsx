@@ -168,6 +168,7 @@ export default function Home() {
             byokSettings.setSettings(settings);
             setIsSettingsOpen(false);
           }}
+          onClearSavedKeys={byokSettings.clearSavedKeys}
           onClose={() => setIsSettingsOpen(false)}
         />
       )}
