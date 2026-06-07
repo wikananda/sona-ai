@@ -6,9 +6,12 @@ import {
     RuntimeDevices,
     TranscriptionModel,
 } from "@/src/api/sonaApi";
+import BrowserAudioRecorder from "@/src/components/BrowserAudioRecorder";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import RecordingUploader from "@/src/components/RecordingUploader";
 import { useState } from "react";
+
+type AddRecordingMode = "upload" | "record";
 
 interface Props {
     recordings: Recording[];
@@ -44,6 +47,7 @@ export default function RecordingSidebar({
     const [editingId, setEditingId] = useState<string>();
     const [draftName, setDraftName] = useState("");
     const [isUploadOpen, setIsUploadOpen] = useState(false);
+    const [addMode, setAddMode] = useState<AddRecordingMode>("upload");
 
     const startEditing = (recording: Recording) => {
         setEditingId(recording.id);
@@ -185,7 +189,7 @@ export default function RecordingSidebar({
                                     Add recording
                                 </h2>
                                 <p className="mt-1 text-sm text-zinc-500">
-                                    Upload an audio file and choose transcription settings.
+                                    Upload audio or record from this browser.
                                 </p>
                             </div>
                             <button
@@ -199,14 +203,50 @@ export default function RecordingSidebar({
                             </button>
                         </div>
                         <div className="p-5">
-                            <RecordingUploader
-                                onUpload={async (params) => {
-                                    await onUpload(params);
-                                    setIsUploadOpen(false);
-                                }}
-                                isUploading={isUploading}
-                                runtimeDevices={runtimeDevices}
-                            />
+                            <div className="mb-4 grid grid-cols-2 gap-2 rounded-lg bg-zinc-100 p-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setAddMode("upload")}
+                                    disabled={isUploading}
+                                    className={`min-h-10 rounded-md text-sm font-medium transition-colors ${addMode === "upload"
+                                        ? "bg-white text-zinc-950 shadow-sm"
+                                        : "text-zinc-600 hover:text-zinc-950"
+                                        } disabled:cursor-not-allowed disabled:opacity-50`}
+                                >
+                                    Upload audio
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setAddMode("record")}
+                                    disabled={isUploading}
+                                    className={`min-h-10 rounded-md text-sm font-medium transition-colors ${addMode === "record"
+                                        ? "bg-white text-zinc-950 shadow-sm"
+                                        : "text-zinc-600 hover:text-zinc-950"
+                                        } disabled:cursor-not-allowed disabled:opacity-50`}
+                                >
+                                    Record audio
+                                </button>
+                            </div>
+
+                            {addMode === "upload" ? (
+                                <RecordingUploader
+                                    onUpload={async (params) => {
+                                        await onUpload(params);
+                                        setIsUploadOpen(false);
+                                    }}
+                                    isUploading={isUploading}
+                                    runtimeDevices={runtimeDevices}
+                                />
+                            ) : (
+                                <BrowserAudioRecorder
+                                    onUpload={async (params) => {
+                                        await onUpload(params);
+                                        setIsUploadOpen(false);
+                                    }}
+                                    isUploading={isUploading}
+                                    runtimeDevices={runtimeDevices}
+                                />
+                            )}
                         </div>
                     </div>
                 </div>
