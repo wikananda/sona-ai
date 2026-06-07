@@ -12,6 +12,7 @@ import {
     LocalLLMModel
 } from "@/src/api/sonaApi";
 import { exportSummaryPdf } from "@/src/utils/pdfExport";
+import { remarkHtmlLineBreaks } from "@/src/utils/markdownPlugins";
 
 import {
     LOCAL_LLM_MODELS,
@@ -347,7 +348,7 @@ export default function SummaryPanel({
             {summary && !isLoading && !isEditingSummary && (
                 <div className="text-zinc-700">
                     <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
+                        remarkPlugins={[remarkGfm, remarkHtmlLineBreaks]}
                         components={{
                             h1: ({ children }) => (
                                 <h1 className="mb-3 mt-5 text-xl font-semibold text-zinc-950">
@@ -403,6 +404,38 @@ export default function SummaryPanel({
                                 <code className="rounded bg-zinc-100 px-1 py-0.5 text-sm text-zinc-900">
                                     {children}
                                 </code>
+                            ),
+                            table: ({ children }) => (
+                                <div className="mb-4 overflow-x-auto rounded-md border border-zinc-200">
+                                    <table className="min-w-full divide-y divide-zinc-200 text-sm">
+                                        {children}
+                                    </table>
+                                </div>
+                            ),
+                            thead: ({ children }) => (
+                                <thead className="bg-zinc-50">
+                                    {children}
+                                </thead>
+                            ),
+                            tbody: ({ children }) => (
+                                <tbody className="divide-y divide-zinc-100 bg-white">
+                                    {children}
+                                </tbody>
+                            ),
+                            tr: ({ children }) => (
+                                <tr>
+                                    {children}
+                                </tr>
+                            ),
+                            th: ({ children }) => (
+                                <th className="px-3 py-2 text-left align-top text-xs font-semibold uppercase tracking-wide text-zinc-600">
+                                    {children}
+                                </th>
+                            ),
+                            td: ({ children }) => (
+                                <td className="whitespace-pre-line px-3 py-2 align-top leading-relaxed text-zinc-700">
+                                    {children}
+                                </td>
                             ),
                         }}
                     >

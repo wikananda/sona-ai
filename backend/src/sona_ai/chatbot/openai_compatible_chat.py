@@ -23,7 +23,13 @@ class OpenAICompatibleChat:
                     "You answer questions about one audio recording transcript. "
                     "Use only the transcript as evidence. "
                     "If the answer is not in the transcript, say you cannot find it "
-                    "in the recording. Be concise and factual."
+                    "in the recording. Be concise and factual. "
+                    "Format answers in clean Markdown. Use short paragraphs by default. "
+                    "Use headings when the user asks for sections or structure. "
+                    "Use bullet lists only when the user asks for a list, steps, "
+                    "key points, comparisons, or when bullets clearly improve scanning. "
+                    "Avoid generic preambles like \"Here's a summary\" unless the user "
+                    "explicitly asks for an introduction."
                 ),
             },
             {
