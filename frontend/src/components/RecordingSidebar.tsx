@@ -1,7 +1,13 @@
 "use client";
 
-import { Recording } from "@/src/api/sonaApi";
+import {
+    Recording,
+    RuntimeDevice,
+    RuntimeDevices,
+    TranscriptionModel,
+} from "@/src/api/sonaApi";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
+import RecordingUploader from "@/src/components/RecordingUploader";
 import { useState } from "react";
 
 interface Props {
@@ -11,6 +17,17 @@ interface Props {
     onDelete: (recordingId: string) => void;
     onRename: (recordingId: string, name: string) => Promise<void>;
     renamingId?: string;
+    onUpload: (params: {
+        files: File[];
+        language?: string;
+        model: TranscriptionModel;
+        device: RuntimeDevice;
+        minSpeakers?: number | "";
+        maxSpeakers?: number | "";
+        extractSpeakers?: boolean;
+    }) => Promise<void>;
+    isUploading: boolean;
+    runtimeDevices: RuntimeDevices;
 }
 
 export default function RecordingSidebar({
@@ -19,10 +36,14 @@ export default function RecordingSidebar({
     onSelect,
     onDelete,
     onRename,
-    renamingId
+    renamingId,
+    onUpload,
+    isUploading,
+    runtimeDevices,
 }: Props) {
     const [editingId, setEditingId] = useState<string>();
     const [draftName, setDraftName] = useState("");
+    const [isUploadOpen, setIsUploadOpen] = useState(false);
 
     const startEditing = (recording: Recording) => {
         setEditingId(recording.id);
@@ -48,7 +69,18 @@ export default function RecordingSidebar({
     return (
         <aside className="min-h-[520px] border-r border-zinc-200 bg-zinc-50">
             <div className="border-b border-zinc-200 px-4 py-3">
-                <h2 className="text-sm font-semibold text-zinc-900">Recordings</h2>
+                <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-semibold text-zinc-900">Recordings</h2>
+                    <button
+                        type="button"
+                        onClick={() => setIsUploadOpen(true)}
+                        disabled={isUploading}
+                        aria-label="Add recording"
+                        className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-300 bg-white text-lg leading-none text-zinc-700 hover:border-zinc-400 cursor-pointer hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        +
+                    </button>
+                </div>
             </div>
             <div className="flex flex-col">
                 {recordings.length === 0 && (
@@ -144,6 +176,41 @@ export default function RecordingSidebar({
                     </div>
                 ))}
             </div>
+            {isUploadOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                    <div className="w-full max-w-xl rounded-lg bg-white shadow-xl">
+                        <div className="flex items-start justify-between gap-4 border-b border-zinc-200 px-5 py-4">
+                            <div>
+                                <h2 className="text-base font-semibold text-zinc-950">
+                                    Add recording
+                                </h2>
+                                <p className="mt-1 text-sm text-zinc-500">
+                                    Upload an audio file and choose transcription settings.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsUploadOpen(false)}
+                                disabled={isUploading}
+                                aria-label="Close add recording"
+                                className="rounded-md px-2 py-1 text-xl leading-none text-zinc-500 hover:text-zinc-950 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                x
+                            </button>
+                        </div>
+                        <div className="p-5">
+                            <RecordingUploader
+                                onUpload={async (params) => {
+                                    await onUpload(params);
+                                    setIsUploadOpen(false);
+                                }}
+                                isUploading={isUploading}
+                                runtimeDevices={runtimeDevices}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </aside>
     );
 }

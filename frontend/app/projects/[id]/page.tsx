@@ -31,7 +31,6 @@ import {
 import BYOKSettingsModal from "@/src/components/BYOKSettingsModal";
 import RecordingDetail from "@/src/components/RecordingDetail";
 import RecordingSidebar from "@/src/components/RecordingSidebar";
-import RecordingUploader from "@/src/components/RecordingUploader";
 import { useBYOKSettings } from "@/src/hooks/useBYOKSettings";
 
 export default function ProjectDetailPage() {
@@ -151,6 +150,7 @@ export default function ProjectDetailPage() {
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to upload recording");
+            throw err;
         } finally {
             setIsUploading(false);
         }
@@ -364,12 +364,6 @@ export default function ProjectDetailPage() {
                     </button>
                 </header>
 
-                <RecordingUploader
-                    onUpload={handleUpload}
-                    isUploading={isUploading}
-                    runtimeDevices={runtimeDevices}
-                />
-
                 {error && (
                     <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                         {error}
@@ -384,6 +378,9 @@ export default function ProjectDetailPage() {
                         onDelete={handleDeleteRecording}
                         onRename={handleRenameRecording}
                         renamingId={renamingRecordingId}
+                        onUpload={handleUpload}
+                        isUploading={isUploading}
+                        runtimeDevices={runtimeDevices}
                     />
                     <RecordingDetail
                         key={selectedRecording?.id ?? "empty-recording"}

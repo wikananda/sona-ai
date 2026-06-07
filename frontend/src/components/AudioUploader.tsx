@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AudioFileDropzone from "@/src/components/AudioFileDropzone";
 
 interface Language {
     label: string;
@@ -62,23 +63,12 @@ export default function AudioUploader({
             <h2 className="text-xl font-bold text-zinc-800">Audio Transcription</h2>
 
             {/* Audio File Upload */}
-            <div className="flex flex-col gap-2">
-                <input
-                    type="file"
-                    accept="audio/*"
-                    className="block w-full text-sm text-slate-500
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded-full file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-zinc-100 file:text-zinc-700
-                        hover:file:bg-zinc-300 cursor-pointer"
-                    onChange={(e) => {
-                        if (e.target.files) {
-                            onFileChange(e.target.files[0]);
-                        }
-                    }}
-                />
-            </div>
+            <AudioFileDropzone
+                file={file}
+                onFileChange={onFileChange}
+                disabled={isLoading}
+                title="Choose audio or drag it here"
+            />
 
             {/* Language Selection */}
             <div className="flex flex-row items-center gap-4 relative">
