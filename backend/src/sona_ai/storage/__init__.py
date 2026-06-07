@@ -1,3 +1,15 @@
-from .audio import SavedAudio, delete_project_dir, delete_recording_file, save_upload
+from .audio import (
+    SavedAudio,
+    delete_project_dir,
+    delete_recording_file,
+    normalize_recording_file,
+    save_upload,
+)
 
-__all__ = ["SavedAudio", "delete_project_dir", "delete_recording_file", "save_upload"]
+__all__ = [
+    "SavedAudio",
+    "delete_project_dir",
+    "delete_recording_file",
+    "normalize_recording_file",
+    "save_upload",
+]

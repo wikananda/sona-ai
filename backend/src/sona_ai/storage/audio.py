@@ -1,4 +1,5 @@
 import shutil
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -26,18 +27,89 @@ def save_upload(project_id: str, recording_id: str, upload_file: UploadFile) -> 
     project_dir = _safe_project_dir(project_id)
     project_dir.mkdir(parents=True, exist_ok=True)
 
-    destination = project_dir / f"{recording_id}{extension}"
+    raw_destination = project_dir / f"{recording_id}.upload{extension}"
+    destination = project_dir / f"{recording_id}.wav"
+
+    try:
+        _write_upload(raw_destination, upload_file)
+        _convert_to_wav(raw_destination, destination)
+        size = destination.stat().st_size
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+    finally:
+        raw_destination.unlink(missing_ok=True)
+
+    return SavedAudio(
+        stored_path=str(destination.relative_to(PROJECT_ROOT)),
+        mime_type="audio/wav",
+        file_size_bytes=size,
+    )
+
+
+def normalize_recording_file(stored_path: str) -> SavedAudio:
+    source = _safe_project_path(stored_path)
+    if not source.is_file():
+        raise FileNotFoundError(f"Recording audio file not found: {stored_path}")
+
+    if source.suffix.lower() == ".wav":
+        return SavedAudio(
+            stored_path=str(source.relative_to(PROJECT_ROOT)),
+            mime_type="audio/wav",
+            file_size_bytes=source.stat().st_size,
+        )
+
+    destination = source.with_suffix(".wav")
+    try:
+        _convert_to_wav(source, destination)
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+    else:
+        source.unlink(missing_ok=True)
+
+    return SavedAudio(
+        stored_path=str(destination.relative_to(PROJECT_ROOT)),
+        mime_type="audio/wav",
+        file_size_bytes=destination.stat().st_size,
+    )
+
+
+def _write_upload(destination: Path, upload_file: UploadFile) -> int:
     size = 0
     with destination.open("wb") as buffer:
         while chunk := upload_file.file.read(1024 * 1024):
             size += len(chunk)
             buffer.write(chunk)
+    return size
 
-    return SavedAudio(
-        stored_path=str(destination.relative_to(PROJECT_ROOT)),
-        mime_type=upload_file.content_type,
-        file_size_bytes=size,
-    )
+
+def _convert_to_wav(input_path: Path, output_path: Path) -> None:
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(input_path),
+        "-vn",
+        "-ac",
+        "1",
+        "-ar",
+        "16000",
+        "-c:a",
+        "pcm_s16le",
+        str(output_path),
+    ]
+
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "ffmpeg is required to normalize uploaded audio before transcription."
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        detail = f": {stderr}" if stderr else ""
+        raise RuntimeError(f"Failed to normalize uploaded audio with ffmpeg{detail}") from exc
 
 
 def delete_recording_file(stored_path: str) -> None:

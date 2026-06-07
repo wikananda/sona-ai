@@ -109,12 +109,25 @@ class ExternalWav2Vec2Aligner:
         logger.info("External Wav2Vec2 alignment finished in %.2f seconds", time.time() - started_at)
         aligned.setdefault("language", transcription.language or language)
         aligned_result = TranscriptionResult.from_aligned_result(aligned)
+        aligned_timed_segments = self._timed_result_segment_count(aligned_result)
+        aligned_timed_words = self._timed_result_word_count(aligned_result)
         logger.info(
             "External Wav2Vec2 alignment output: segments=%d timed_segments=%d timed_words=%d",
             len(aligned_result.segments),
-            self._timed_result_segment_count(aligned_result),
-            self._timed_result_word_count(aligned_result),
+            aligned_timed_segments,
+            aligned_timed_words,
         )
+        if self._should_keep_original_transcription(
+            original=transcription,
+            aligned_timed_segments=aligned_timed_segments,
+            aligned_timed_words=aligned_timed_words,
+        ):
+            logger.warning(
+                "External Wav2Vec2 alignment returned no usable timestamps; "
+                "keeping original ASR timestamps for downstream speaker assignment."
+            )
+            return transcription
+
         return aligned_result
 
     def _normalize_segments_for_alignment(
@@ -189,6 +202,20 @@ class ExternalWav2Vec2Aligner:
             for segment in transcription.segments
             for word in segment.words
             if word.start is not None and word.end is not None and word.end > word.start
+        )
+
+    def _should_keep_original_transcription(
+        self,
+        original: TranscriptionResult,
+        aligned_timed_segments: int,
+        aligned_timed_words: int,
+    ) -> bool:
+        if aligned_timed_segments > 0 or aligned_timed_words > 0:
+            return False
+
+        return (
+            self._timed_result_segment_count(original) > 0
+            or self._timed_result_word_count(original) > 0
         )
 
     def _align_model_name(self, language: str) -> str:

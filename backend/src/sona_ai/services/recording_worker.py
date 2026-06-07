@@ -7,6 +7,7 @@ from sona_ai.core import PROJECT_ROOT, sanitize_for_json, setup_logging
 from sona_ai.db.engine import SessionLocal
 from sona_ai.db.models import Recording, RecordingStatus, Transcript
 from sona_ai.services.transcription_service import TranscriptionService
+from sona_ai.storage import normalize_recording_file
 from sona_ai.transcription.schemas import TranscriptSegment, TranscriptionResult
 
 
@@ -45,6 +46,8 @@ def run_transcription(
             total_steps=total_steps,
             job_id=job_id,
         )
+        _normalize_recording_audio(db, recording)
+        _raise_if_canceled_or_stale(db, recording.id, job_id)
         logger.info(
             "Recording %s marked processing: file=%s model=%s device=%s language=%s",
             recording.id,
@@ -147,6 +150,8 @@ def run_speaker_extraction(
             total_steps=total_steps,
             job_id=job_id,
         )
+        _normalize_recording_audio(db, recording)
+        _raise_if_canceled_or_stale(db, recording.id, job_id)
         segments = json.loads(recording.transcript.segments_json)
         transcription = TranscriptionResult(
             segments=[
@@ -226,6 +231,28 @@ def run_speaker_extraction(
         _mark_failed(db, recording_id, job_id, str(exc))
     finally:
         db.close()
+
+
+def _normalize_recording_audio(db: Session, recording: Recording) -> None:
+    normalized = normalize_recording_file(recording.stored_path)
+    if (
+        normalized.stored_path == recording.stored_path
+        and normalized.mime_type == recording.mime_type
+        and normalized.file_size_bytes == recording.file_size_bytes
+    ):
+        return
+
+    logger.info(
+        "Normalized recording audio for recording_id=%s: %s -> %s",
+        recording.id,
+        recording.stored_path,
+        normalized.stored_path,
+    )
+    recording.stored_path = normalized.stored_path
+    recording.mime_type = normalized.mime_type
+    recording.file_size_bytes = normalized.file_size_bytes
+    db.commit()
+    db.refresh(recording)
 
 
 def _set_status(
