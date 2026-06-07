@@ -11,6 +11,8 @@ interface ExportSummaryPdfParams {
 }
 
 type JsPdfDocument = InstanceType<typeof import("jspdf").jsPDF>;
+type PdfFontStyle = "normal" | "bold";
+type PdfColor = [number, number, number];
 
 const PAGE_MARGIN = 56;
 const LINE_HEIGHT = 15;
@@ -68,19 +70,38 @@ function createPdfWriter(doc: JsPdfDocument) {
     const contentWidth = pageWidth - PAGE_MARGIN * 2;
     let cursorY = PAGE_MARGIN;
 
-    const addPageIfNeeded = (height: number) => {
-        if (cursorY + height <= pageHeight - PAGE_MARGIN) return;
+    const bottomY = pageHeight - PAGE_MARGIN;
 
+    const addPage = () => {
         doc.addPage();
         cursorY = PAGE_MARGIN;
+    };
+
+    const addPageIfNeeded = (height: number) => {
+        if (cursorY + height <= bottomY) return;
+
+        addPage();
+    };
+
+    const measureLines = (
+        text: string,
+        maxLineWidth: number,
+        fontSize: number,
+        fontStyle: PdfFontStyle,
+    ): string[] => {
+        doc.setFont("helvetica", fontStyle);
+        doc.setFontSize(fontSize);
+
+        const wrappedText = doc.splitTextToSize(text, maxLineWidth);
+        return Array.isArray(wrappedText) ? wrappedText : [wrappedText];
     };
 
     const addText = (
         text: string,
         options: {
             fontSize?: number;
-            fontStyle?: "normal" | "bold";
-            textColor?: [number, number, number];
+            fontStyle?: PdfFontStyle;
+            textColor?: PdfColor;
             before?: number;
             after?: number;
             indent?: number;
@@ -104,8 +125,12 @@ function createPdfWriter(doc: JsPdfDocument) {
         doc.setFontSize(fontSize);
         doc.setTextColor(...(options.textColor ?? [39, 39, 42]));
 
-        const wrappedText = doc.splitTextToSize(safeText, maxLineWidth);
-        const wrappedLines = Array.isArray(wrappedText) ? wrappedText : [wrappedText];
+        const wrappedLines = measureLines(
+            safeText,
+            maxLineWidth,
+            fontSize,
+            fontStyle,
+        );
 
         addPageIfNeeded(before + lineHeight);
         cursorY += before;
@@ -115,6 +140,118 @@ function createPdfWriter(doc: JsPdfDocument) {
             cursorY += lineHeight;
         });
         cursorY += after;
+    };
+
+    const addTable = (headers: string[], rows: string[][]) => {
+        const columnCount = headers.length;
+        if (columnCount === 0) return;
+
+        cursorY += 4;
+
+        const columnWidths = buildColumnWidths(columnCount, contentWidth);
+        const paddingX = 6;
+        const paddingY = 7;
+        const tableLineHeight = 12;
+        const headerFontSize = 9;
+        const bodyFontSize = 9;
+        const maxCellWidths = columnWidths.map((width) => Math.max(20, width - paddingX * 2));
+
+        const renderRowChunk = (
+            cellLineSets: string[][],
+            startLine: number,
+            lineCount: number,
+            isHeader: boolean,
+        ) => {
+            const rowHeight = Math.max(26, lineCount * tableLineHeight + paddingY * 2);
+
+            if (cursorY + rowHeight > bottomY) {
+                addPage();
+            }
+
+            let cursorX = PAGE_MARGIN;
+            columnWidths.forEach((columnWidth, columnIndex) => {
+                if (isHeader) {
+                    doc.setFillColor(244, 244, 245);
+                } else {
+                    doc.setFillColor(255, 255, 255);
+                }
+                doc.setDrawColor(212, 212, 216);
+                doc.setLineWidth(0.5);
+                doc.rect(cursorX, cursorY, columnWidth, rowHeight, "FD");
+
+                doc.setFont("helvetica", isHeader ? "bold" : "normal");
+                doc.setFontSize(isHeader ? headerFontSize : bodyFontSize);
+                const textColor: PdfColor = isHeader ? [63, 63, 70] : [39, 39, 42];
+                doc.setTextColor(...textColor);
+
+                const visibleLines = cellLineSets[columnIndex].slice(
+                    startLine,
+                    startLine + lineCount,
+                );
+                visibleLines.forEach((line, lineIndex) => {
+                    doc.text(
+                        line,
+                        cursorX + paddingX,
+                        cursorY + paddingY + (lineIndex + 1) * tableLineHeight - 2,
+                    );
+                });
+
+                cursorX += columnWidth;
+            });
+
+            cursorY += rowHeight;
+        };
+
+        const renderHeader = () => {
+            const headerLineSets = headers.map((header, index) => (
+                measureLines(
+                    cleanMarkdownInline(header),
+                    maxCellWidths[index],
+                    headerFontSize,
+                    "bold",
+                )
+            ));
+            const headerLineCount = Math.max(
+                1,
+                ...headerLineSets.map((lines) => lines.length),
+            );
+            renderRowChunk(headerLineSets, 0, headerLineCount, true);
+        };
+
+        renderHeader();
+
+        rows.forEach((row) => {
+            const cellLineSets = headers.map((_, index) => (
+                wrapTableCell(row[index] ?? "", maxCellWidths[index], bodyFontSize)
+            ));
+            const totalLineCount = Math.max(
+                1,
+                ...cellLineSets.map((lines) => lines.length),
+            );
+            let startLine = 0;
+
+            while (startLine < totalLineCount) {
+                const availableLineCount = Math.floor(
+                    Math.max(0, bottomY - cursorY - paddingY * 2) / tableLineHeight,
+                );
+                if (availableLineCount < 1) {
+                    addPage();
+                    renderHeader();
+                    continue;
+                }
+
+                const lineCount = Math.min(totalLineCount - startLine, availableLineCount);
+                renderRowChunk(cellLineSets, startLine, lineCount, false);
+                startLine += lineCount;
+
+                if (startLine < totalLineCount) {
+                    addPage();
+                    renderHeader();
+                }
+            }
+        });
+
+        cursorY += 8;
     };
 
     const addDocumentHeader = (title: string, recordingName: string) => {
@@ -145,19 +282,44 @@ function createPdfWriter(doc: JsPdfDocument) {
 
     return {
         addText,
+        addTable,
         addDocumentHeader,
     };
+
+    function wrapTableCell(text: string, maxLineWidth: number, fontSize: number): string[] {
+        const parts = text.split(/<br\s*\/?>/i);
+        const lines = parts.flatMap((part) => {
+            const cleanedPart = cleanMarkdownInline(part)
+                .replace(/^\s*[-*]\s+/, "• ")
+                .trim();
+            if (!cleanedPart) return [];
+
+            return measureLines(cleanedPart, maxLineWidth, fontSize, "normal");
+        });
+
+        return lines.length ? lines : [""];
+    }
 }
 
 function writeMarkdownSummary(
     writer: ReturnType<typeof createPdfWriter>,
     summary: string,
 ) {
-    summary.split("\n").forEach((line) => {
+    const lines = summary.split("\n");
+
+    for (let index = 0; index < lines.length; index += 1) {
+        const tableBlock = parseMarkdownTable(lines, index);
+        if (tableBlock) {
+            writer.addTable(tableBlock.headers, tableBlock.rows);
+            index = tableBlock.endIndex;
+            continue;
+        }
+
+        const line = lines[index];
         const trimmedLine = line.trim();
         if (!trimmedLine) {
             writer.addText("", { after: 5 });
-            return;
+            continue;
         }
 
         const headingMatch = trimmedLine.match(/^(#{1,3})\s+(.+)$/);
@@ -170,7 +332,7 @@ function writeMarkdownSummary(
                 before: level === 1 ? 10 : 8,
                 after: 4,
             });
-            return;
+            continue;
         }
 
         const boldHeadingMatch = trimmedLine.match(/^\*\*(.+)\*\*$/);
@@ -182,7 +344,7 @@ function writeMarkdownSummary(
                 before: 8,
                 after: 4,
             });
-            return;
+            continue;
         }
 
         const unorderedListMatch = trimmedLine.match(/^[-*]\s+(.+)$/);
@@ -192,7 +354,7 @@ function writeMarkdownSummary(
                 indent: 12,
                 after: 3,
             });
-            return;
+            continue;
         }
 
         const orderedListMatch = trimmedLine.match(/^(\d+\.)\s+(.+)$/);
@@ -205,14 +367,76 @@ function writeMarkdownSummary(
                     after: 3,
                 },
             );
-            return;
+            continue;
         }
 
         writer.addText(cleanMarkdownInline(trimmedLine), {
             fontSize: 11,
             after: 6,
         });
-    });
+    }
+}
+
+function parseMarkdownTable(
+    lines: string[],
+    startIndex: number,
+): { headers: string[]; rows: string[][]; endIndex: number } | null {
+    const headerLine = lines[startIndex]?.trim();
+    const separatorLine = lines[startIndex + 1]?.trim();
+    if (!headerLine || !separatorLine) return null;
+    if (!isMarkdownTableRow(headerLine) || !isMarkdownTableSeparator(separatorLine)) {
+        return null;
+    }
+
+    const headers = splitMarkdownTableRow(headerLine);
+    const separatorCells = splitMarkdownTableRow(separatorLine);
+    if (headers.length < 2 || separatorCells.length !== headers.length) return null;
+
+    const rows: string[][] = [];
+    let index = startIndex + 2;
+    while (index < lines.length && isMarkdownTableRow(lines[index])) {
+        const row = splitMarkdownTableRow(lines[index]);
+        if (row.length === headers.length) {
+            rows.push(row);
+        }
+        index += 1;
+    }
+
+    return {
+        headers,
+        rows,
+        endIndex: index - 1,
+    };
+}
+
+function isMarkdownTableRow(line: string): boolean {
+    return line.trim().includes("|");
+}
+
+function isMarkdownTableSeparator(line: string): boolean {
+    const cells = splitMarkdownTableRow(line);
+    return (
+        cells.length >= 2 &&
+        cells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s/g, "")))
+    );
+}
+
+function splitMarkdownTableRow(line: string): string[] {
+    return line
+        .trim()
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((cell) => cell.trim());
+}
+
+function buildColumnWidths(columnCount: number, contentWidth: number): number[] {
+    if (columnCount === 2) {
+        return [contentWidth * 0.3, contentWidth * 0.7];
+    }
+
+    const columnWidth = contentWidth / columnCount;
+    return Array.from({ length: columnCount }, () => columnWidth);
 }
 
 function cleanMarkdownInline(text: string): string {
