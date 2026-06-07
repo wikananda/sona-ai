@@ -171,6 +171,10 @@ export interface RecordingSummaryParams {
     byok?: BYOKSummarySettings;
 }
 
+export interface RecordingSummaryUpdateParams {
+    text: string;
+}
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export function recordingAudioUrl(recordingId: string): string {
@@ -394,6 +398,19 @@ export async function summarizeRecording(
                     base_url: params.byok.baseUrl,
                 }
                 : undefined,
+        }),
+    });
+}
+
+export async function updateRecordingSummary(
+    recordingId: string,
+    params: RecordingSummaryUpdateParams,
+): Promise<Recording> {
+    return requestJson(`/recordings/${recordingId}/summary`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            text: params.text,
         }),
     });
 }

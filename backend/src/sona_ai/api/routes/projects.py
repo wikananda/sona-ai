@@ -24,6 +24,7 @@ from sona_ai.api.schemas.projects import (
     RecordingRename,
     RecordingRetranscribe,
     RecordingSpeakerExtraction,
+    RecordingSummaryUpdate,
     TranscriptSegmentUpdate,
     TranscriptSpeakerRename,
 )
@@ -286,6 +287,37 @@ async def summarize_recording(
     db.commit()
     db.refresh(recording)
     db.refresh(summary)
+    return _serialize_recording(recording, include_transcript=True)
+
+
+@router.patch("/recordings/{recording_id}/summary")
+def update_recording_summary(
+    recording_id: str,
+    body: RecordingSummaryUpdate,
+    db: Session = Depends(get_db),
+):
+    recording = db.scalar(
+        select(Recording)
+        .where(Recording.id == recording_id)
+        .options(
+            selectinload(Recording.transcript),
+            selectinload(Recording.summary),
+        )
+    )
+    if recording is None:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    if recording.summary is None:
+        raise HTTPException(status_code=404, detail="Summary not found")
+
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Summary text cannot be empty")
+
+    recording.summary.text = text
+    recording.summary.strategy = "manual_edit"
+    db.commit()
+    db.refresh(recording)
+    db.refresh(recording.summary)
     return _serialize_recording(recording, include_transcript=True)
 
 

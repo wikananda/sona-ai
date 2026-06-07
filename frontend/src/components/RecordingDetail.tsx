@@ -5,6 +5,7 @@ import {
     recordingAudioUrl,
     Recording,
     RecordingSummaryParams,
+    RecordingSummaryUpdateParams,
     RetranscribeParams,
     SpeakerExtractionParams,
     RuntimeDevice,
@@ -61,6 +62,11 @@ interface Props {
         recordingId: string,
         settings: RecordingSummaryParams,
     ) => Promise<void>;
+    isUpdatingSummary?: boolean;
+    onUpdateSummary?: (
+        recordingId: string,
+        params: RecordingSummaryUpdateParams,
+    ) => Promise<void>;
     byokSettings?: BYOKSummarySettings;
     isBYOKConfigured: boolean;
     onOpenSettings: () => void;
@@ -82,6 +88,8 @@ export default function RecordingDetail({
     onExtractSpeakers,
     isSummarizing = false,
     onSummarize,
+    isUpdatingSummary = false,
+    onUpdateSummary,
     byokSettings,
     isBYOKConfigured,
     onOpenSettings,
@@ -161,6 +169,12 @@ export default function RecordingDetail({
             prompt: summaryInstruction.trim() || undefined,
             byok: summaryMode === "byok" ? byokSettings : undefined,
         });
+    };
+
+    const handleUpdateSummary = async (text: string) => {
+        if (!onUpdateSummary) return;
+
+        await onUpdateSummary(recording.id, { text });
     };
 
     const handleRenameSpeakers = async (speakers: Record<string, string>) => {
@@ -466,6 +480,8 @@ export default function RecordingDetail({
                                 customInstruction={summaryInstruction}
                                 onCustomInstructionChange={setSummaryInstruction}
                                 onSummarize={handleSummarize}
+                                isSavingSummary={isUpdatingSummary}
+                                onUpdateSummary={handleUpdateSummary}
                                 canSummarize={
                                     Boolean(onSummarize) &&
                                     segments.length > 0 &&

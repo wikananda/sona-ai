@@ -31,5 +31,9 @@ class TranscriptSegmentUpdate(BaseModel):
     speaker: Optional[str] = None
 
 
+class RecordingSummaryUpdate(BaseModel):
+    text: str
+
+
 class RecordingRename(BaseModel):
     name: str

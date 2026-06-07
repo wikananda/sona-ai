@@ -33,6 +33,8 @@ interface Props {
     customInstruction: string;
     onCustomInstructionChange: (instruction: string) => void;
     onSummarize: () => void;
+    isSavingSummary?: boolean;
+    onUpdateSummary?: (text: string) => Promise<void>;
     canSummarize: boolean;
 }
 
@@ -52,9 +54,61 @@ export default function SummaryPanel({
     customInstruction,
     onCustomInstructionChange,
     onSummarize,
+    isSavingSummary = false,
+    onUpdateSummary,
     canSummarize,
 }: Props) {
     const [isInstructionOpen, setIsInstructionOpen] = useState(false);
+    const [isEditingSummary, setIsEditingSummary] = useState(false);
+    const [summaryDraft, setSummaryDraft] = useState(summary);
+    const [summaryEditError, setSummaryEditError] = useState("");
+    const isBusy = isLoading || isSavingSummary;
+
+    const openSummaryEditor = () => {
+        setSummaryDraft(summary);
+        setSummaryEditError("");
+        setIsEditingSummary(true);
+    };
+
+    const handleCancelSummaryEdit = () => {
+        if (
+            summaryDraft !== summary &&
+            !window.confirm("Discard changes to this summary?")
+        ) {
+            return;
+        }
+
+        setSummaryDraft(summary);
+        setSummaryEditError("");
+        setIsEditingSummary(false);
+    };
+
+    const handleSaveSummaryEdit = async () => {
+        if (!onUpdateSummary) return;
+
+        const nextSummary = summaryDraft.trim();
+        if (!nextSummary) {
+            setSummaryEditError("Summary cannot be empty.");
+            return;
+        }
+        if (nextSummary === summary.trim()) {
+            setSummaryDraft(summary);
+            setSummaryEditError("");
+            setIsEditingSummary(false);
+            return;
+        }
+        if (!window.confirm("Save changes to this summary?")) return;
+
+        setSummaryEditError("");
+        try {
+            await onUpdateSummary(nextSummary);
+            setIsEditingSummary(false);
+        } catch (err) {
+            setSummaryEditError(
+                err instanceof Error ? err.message : "Failed to save summary.",
+            );
+        }
+    };
 
     return (
         <div className="flex flex-col gap-4">
@@ -72,6 +126,7 @@ export default function SummaryPanel({
                             key={mode}
                             type="button"
                             onClick={() => onModeChange(mode)}
+                            disabled={isBusy}
                             className={`cursor-pointer rounded-md px-4 py-1.5 text-sm font-medium transition-all ${selectedMode === mode
                                 ? "bg-white text-zinc-900 shadow-sm ring-1 ring-black/5"
                                 : "text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200/50"
@@ -95,7 +150,7 @@ export default function SummaryPanel({
                                     id="summary-model"
                                     value={selectedModel}
                                     onChange={(event) => onModelChange(event.target.value as LocalLLMModel)}
-                                    disabled={isLoading}
+                                    disabled={isBusy}
                                     className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {LOCAL_LLM_MODELS.map((model) => (
@@ -114,7 +169,7 @@ export default function SummaryPanel({
                                     id="summary-device"
                                     value={selectedDevice}
                                     onChange={(event) => onDeviceChange(event.target.value as RuntimeDevice)}
-                                    disabled={isLoading}
+                                    disabled={isBusy}
                                     className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {runtimeDevices.available.map((device) => (
@@ -137,7 +192,7 @@ export default function SummaryPanel({
                             <button
                                 type="button"
                                 onClick={onOpenSettings}
-                                disabled={isLoading}
+                                disabled={isBusy}
                                 className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Settings
@@ -146,14 +201,26 @@ export default function SummaryPanel({
                     )}
                 </div>
 
-                <button
-                    type="button"
-                    onClick={onSummarize}
-                    disabled={isLoading || !canSummarize}
-                    className="min-h-10 shrink-0 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    {isLoading ? "Summarizing" : summary ? "Re-summarize" : "Summarize"}
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                    {summary && !isEditingSummary && onUpdateSummary && (
+                        <button
+                            type="button"
+                            onClick={openSummaryEditor}
+                            disabled={isBusy}
+                            className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Edit
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={onSummarize}
+                        disabled={isBusy || !canSummarize || isEditingSummary}
+                        className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {isLoading ? "Summarizing" : summary ? "Re-summarize" : "Summarize"}
+                    </button>
+                </div>
             </div>
 
             {selectedMode === "byok" && !isBYOKConfigured && (
@@ -166,7 +233,7 @@ export default function SummaryPanel({
                 <button
                     type="button"
                     onClick={() => setIsInstructionOpen((current) => !current)}
-                    disabled={isLoading}
+                    disabled={isBusy}
                     className="w-fit cursor-pointer text-sm font-medium text-zinc-600 underline hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     Custom instruction
@@ -176,7 +243,7 @@ export default function SummaryPanel({
                     <textarea
                         value={customInstruction}
                         onChange={(event) => onCustomInstructionChange(event.target.value)}
-                        disabled={isLoading}
+                        disabled={isBusy}
                         rows={3}
                         placeholder="Example: summarize this as meeting notes with decisions and action items."
                         className="w-full resize-y rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
@@ -199,7 +266,50 @@ export default function SummaryPanel({
                 </div>
             )}
 
-            {summary && !isLoading && (
+            {summary && isEditingSummary && !isLoading && (
+                <div className="flex flex-col gap-3">
+                    <label className="flex flex-col gap-2">
+                        <span className="text-xs font-medium text-zinc-500">
+                            Markdown summary
+                        </span>
+                        <textarea
+                            value={summaryDraft}
+                            onChange={(event) => {
+                                setSummaryDraft(event.target.value);
+                                setSummaryEditError("");
+                            }}
+                            disabled={isSavingSummary}
+                            rows={14}
+                            className="w-full resize-y rounded-md border border-zinc-300 px-3 py-2 font-mono text-sm leading-relaxed text-zinc-900 outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                    </label>
+
+                    {summaryEditError && (
+                        <p className="text-sm text-red-700">{summaryEditError}</p>
+                    )}
+
+                    <div className="flex justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={handleCancelSummaryEdit}
+                            disabled={isSavingSummary}
+                            className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSaveSummaryEdit}
+                            disabled={isSavingSummary}
+                            className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {isSavingSummary ? "Saving..." : "Save"}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {summary && !isLoading && !isEditingSummary && (
                 <div className="text-zinc-700">
                     <ReactMarkdown
                         remarkPlugins={[remarkGfm]}

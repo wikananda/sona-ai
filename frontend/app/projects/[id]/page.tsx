@@ -14,6 +14,7 @@ import {
     Recording,
     renameRecording,
     RecordingSummaryParams,
+    RecordingSummaryUpdateParams,
     RetranscribeParams,
     SpeakerExtractionParams,
     RuntimeDevice,
@@ -25,6 +26,7 @@ import {
     TranscriptSegmentUpdateParams,
     uploadProjectRecording,
     updateTranscriptSegment,
+    updateRecordingSummary,
 } from "@/src/api/sonaApi";
 import BYOKSettingsModal from "@/src/components/BYOKSettingsModal";
 import RecordingDetail from "@/src/components/RecordingDetail";
@@ -51,6 +53,7 @@ export default function ProjectDetailPage() {
     const [editingTranscriptId, setEditingTranscriptId] = useState<string>();
     const [extractingSpeakerId, setExtractingSpeakerId] = useState<string>();
     const [summarizingId, setSummarizingId] = useState<string>();
+    const [updatingSummaryId, setUpdatingSummaryId] = useState<string>();
     const [runtimeDevices, setRuntimeDevices] = useState<RuntimeDevices>({
         default: "auto",
         available: ["auto", "cpu"],
@@ -302,6 +305,25 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleUpdateRecordingSummary = async (
+        recordingId: string,
+        params: RecordingSummaryUpdateParams,
+    ) => {
+        setError("");
+        setUpdatingSummaryId(recordingId);
+        try {
+            const recording = await updateRecordingSummary(recordingId, params);
+            setSelectedRecording((current) =>
+                current?.id === recordingId ? recording : current,
+            );
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to update summary");
+            throw err;
+        } finally {
+            setUpdatingSummaryId(undefined);
+        }
+    };
+
     if (isLoadingProject) {
         return (
             <main className="min-h-screen bg-zinc-100 p-6 text-sm text-zinc-500">
@@ -380,6 +402,8 @@ export default function ProjectDetailPage() {
                         onExtractSpeakers={handleExtractSpeakers}
                         isSummarizing={summarizingId === selectedRecording?.id}
                         onSummarize={handleSummarizeRecording}
+                        isUpdatingSummary={updatingSummaryId === selectedRecording?.id}
+                        onUpdateSummary={handleUpdateRecordingSummary}
                         byokSettings={byokSettings.selectedBYOKSettings}
                         isBYOKConfigured={byokSettings.isSelectedProviderConfigured}
                         onOpenSettings={() => setIsSettingsOpen(true)}
