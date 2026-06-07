@@ -3,9 +3,8 @@ from typing import Optional
 
 from sona_ai.core import resolve_device, validate_device_available
 from sona_ai.summarization.prompts import (
-    build_adaptive_summary_prompt,
-    build_summary_planner_prompt,
-    parse_summary_plan
+    build_one_call_adaptive_summary_prompt,
+    parse_adaptive_summary_response,
 )
 
 
@@ -59,7 +58,32 @@ class SummarizationService:
             else self._model_input_limit(model_name)
         )
         return summarizer.generate(text, prompt, max_length=input_limit)
-    
+
+    def summarize_prompt(
+        self,
+        prompt: str,
+        max_length: Optional[int] = None,
+        model: Optional[str] = None,
+        device: Optional[str] = None,
+        mode: str = "local",
+        byok: Optional[dict] = None,
+    ) -> str:
+        if mode == "byok":
+            return self._summarize_byok_prompt(
+                prompt=prompt,
+                max_length=max_length,
+                byok=byok,
+            )
+
+        model_name = self._normalize_model(model or self.config)
+        summarizer = self._get_summarizer(model_name, device)
+        input_limit = (
+            max_length
+            if max_length is not None
+            else self._model_input_limit(model_name)
+        )
+        return summarizer.generate_from_prompt(prompt, max_length=input_limit)
+
     def summarize_adaptive(
         self,
         text: str,
@@ -70,22 +94,9 @@ class SummarizationService:
         mode: str = "local",
         byok: Optional[dict] = None,
     ) -> dict:
-        planner_prompt = build_summary_planner_prompt(text, prompt)
-        raw_plan = self.summarize(
-            text=text,
-            prompt=planner_prompt,
-            max_length=max_length,
-            model=model,
-            device=device,
-            mode=mode,
-            byok=byok,
-        )
-        plan = parse_summary_plan(raw_plan)
-
-        final_prompt = build_adaptive_summary_prompt(text, plan, prompt)
-        summary = self.summarize(
-            text=text,
-            prompt=final_prompt,
+        adaptive_prompt = build_one_call_adaptive_summary_prompt(text, prompt)
+        raw_response = self.summarize_prompt(
+            prompt=adaptive_prompt,
             max_length=max_length,
             model=model,
             device=device,
@@ -93,11 +104,7 @@ class SummarizationService:
             byok=byok,
         )
 
-        return {
-            "summary": summary,
-            "plan": plan,
-            "format_name": plan.get("format_name"),
-        }
+        return parse_adaptive_summary_response(raw_response)
 
 
     def _summarize_byok(
@@ -131,7 +138,39 @@ class SummarizationService:
             provider=provider,
             base_url=base_url,
             max_length=max_length or 2048,
-            max_tokens=256,
+            max_tokens=self._byok_output_limit(),
+        )
+
+    def _summarize_byok_prompt(
+        self,
+        prompt: str,
+        max_length: Optional[int],
+        byok: Optional[dict],
+    ) -> str:
+        if byok is None:
+            raise ValueError("BYOK settings are required")
+
+        api_key = (byok.get("api_key") or "").strip()
+        model = (byok.get("model") or "").strip()
+        provider = (byok.get("provider", "") or "").strip()
+        base_url = (byok.get("base_url") or "").strip()
+
+        if not api_key:
+            raise ValueError("BYOK: api_key is required")
+        if not model:
+            raise ValueError("BYOK: model is required")
+
+        from sona_ai.summarization import OpenAICompatibleSummarizer
+
+        summarizer = OpenAICompatibleSummarizer()
+        return summarizer.generate_from_prompt(
+            prompt=prompt,
+            api_key=api_key,
+            model=model,
+            provider=provider,
+            base_url=base_url,
+            max_length=max_length or 2048,
+            max_tokens=self._byok_output_limit(),
         )
 
     def close(self):
@@ -220,3 +259,8 @@ class SummarizationService:
         if configured is not None:
             return configured
         return int(config.get("generation", {}).get("num_beams", 4))
+
+    def _byok_output_limit(self) -> int:
+        if self.max_new_tokens is not None:
+            return self.max_new_tokens
+        return 1024

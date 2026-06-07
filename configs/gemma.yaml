@@ -8,7 +8,7 @@ model:
 
 limits:
     max_input_length: 512
-    max_output_tokens: 256
+    max_output_tokens: 1024
 
 cp_dir:
     hf_cache: "cp/hf_cache"
