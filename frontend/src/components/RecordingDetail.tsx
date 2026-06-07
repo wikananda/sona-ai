@@ -301,60 +301,73 @@ export default function RecordingDetail({
             </div>
 
             <div className="flex-1 p-6">
-                {recording.status === "pending" && !hasTranscript && (
-                    <RecordingProgressPanel
-                        recording={recording}
-                        isCanceling={isCanceling}
-                        onCancel={onCancel ? handleCancelProcessing : undefined}
+                <div className="flex flex-col gap-5">
+                    <audio
+                        key={recording.id}
+                        ref={audioRef}
+                        controls
+                        src={recordingAudioUrl(recording.id)}
+                        onTimeUpdate={(event) => {
+                            setCurrentTime(event.currentTarget.currentTime);
+                        }}
+                        onLoadedMetadata={() => setCurrentTime(0)}
+                        className="w-full"
                     />
-                )}
-                {recording.status === "processing" && !hasTranscript && (
-                    <RecordingProgressPanel
-                        recording={recording}
-                        isCanceling={isCanceling}
-                        onCancel={onCancel ? handleCancelProcessing : undefined}
-                    />
-                )}
-                {recording.status === "failed" && !hasTranscript && (
-                    <div className="flex flex-col gap-4">
-                        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                            {recording.error ?? "Transcription failed."}
-                        </div>
-                        {canRetranscribe && (
-                            <div>
-                                <button
-                                    type="button"
-                                    onClick={openRetranscribeEditor}
-                                    disabled={isRetranscribing}
-                                    className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
-                                </button>
+
+                    {recording.status === "pending" && !hasTranscript && (
+                        <RecordingProgressPanel
+                            recording={recording}
+                            isCanceling={isCanceling}
+                            onCancel={onCancel ? handleCancelProcessing : undefined}
+                        />
+                    )}
+                    {recording.status === "processing" && !hasTranscript && (
+                        <RecordingProgressPanel
+                            recording={recording}
+                            isCanceling={isCanceling}
+                            onCancel={onCancel ? handleCancelProcessing : undefined}
+                        />
+                    )}
+                    {recording.status === "failed" && !hasTranscript && (
+                        <div className="flex flex-col gap-4">
+                            <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                                {recording.error ?? "Transcription failed."}
                             </div>
-                        )}
-                    </div>
-                )}
-                {recording.status === "canceled" && !hasTranscript && (
-                    <div className="flex flex-col gap-4">
-                        <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
-                            Transcription was canceled.
+                            {canRetranscribe && (
+                                <div>
+                                    <button
+                                        type="button"
+                                        onClick={openRetranscribeEditor}
+                                        disabled={isRetranscribing}
+                                        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
+                                    </button>
+                                </div>
+                            )}
                         </div>
-                        {canRetranscribe && (
-                            <div>
-                                <button
-                                    type="button"
-                                    onClick={openRetranscribeEditor}
-                                    disabled={isRetranscribing}
-                                    className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
-                                </button>
+                    )}
+                    {recording.status === "canceled" && !hasTranscript && (
+                        <div className="flex flex-col gap-4">
+                            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
+                                Transcription was canceled.
                             </div>
-                        )}
-                    </div>
-                )}
-                {(recording.status === "done" || hasTranscript) && (
-                    <div className="flex flex-col gap-5">
+                            {canRetranscribe && (
+                                <div>
+                                    <button
+                                        type="button"
+                                        onClick={openRetranscribeEditor}
+                                        disabled={isRetranscribing}
+                                        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {(recording.status === "done" || hasTranscript) && (
+                        <>
                         {isProcessingRecording && (
                             <RecordingProgressPanel
                                 recording={recording}
@@ -373,17 +386,6 @@ export default function RecordingDetail({
                                 Processing was canceled, but the previous transcript is still available.
                             </div>
                         )}
-                        <audio
-                            key={recording.id}
-                            ref={audioRef}
-                            controls
-                            src={recordingAudioUrl(recording.id)}
-                            onTimeUpdate={(event) => {
-                                setCurrentTime(event.currentTarget.currentTime);
-                            }}
-                            onLoadedMetadata={() => setCurrentTime(0)}
-                            className="w-full"
-                        />
 
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200">
                             <div className="flex">
@@ -501,8 +503,9 @@ export default function RecordingDetail({
                                 onOpenSettings={onOpenSettings}
                             />
                         )}
-                    </div>
-                )}
+                        </>
+                    )}
+                </div>
             </div>
 
             {isRetranscribeEditorOpen && (
