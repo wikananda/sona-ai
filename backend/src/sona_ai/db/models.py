@@ -12,8 +12,9 @@ class RecordingStatus:
     PROCESSING = "processing"
     DONE = "done"
     FAILED = "failed"
+    CANCELED = "canceled"
 
-    TERMINAL = {DONE, FAILED}
+    TERMINAL = {DONE, FAILED, CANCELED}
 
 
 def utc_now() -> datetime:
@@ -70,6 +71,10 @@ class Recording(Base):
         default=RecordingStatus.PENDING,
         index=True,
     )
+    processing_stage: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    processing_job_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    progress_completed_steps: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    progress_total_steps: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -146,6 +151,9 @@ class RecordingSummary(Base):
     device: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     provider: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     provider_model: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    format_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    plan_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    strategy: Mapped[str] = mapped_column(String(32), nullable=False, default="adaptive")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,

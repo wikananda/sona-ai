@@ -2,14 +2,18 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import BYOKSettingsModal from "@/src/components/BYOKSettingsModal";
 import NewProjectForm from "@/src/components/NewProjectForm";
 import { createProject, deleteProject, listProjects, Project } from "@/src/api/sonaApi";
+import { useBYOKSettings } from "@/src/hooks/useBYOKSettings";
 
 export default function Home() {
+  const byokSettings = useBYOKSettings();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [error, setError] = useState("");
 
   const refreshProjects = async () => {
@@ -58,13 +62,22 @@ export default function Home() {
             <h1 className="text-2xl font-semibold">Sona AI</h1>
             <p className="text-sm text-zinc-600">Projects</p>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsCreateModalOpen(true)}
-            className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white"
-          >
-            New project
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+            >
+              Settings
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white"
+            >
+              New project
+            </button>
+          </div>
         </header>
 
         {error && (
@@ -146,6 +159,18 @@ export default function Home() {
             </div>
           </div>
         </div>
+      )}
+
+      {isSettingsOpen && (
+        <BYOKSettingsModal
+          settings={byokSettings.settings}
+          onSave={(settings) => {
+            byokSettings.setSettings(settings);
+            setIsSettingsOpen(false);
+          }}
+          onClearSavedKeys={byokSettings.clearSavedKeys}
+          onClose={() => setIsSettingsOpen(false)}
+        />
       )}
     </main>
   );

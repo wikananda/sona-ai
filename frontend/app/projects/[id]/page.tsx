@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+    cancelRecording,
     deleteRecording,
+    extractRecordingSpeakers,
     getProject,
     getRecording,
     getRuntimeDevices,
@@ -12,22 +14,30 @@ import {
     Recording,
     renameRecording,
     RecordingSummaryParams,
+    RecordingSummaryUpdateParams,
     RetranscribeParams,
+    SpeakerExtractionParams,
     RuntimeDevice,
     RuntimeDevices,
     renameTranscriptSpeakers,
     retranscribeRecording,
     summarizeRecording,
     TranscriptionModel,
+    TranscriptSegmentUpdateParams,
     uploadProjectRecording,
+    updateTranscriptSegment,
+    updateRecordingSummary,
 } from "@/src/api/sonaApi";
+import BYOKSettingsModal from "@/src/components/BYOKSettingsModal";
 import RecordingDetail from "@/src/components/RecordingDetail";
 import RecordingSidebar from "@/src/components/RecordingSidebar";
 import RecordingUploader from "@/src/components/RecordingUploader";
+import { useBYOKSettings } from "@/src/hooks/useBYOKSettings";
 
 export default function ProjectDetailPage() {
     const params = useParams<{ id: string }>();
     const projectId = params.id;
+    const byokSettings = useBYOKSettings();
 
     const [project, setProject] = useState<Project | null>(null);
     const [selectedRecordingId, setSelectedRecordingId] = useState<string>();
@@ -35,10 +45,15 @@ export default function ProjectDetailPage() {
     const [isLoadingProject, setIsLoadingProject] = useState(true);
     const [isLoadingRecording, setIsLoadingRecording] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [renamingRecordingId, setRenamingRecordingId] = useState<string>();
     const [retranscribingId, setRetranscribingId] = useState<string>();
+    const [cancelingRecordingId, setCancelingRecordingId] = useState<string>();
     const [renamingSpeakerId, setRenamingSpeakerId] = useState<string>();
+    const [editingTranscriptId, setEditingTranscriptId] = useState<string>();
+    const [extractingSpeakerId, setExtractingSpeakerId] = useState<string>();
     const [summarizingId, setSummarizingId] = useState<string>();
+    const [updatingSummaryId, setUpdatingSummaryId] = useState<string>();
     const [runtimeDevices, setRuntimeDevices] = useState<RuntimeDevices>({
         default: "auto",
         available: ["auto", "cpu"],
@@ -111,6 +126,7 @@ export default function ProjectDetailPage() {
         device: RuntimeDevice;
         minSpeakers?: number | "";
         maxSpeakers?: number | "";
+        extractSpeakers?: boolean;
     }) => {
         setIsUploading(true);
         setError("");
@@ -125,6 +141,7 @@ export default function ProjectDetailPage() {
                     device: params.device,
                     minSpeakers: params.minSpeakers,
                     maxSpeakers: params.maxSpeakers,
+                    extractSpeakers: params.extractSpeakers,
                 });
                 firstRecording = firstRecording ?? recording;
             }
@@ -199,6 +216,23 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleCancelRecording = async (recordingId: string) => {
+        setError("");
+        setCancelingRecordingId(recordingId);
+        try {
+            const recording = await cancelRecording(recordingId);
+            setSelectedRecording((current) =>
+                current?.id === recordingId ? recording : current,
+            );
+            await refreshProject();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to cancel recording");
+            throw err;
+        } finally {
+            setCancelingRecordingId(undefined);
+        }
+    };
+
     const handleRenameTranscriptSpeakers = async (
         recordingId: string,
         speakers: Record<string, string>,
@@ -213,6 +247,42 @@ export default function ProjectDetailPage() {
             throw err;
         } finally {
             setRenamingSpeakerId(undefined);
+        }
+    };
+
+    const handleUpdateTranscriptSegment = async (
+        recordingId: string,
+        segmentIndex: number,
+        params: TranscriptSegmentUpdateParams,
+    ) => {
+        setError("");
+        setEditingTranscriptId(recordingId);
+        try {
+            const recording = await updateTranscriptSegment(recordingId, segmentIndex, params);
+            setSelectedRecording(recording);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to update transcript");
+            throw err;
+        } finally {
+            setEditingTranscriptId(undefined);
+        }
+    };
+
+    const handleExtractSpeakers = async (
+        recordingId: string,
+        params: SpeakerExtractionParams,
+    ) => {
+        setError("");
+        setExtractingSpeakerId(recordingId);
+        try {
+            const recording = await extractRecordingSpeakers(recordingId, params);
+            setSelectedRecording(recording);
+            await refreshProject();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to extract speakers");
+            throw err;
+        } finally {
+            setExtractingSpeakerId(undefined);
         }
     };
 
@@ -235,6 +305,25 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleUpdateRecordingSummary = async (
+        recordingId: string,
+        params: RecordingSummaryUpdateParams,
+    ) => {
+        setError("");
+        setUpdatingSummaryId(recordingId);
+        try {
+            const recording = await updateRecordingSummary(recordingId, params);
+            setSelectedRecording((current) =>
+                current?.id === recordingId ? recording : current,
+            );
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to update summary");
+            throw err;
+        } finally {
+            setUpdatingSummaryId(undefined);
+        }
+    };
+
     if (isLoadingProject) {
         return (
             <main className="min-h-screen bg-zinc-100 p-6 text-sm text-zinc-500">
@@ -254,16 +343,25 @@ export default function ProjectDetailPage() {
     return (
         <main className="min-h-screen bg-zinc-100 text-zinc-950">
             <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-5 py-6">
-                <header className="flex flex-col gap-3">
-                    <Link href="/" className="text-sm font-medium text-zinc-600 hover:text-zinc-950">
-                        Back to projects
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-semibold">{project.name}</h1>
-                        {project.description && (
-                            <p className="mt-1 text-sm text-zinc-600">{project.description}</p>
-                        )}
+                <header className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="flex flex-col gap-3">
+                        <Link href="/" className="text-sm font-medium text-zinc-600 hover:text-zinc-950">
+                            Back to projects
+                        </Link>
+                        <div>
+                            <h1 className="text-2xl font-semibold">{project.name}</h1>
+                            {project.description && (
+                                <p className="mt-1 text-sm text-zinc-600">{project.description}</p>
+                            )}
+                        </div>
                     </div>
+                    <button
+                        type="button"
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="min-h-10 rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                    >
+                        Settings
+                    </button>
                 </header>
 
                 <RecordingUploader
@@ -294,13 +392,35 @@ export default function ProjectDetailPage() {
                         runtimeDevices={runtimeDevices}
                         isRetranscribing={retranscribingId === selectedRecording?.id}
                         onRetranscribe={handleRetranscribeRecording}
+                        isCanceling={cancelingRecordingId === selectedRecording?.id}
+                        onCancel={handleCancelRecording}
                         isRenamingSpeakers={renamingSpeakerId === selectedRecording?.id}
                         onRenameSpeakers={handleRenameTranscriptSpeakers}
+                        isEditingTranscript={editingTranscriptId === selectedRecording?.id}
+                        onUpdateTranscriptSegment={handleUpdateTranscriptSegment}
+                        isExtractingSpeakers={extractingSpeakerId === selectedRecording?.id}
+                        onExtractSpeakers={handleExtractSpeakers}
                         isSummarizing={summarizingId === selectedRecording?.id}
                         onSummarize={handleSummarizeRecording}
+                        isUpdatingSummary={updatingSummaryId === selectedRecording?.id}
+                        onUpdateSummary={handleUpdateRecordingSummary}
+                        byokSettings={byokSettings.selectedBYOKSettings}
+                        isBYOKConfigured={byokSettings.isSelectedProviderConfigured}
+                        onOpenSettings={() => setIsSettingsOpen(true)}
                     />
                 </div>
             </div>
+            {isSettingsOpen && (
+                <BYOKSettingsModal
+                    settings={byokSettings.settings}
+                    onSave={(settings) => {
+                        byokSettings.setSettings(settings);
+                        setIsSettingsOpen(false);
+                    }}
+                    onClearSavedKeys={byokSettings.clearSavedKeys}
+                    onClose={() => setIsSettingsOpen(false)}
+                />
+            )}
         </main>
     );
 }

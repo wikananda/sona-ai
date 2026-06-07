@@ -79,6 +79,8 @@ def _mark_interrupted_recordings_failed():
         )
         for recording in recordings:
             recording.status = RecordingStatus.FAILED
+            recording.processing_stage = "failed"
+            recording.processing_job_id = None
             recording.error = "Interrupted by server restart"
         db.commit()
     finally:

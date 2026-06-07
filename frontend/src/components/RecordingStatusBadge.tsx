@@ -5,6 +5,7 @@ const LABELS: Record<RecordingStatus, string> = {
     processing: "Processing",
     done: "Done",
     failed: "Failed",
+    canceled: "Canceled",
 };
 
 const STYLES: Record<RecordingStatus, string> = {
@@ -12,6 +13,7 @@ const STYLES: Record<RecordingStatus, string> = {
     processing: "bg-amber-100 text-amber-800",
     done: "bg-emerald-100 text-emerald-800",
     failed: "bg-red-100 text-red-800",
+    canceled: "bg-zinc-200 text-zinc-700",
 };
 
 interface Props {

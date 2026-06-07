@@ -1,5 +1,6 @@
 import json
 import os
+import wave
 import subprocess
 import tempfile
 import time
@@ -38,13 +39,21 @@ class ExternalWav2Vec2Aligner:
     ) -> TranscriptionResult:
         language = self._resolve_language(transcription.language)
         model_name = self._align_model_name(language)
+        raw_segments = transcription.to_segment_dicts()
+        input_segments = self._normalize_segments_for_alignment(raw_segments, audio_path)
+        logger.info(
+            "Preparing external Wav2Vec2 alignment input: segments=%d timed_segments=%d words=%d",
+            len(input_segments),
+            self._timed_segment_count(input_segments),
+            self._word_count(input_segments),
+        )
 
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as input_file:
             input_path = Path(input_file.name)
             json.dump(
                 {
                     "language": transcription.language,
-                    "segments": transcription.to_segment_dicts(),
+                    "segments": input_segments,
                 },
                 input_file,
             )
@@ -99,7 +108,88 @@ class ExternalWav2Vec2Aligner:
 
         logger.info("External Wav2Vec2 alignment finished in %.2f seconds", time.time() - started_at)
         aligned.setdefault("language", transcription.language or language)
-        return TranscriptionResult.from_aligned_result(aligned)
+        aligned_result = TranscriptionResult.from_aligned_result(aligned)
+        logger.info(
+            "External Wav2Vec2 alignment output: segments=%d timed_segments=%d timed_words=%d",
+            len(aligned_result.segments),
+            self._timed_result_segment_count(aligned_result),
+            self._timed_result_word_count(aligned_result),
+        )
+        return aligned_result
+
+    def _normalize_segments_for_alignment(
+        self,
+        segments: list[dict],
+        audio_path: str,
+    ) -> list[dict]:
+        if not segments:
+            return segments
+
+        if any(self._is_timed_segment(segment) for segment in segments):
+            return segments
+
+        duration = self._audio_duration(audio_path)
+        if duration <= 0:
+            return segments
+
+        normalized_segments = []
+        for segment in segments:
+            normalized_segment = dict(segment)
+            normalized_segment["start"] = 0.0
+            normalized_segment["end"] = duration
+            normalized_segment.pop("words", None)
+            normalized_segments.append(normalized_segment)
+
+        logger.info(
+            "Normalized %d untimed alignment segment(s) to full audio duration %.3fs",
+            len(normalized_segments),
+            duration,
+        )
+        return normalized_segments
+
+    def _audio_duration(self, audio_path: str) -> float:
+        try:
+            import soundfile as sf
+
+            info = sf.info(audio_path)
+            return float(info.duration or 0.0)
+        except Exception:
+            pass
+
+        try:
+            with wave.open(audio_path) as audio:
+                frames = audio.getnframes()
+                rate = audio.getframerate()
+                if rate > 0:
+                    return frames / float(rate)
+        except Exception:
+            logger.warning("Unable to determine audio duration for alignment: %s", audio_path)
+
+        return 0.0
+
+    def _is_timed_segment(self, segment: dict) -> bool:
+        return float(segment.get("end") or 0.0) > float(segment.get("start") or 0.0)
+
+    def _timed_segment_count(self, segments: list[dict]) -> int:
+        return sum(1 for segment in segments if self._is_timed_segment(segment))
+
+    def _word_count(self, segments: list[dict]) -> int:
+        return sum(len(segment.get("words") or []) for segment in segments)
+
+    def _timed_result_segment_count(self, transcription: TranscriptionResult) -> int:
+        return sum(
+            1
+            for segment in transcription.segments
+            if segment.end > segment.start
+        )
+
+    def _timed_result_word_count(self, transcription: TranscriptionResult) -> int:
+        return sum(
+            1
+            for segment in transcription.segments
+            for word in segment.words
+            if word.start is not None and word.end is not None and word.end > word.start
+        )
 
     def _align_model_name(self, language: str) -> str:
         model_config = self.config["model"]

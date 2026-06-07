@@ -13,11 +13,30 @@ class OpenAICompatibleSummarizer:
         base_url: Optional[str] = None,
         prompt: Optional[str] = None,
         max_length: int = 2048,
-        max_tokens: int = 256,
+        max_tokens: int = 1024,
+    ) -> str:
+        formatted_prompt = build_prompt(text, prompt)
+        return self.generate_from_prompt(
+            prompt=formatted_prompt,
+            api_key=api_key,
+            model=model,
+            provider=provider,
+            base_url=base_url,
+            max_length=max_length,
+            max_tokens=max_tokens,
+        )
+
+    def generate_from_prompt(
+        self,
+        prompt: str,
+        api_key: str,
+        model: str,
+        provider: str,
+        base_url: Optional[str] = None,
+        max_length: int = 2048,
+        max_tokens: int = 1024,
     ) -> str:
         resolved_base_url = self._resolve_base_url(provider, base_url)
-        formatted_prompt = build_prompt(text, prompt)
-
         response = httpx.post(
             f"{resolved_base_url}/chat/completions",
             headers={
@@ -30,12 +49,13 @@ class OpenAICompatibleSummarizer:
                     {
                         "role": "system",
                         "content": (
-                            "You summarize transcripts accurately and concisely."
+                            "You summarize transcripts accurately and follow the "
+                            "requested output format exactly."
                         ),
                     },
                     {
                         "role": "user",
-                        "content": formatted_prompt[:max_length * 4],
+                        "content": prompt[:max_length * 4],
                     },
                 ],
                 "temperature": 0.2,

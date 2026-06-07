@@ -105,8 +105,17 @@ class LocalLLMSummarizer:
 
     def generate(self, text: str, prompt: Optional[str] = None, max_length: int = 2048) -> str:
         formatted_prompt = build_prompt(text, prompt)
+        summary = self.generate_from_prompt(formatted_prompt, max_length=max_length)
+
+        if self.write_outputs:
+            output_path = PROJECT_ROOT / "outputs" / "summarization" / "summary.json"
+            write_json(output_path, {"text": text, "summary": summary})
+
+        return summary
+
+    def generate_from_prompt(self, prompt: str, max_length: int = 2048) -> str:
         inputs = self.tokenizer(
-            formatted_prompt,
+            prompt,
             return_tensors="pt",
             max_length=max_length,
             truncation=True,
@@ -130,10 +139,6 @@ class LocalLLMSummarizer:
 
         summary = self.tokenizer.decode(generated_ids, skip_special_tokens=True)
 
-        if self.write_outputs:
-            output_path = PROJECT_ROOT / "outputs" / "summarization" / "summary.json"
-            write_json(output_path, {"text": text, "summary": summary})
-
         return summary
 
     def cleanup_models(self):
@@ -146,4 +151,3 @@ class LocalLLMSummarizer:
             torch.cuda.empty_cache()
         elif torch.backends.mps.is_available():
             torch.mps.empty_cache()
-

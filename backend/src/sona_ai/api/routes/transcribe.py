@@ -18,7 +18,8 @@ async def transcribe(
     model: Optional[str]=None,
     device: Optional[str]=None,
     min_speakers: Optional[int]=None,
-    max_speakers: Optional[int]=None
+    max_speakers: Optional[int]=None,
+    extract_speakers: bool=True,
 ):
     # Legacy single-shot route. New UI should use project-scoped recording routes.
     filename = file.filename
@@ -38,6 +39,7 @@ async def transcribe(
             device=device,
             min_speakers=min_speakers,
             max_speakers=max_speakers,
+            extract_speakers=extract_speakers,
         )
         return result
     except Exception as e:

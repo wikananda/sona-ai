@@ -1,11 +1,11 @@
 export interface SpeakerSegment {
-    speaker: string;
+    speaker?: string;
     text: string;
     start: number;
     end: number;
 }
 
-export type RecordingStatus = "pending" | "processing" | "done" | "failed";
+export type RecordingStatus = "pending" | "processing" | "done" | "failed" | "canceled";
 export type TranscriptionModel =
     | "parakeet"
     | "faster-whisper-large-v3"
@@ -15,6 +15,17 @@ export type BYOKProvider = "openai" | "groq" | "openrouter" | "custom";
 export type LocalLLMModel = "qwen" | "llama" | "gemma";
 export type RuntimeDevice = "auto" | "cpu" | "mps" | "cuda";
 export type RecordingChatRole = "user" | "assistant";
+export type RecordingProgressStage =
+    | "queued"
+    | "preparing"
+    | "transcribing"
+    | "aligning"
+    | "diarizing"
+    | "assigning_speakers"
+    | "done"
+    | "failed"
+    | "canceled"
+    | "processing";
 
 export interface RuntimeDevices {
     default: RuntimeDevice;
@@ -55,8 +66,18 @@ export interface RecordingSummary {
     device?: RuntimeDevice | null;
     provider?: BYOKProvider | null;
     provider_model?: string | null;
+    format_name?: string | null;
+    plan?: Record<string, unknown> | null;
     created_at: string;
     updated_at: string;
+}
+
+export interface RecordingProgress {
+    stage: RecordingProgressStage | string;
+    label: string;
+    completed_steps: number;
+    total_steps: number;
+    percent: number;
 }
 
 export interface Recording {
@@ -72,6 +93,7 @@ export interface Recording {
     min_speakers?: number | null;
     max_speakers?: number | null;
     status: RecordingStatus;
+    progress: RecordingProgress;
     error?: string | null;
     created_at: string;
     updated_at: string;
@@ -97,6 +119,7 @@ export interface TranscribeParams {
     device?: RuntimeDevice;
     minSpeakers?: number | "";
     maxSpeakers?: number | "";
+    extractSpeakers?: boolean;
 }
 
 export interface UploadProjectRecordingParams extends TranscribeParams {
@@ -109,6 +132,17 @@ export interface RetranscribeParams {
     device: RuntimeDevice;
     minSpeakers?: number | "";
     maxSpeakers?: number | "";
+    extractSpeakers?: boolean;
+}
+
+export interface SpeakerExtractionParams {
+    minSpeakers?: number | "";
+    maxSpeakers?: number | "";
+}
+
+export interface TranscriptSegmentUpdateParams {
+    text: string;
+    speaker?: string | null;
 }
 
 export interface BYOKSummarySettings {
@@ -135,6 +169,10 @@ export interface RecordingSummaryParams {
     model?: LocalLLMModel;
     device?: RuntimeDevice;
     byok?: BYOKSummarySettings;
+}
+
+export interface RecordingSummaryUpdateParams {
+    text: string;
 }
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -213,6 +251,29 @@ export async function retranscribeRecording(
                 device: params.device,
                 min_speakers: emptyToNull(params.minSpeakers),
                 max_speakers: emptyToNull(params.maxSpeakers),
+                extract_speakers: params.extractSpeakers ?? true,
+            })
+            : undefined,
+    });
+}
+
+export async function cancelRecording(recordingId: string): Promise<Recording> {
+    return requestJson(`/recordings/${recordingId}/cancel`, {
+        method: "POST",
+    });
+}
+
+export async function extractRecordingSpeakers(
+    recordingId: string,
+    params?: SpeakerExtractionParams,
+): Promise<Recording> {
+    return requestJson(`/recordings/${recordingId}/speakers/extract`, {
+        method: "POST",
+        headers: params ? { "Content-Type": "application/json" } : undefined,
+        body: params
+            ? JSON.stringify({
+                min_speakers: emptyToNull(params.minSpeakers),
+                max_speakers: emptyToNull(params.maxSpeakers),
             })
             : undefined,
     });
@@ -251,6 +312,21 @@ export async function renameTranscriptSpeakers(
     });
 }
 
+export async function updateTranscriptSegment(
+    recordingId: string,
+    segmentIndex: number,
+    params: TranscriptSegmentUpdateParams,
+): Promise<Recording> {
+    return requestJson(`/recordings/${recordingId}/transcript/segments/${segmentIndex}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            text: params.text,
+            speaker: params.speaker,
+        }),
+    });
+}
+
 export async function transcribeAudio(params: TranscribeParams): Promise<SpeakerSegment[]> {
     const formData = new FormData();
     formData.append("file", params.file);
@@ -261,6 +337,7 @@ export async function transcribeAudio(params: TranscribeParams): Promise<Speaker
     appendSearchParam(url, "device", params.device);
     appendSearchParam(url, "min_speakers", params.minSpeakers);
     appendSearchParam(url, "max_speakers", params.maxSpeakers);
+    appendSearchParam(url, "extract_speakers", params.extractSpeakers);
 
     const response = await fetch(url.toString(), {
         method: "POST",
@@ -325,6 +402,19 @@ export async function summarizeRecording(
     });
 }
 
+export async function updateRecordingSummary(
+    recordingId: string,
+    params: RecordingSummaryUpdateParams,
+): Promise<Recording> {
+    return requestJson(`/recordings/${recordingId}/summary`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            text: params.text,
+        }),
+    });
+}
+
 function buildRecordingFormData(params: TranscribeParams): FormData {
     const formData = new FormData();
     formData.append("file", params.file);
@@ -333,6 +423,7 @@ function buildRecordingFormData(params: TranscribeParams): FormData {
     appendFormValue(formData, "device", params.device ?? "auto");
     appendFormValue(formData, "min_speakers", params.minSpeakers);
     appendFormValue(formData, "max_speakers", params.maxSpeakers);
+    appendFormValue(formData, "extract_speakers", params.extractSpeakers ?? true);
     return formData;
 }
 
@@ -347,7 +438,7 @@ async function requestJson(path: string, init?: RequestInit) {
 function appendFormValue(
     formData: FormData,
     key: string,
-    value?: string | number | "",
+    value?: string | number | boolean | "",
 ) {
     if (value !== undefined && value !== "") {
         formData.append(key, String(value));
@@ -357,7 +448,7 @@ function appendFormValue(
 function appendSearchParam(
     url: URL,
     key: string,
-    value?: string | number | "",
+    value?: string | number | boolean | "",
 ) {
     if (value !== undefined && value !== "") {
         url.searchParams.append(key, String(value));

@@ -73,14 +73,26 @@ class Gemma4Summarizer:
 
     def generate(self, text: str, prompt: Optional[str] = None, max_length: int = 2048) -> str:
         formatted_prompt = build_prompt(text, prompt)
+        summary = self.generate_from_prompt(formatted_prompt, max_length=max_length)
+
+        if self.write_outputs:
+            output_path = PROJECT_ROOT / "outputs" / "summarization" / "summary.json"
+            write_json(output_path, {"text": text, "summary": summary})
+
+        return summary
+
+    def generate_from_prompt(self, prompt: str, max_length: int = 2048) -> str:
         messages = [
             {
                 "role": "system",
-                "content": "You summarize transcripts accurately and concisely.",
+                "content": (
+                    "You summarize transcripts accurately and follow the requested "
+                    "output format exactly."
+                ),
             },
             {
                 "role": "user",
-                "content": formatted_prompt[:max_length * 4],
+                "content": prompt[:max_length * 4],
             },
         ]
         chat_text = self.processor.apply_chat_template(
@@ -104,10 +116,6 @@ class Gemma4Summarizer:
             skip_special_tokens=False,
         )
         summary = self._parse_response(response)
-
-        if self.write_outputs:
-            output_path = PROJECT_ROOT / "outputs" / "summarization" / "summary.json"
-            write_json(output_path, {"text": text, "summary": summary})
 
         return summary
 

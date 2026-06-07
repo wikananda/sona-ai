@@ -39,7 +39,39 @@ def _migrate_sqlite():
             row[1]
             for row in connection.execute(text("PRAGMA table_info(recordings)"))
         }
+        summary_columns = {
+            row[1]
+            for row in connection.execute(text("PRAGMA table_info(recording_summaries)"))
+        }
+        if "format_name" not in summary_columns:
+            connection.execute(
+                text("ALTER TABLE recording_summaries ADD COLUMN format_name VARCHAR(255)")
+            )
+        if "plan_json" not in summary_columns:
+            connection.execute(
+                text("ALTER TABLE recording_summaries ADD COLUMN plan_json TEXT")
+            )
+        if "strategy" not in summary_columns:
+            connection.execute(
+                text("ALTER TABLE recording_summaries ADD COLUMN strategy VARCHAR(32) NOT NULL DEFAULT 'adaptive'")
+            )
         if "device" not in columns:
             connection.execute(
                 text("ALTER TABLE recordings ADD COLUMN device VARCHAR(32) NOT NULL DEFAULT 'auto'")
+            )
+        if "processing_stage" not in columns:
+            connection.execute(
+                text("ALTER TABLE recordings ADD COLUMN processing_stage VARCHAR(64)")
+            )
+        if "processing_job_id" not in columns:
+            connection.execute(
+                text("ALTER TABLE recordings ADD COLUMN processing_job_id VARCHAR(36)")
+            )
+        if "progress_completed_steps" not in columns:
+            connection.execute(
+                text("ALTER TABLE recordings ADD COLUMN progress_completed_steps INTEGER NOT NULL DEFAULT 0")
+            )
+        if "progress_total_steps" not in columns:
+            connection.execute(
+                text("ALTER TABLE recordings ADD COLUMN progress_total_steps INTEGER NOT NULL DEFAULT 0")
             )
