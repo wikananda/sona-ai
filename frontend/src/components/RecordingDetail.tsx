@@ -451,6 +451,7 @@ export default function RecordingDetail({
 
                         {activeTab === "transcript" && (
                             <TranscriptPanel
+                                recordingName={recording.original_name}
                                 segments={segments}
                                 isSavingSpeakers={isRenamingSpeakers}
                                 onRenameSpeakers={handleRenameSpeakers}
@@ -465,6 +466,7 @@ export default function RecordingDetail({
 
                         {activeTab === "summary" && (
                             <SummaryPanel
+                                recordingName={recording.original_name}
                                 summary={summary}
                                 isLoading={isSummarizing}
                                 selectedModel={localLLMModel}

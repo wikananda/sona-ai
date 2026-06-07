@@ -11,6 +11,7 @@ import {
     SummaryMode,
     LocalLLMModel
 } from "@/src/api/sonaApi";
+import { exportSummaryPdf } from "@/src/utils/pdfExport";
 
 import {
     LOCAL_LLM_MODELS,
@@ -18,6 +19,7 @@ import {
 } from "@/src/utils/constants";
 
 interface Props {
+    recordingName: string;
     summary: string;
     isLoading: boolean;
     selectedModel: LocalLLMModel;
@@ -39,6 +41,7 @@ interface Props {
 }
 
 export default function SummaryPanel({
+    recordingName,
     summary,
     isLoading,
     selectedModel,
@@ -62,6 +65,8 @@ export default function SummaryPanel({
     const [isEditingSummary, setIsEditingSummary] = useState(false);
     const [summaryDraft, setSummaryDraft] = useState(summary);
     const [summaryEditError, setSummaryEditError] = useState("");
+    const [isExportingPdf, setIsExportingPdf] = useState(false);
+    const [exportError, setExportError] = useState("");
     const isBusy = isLoading || isSavingSummary;
 
     const openSummaryEditor = () => {
@@ -107,6 +112,22 @@ export default function SummaryPanel({
             setSummaryEditError(
                 err instanceof Error ? err.message : "Failed to save summary.",
             );
+        }
+    };
+
+    const handleExportPdf = async () => {
+        if (!summary.trim() || isExportingPdf) return;
+
+        setExportError("");
+        setIsExportingPdf(true);
+        try {
+            await exportSummaryPdf({ recordingName, summary });
+        } catch (err) {
+            setExportError(
+                err instanceof Error ? err.message : "Failed to export summary PDF.",
+            );
+        } finally {
+            setIsExportingPdf(false);
         }
     };
 
@@ -202,6 +223,16 @@ export default function SummaryPanel({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
+                    {summary && !isEditingSummary && (
+                        <button
+                            type="button"
+                            onClick={handleExportPdf}
+                            disabled={isExportingPdf || isBusy}
+                            className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {isExportingPdf ? "Exporting..." : "Export PDF"}
+                        </button>
+                    )}
                     {summary && !isEditingSummary && onUpdateSummary && (
                         <button
                             type="button"
@@ -227,6 +258,10 @@ export default function SummaryPanel({
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                     Add API settings before running BYOK summary.
                 </div>
+            )}
+
+            {exportError && (
+                <p className="text-sm text-red-700">{exportError}</p>
             )}
 
             <div className="flex w-full border-b border-zinc-200 pb-5 flex-col gap-2">

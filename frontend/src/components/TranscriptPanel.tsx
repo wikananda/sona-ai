@@ -9,10 +9,12 @@ import {
     type PointerEvent,
 } from "react";
 import { SpeakerSegment, TranscriptSegmentUpdateParams } from "@/src/api/sonaApi";
+import { exportTranscriptPdf } from "@/src/utils/pdfExport";
 
 const EDIT_HOLD_MS = 600;
 
 interface Props {
+    recordingName: string;
     segments: SpeakerSegment[];
     isSavingSpeakers?: boolean;
     onRenameSpeakers?: (speakers: Record<string, string>) => Promise<void>;
@@ -28,6 +30,7 @@ interface Props {
 }
 
 export default function TranscriptPanel({
+    recordingName,
     segments,
     isSavingSpeakers = false,
     onRenameSpeakers,
@@ -62,6 +65,8 @@ export default function TranscriptPanel({
     const [draftText, setDraftText] = useState("");
     const [draftSpeaker, setDraftSpeaker] = useState("");
     const [segmentError, setSegmentError] = useState("");
+    const [isExportingPdf, setIsExportingPdf] = useState(false);
+    const [exportError, setExportError] = useState("");
 
     useEffect(() => {
         return () => {
@@ -233,8 +238,43 @@ export default function TranscriptPanel({
         }
     };
 
+    const handleExportPdf = async () => {
+        if (isExportingPdf) return;
+
+        setExportError("");
+        setIsExportingPdf(true);
+        try {
+            await exportTranscriptPdf({ recordingName, segments });
+        } catch (err) {
+            setExportError(
+                err instanceof Error ? err.message : "Failed to export transcript PDF.",
+            );
+        } finally {
+            setIsExportingPdf(false);
+        }
+    };
+
     return (
         <div className="flex max-w-full flex-col">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <h3 className="text-sm font-semibold text-zinc-900">Transcript</h3>
+                    <p className="mt-1 text-sm text-zinc-500">
+                        Review and edit the detected transcript segments.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={handleExportPdf}
+                    disabled={isExportingPdf || segments.length === 0}
+                    className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    {isExportingPdf ? "Exporting..." : "Export PDF"}
+                </button>
+            </div>
+            {exportError && (
+                <p className="mb-3 text-sm text-red-700">{exportError}</p>
+            )}
             <div className="flex max-h-[520px] flex-col gap-1 overflow-y-auto pr-2">
                 {segments.map((segment, index) => {
                     const isEditing = editingIndex === index;
