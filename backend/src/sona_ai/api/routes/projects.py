@@ -1,6 +1,8 @@
 import json
 import httpx
+import tempfile
 import uuid
+from pathlib import Path
 from typing import Optional
 
 from fastapi import (
@@ -29,12 +31,12 @@ from sona_ai.api.schemas.projects import (
     TranscriptSpeakerRename,
 )
 from sona_ai.api.schemas.summarize import RecordingSummaryRequest
-from sona_ai.core import PROJECT_ROOT, setup_logging, validate_device_available
-from sona_ai.db.models import Project, Recording, RecordingStatus, RecordingSummary
+from sona_ai.core import PROJECT_ROOT, sanitize_for_json, setup_logging, validate_device_available
+from sona_ai.db.models import Project, Recording, RecordingStatus, RecordingSummary, Transcript
 from sona_ai.db.session import get_db
 from sona_ai.services.recording_worker import run_speaker_extraction, run_transcription
 from sona_ai.services.transcription_service import SUPPORTED_TRANSCRIPTION_MODELS
-from sona_ai.storage import delete_project_dir, delete_recording_file, save_upload
+from sona_ai.storage import delete_project_dir, delete_recording_file, save_upload, save_upload_as_wav
 
 
 logger = setup_logging()
@@ -178,6 +180,127 @@ def upload_project_recording(
         extract_speakers,
     )
     return _serialize_recording(recording, include_transcript=False)
+
+
+@router.post("/projects/{project_id}/live-transcription/chunks")
+async def transcribe_live_chunk(
+    project_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    chunk_index: int = Form(...),
+    chunk_start: float = Form(default=0.0),
+    language: Optional[str] = Form(default=None),
+    model: str = Form(default="parakeet"),
+    device: str = Form(default="auto"),
+    db: Session = Depends(get_db),
+):
+    if db.get(Project, project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    model = _normalize_model(model)
+    device = _normalize_device(device)
+    language = _normalize_language(language)
+    if chunk_index < 0:
+        raise HTTPException(status_code=400, detail="chunk_index must be at least 0")
+    if chunk_start < 0:
+        raise HTTPException(status_code=400, detail="chunk_start must be at least 0")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        audio_path = Path(temp_dir) / f"live-chunk-{chunk_index}.wav"
+        try:
+            await run_in_threadpool(save_upload_as_wav, file, audio_path)
+            transcription = await run_in_threadpool(
+                request.app.state.transcription_service.transcribe_live_chunk,
+                str(audio_path),
+                language=language,
+                model=model,
+                device=device,
+            )
+        except (RuntimeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    segments = _offset_segments(transcription.to_segment_dicts(), chunk_start)
+    return {
+        "chunk_index": chunk_index,
+        "chunk_start": chunk_start,
+        "segments": segments,
+        "language": transcription.language or language,
+    }
+
+
+@router.post("/projects/{project_id}/live-transcription/recordings")
+def save_live_recording(
+    project_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    segments_json: str = Form(...),
+    language: Optional[str] = Form(default=None),
+    model: str = Form(default="parakeet"),
+    device: str = Form(default="auto"),
+    db: Session = Depends(get_db),
+):
+    if db.get(Project, project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    model = _normalize_model(model)
+    device = _normalize_device(device)
+    language = _normalize_language(language)
+    segments = _parse_live_segments(segments_json)
+    profile = request.app.state.transcription_service.resolve_profile(
+        model=model,
+        device=device,
+        alignment_enabled=False,
+        extract_speakers=False,
+    )
+
+    recording_id = str(uuid.uuid4())
+    saved_audio = None
+    try:
+        saved_audio = save_upload(project_id, recording_id, file)
+        recording = Recording(
+            id=recording_id,
+            project_id=project_id,
+            original_name=file.filename or "live-recording.webm",
+            stored_path=saved_audio.stored_path,
+            mime_type=saved_audio.mime_type,
+            file_size_bytes=saved_audio.file_size_bytes,
+            language_hint=language,
+            model=model,
+            device=device,
+            status=RecordingStatus.DONE,
+            processing_stage="done",
+            processing_job_id=None,
+            progress_completed_steps=1,
+            progress_total_steps=1,
+            error=None,
+        )
+        transcript_metadata = profile.to_metadata()
+        transcript_metadata["runtime"]["language"] = language
+        transcript = Transcript(
+            id=str(uuid.uuid4()),
+            recording_id=recording_id,
+            segments_json=json.dumps(segments),
+            language=language,
+            transcription_engine=profile.transcription_engine,
+            diarization_engine=None,
+            model_config_json=json.dumps(transcript_metadata),
+        )
+        recording.transcript = transcript
+        db.add(recording)
+        db.commit()
+        db.refresh(recording)
+    except Exception as exc:
+        db.rollback()
+        if saved_audio is not None:
+            try:
+                delete_recording_file(saved_audio.stored_path)
+            except Exception as cleanup_exc:
+                logger.warning("Failed to clean up live recording audio: %s", cleanup_exc)
+        if isinstance(exc, HTTPException):
+            raise
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return _serialize_recording(recording, include_transcript=True)
 
 @router.patch("/recordings/{recording_id}")
 def rename_recording(
@@ -767,6 +890,62 @@ def _summary_text_from_segments(segments: list) -> str:
             lines.append(text)
 
     return "\n".join(lines)
+
+
+def _offset_segments(segments: list[dict], offset_seconds: float) -> list[dict]:
+    offset_segments = []
+    for segment in segments:
+        if not isinstance(segment, dict):
+            continue
+        shifted = dict(segment)
+        shifted["start"] = float(shifted.get("start") or 0.0) + offset_seconds
+        shifted["end"] = float(shifted.get("end") or 0.0) + offset_seconds
+        words = []
+        for word in shifted.get("words") or []:
+            if not isinstance(word, dict):
+                continue
+            shifted_word = dict(word)
+            if shifted_word.get("start") is not None:
+                shifted_word["start"] = float(shifted_word["start"]) + offset_seconds
+            if shifted_word.get("end") is not None:
+                shifted_word["end"] = float(shifted_word["end"]) + offset_seconds
+            words.append(shifted_word)
+        if words:
+            shifted["words"] = words
+        offset_segments.append(shifted)
+    return sanitize_for_json(offset_segments)
+
+
+def _parse_live_segments(segments_json: str) -> list[dict]:
+    try:
+        segments = json.loads(segments_json)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="segments_json must be valid JSON") from exc
+
+    if not isinstance(segments, list):
+        raise HTTPException(status_code=400, detail="segments_json must be a list")
+
+    parsed_segments = []
+    for segment in segments:
+        if not isinstance(segment, dict):
+            continue
+        text = str(segment.get("text") or "").strip()
+        if not text:
+            continue
+        start = float(segment.get("start") or 0.0)
+        end = float(segment.get("end") or start)
+        parsed_segments.append(
+            {
+                "text": text,
+                "start": start,
+                "end": max(end, start),
+            }
+        )
+
+    if not parsed_segments:
+        raise HTTPException(status_code=400, detail="Live transcript has no text segments")
+
+    return sanitize_for_json(parsed_segments)
 
 
 def _normalize_model(model: str) -> str:

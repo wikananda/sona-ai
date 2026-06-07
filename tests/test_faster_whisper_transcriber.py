@@ -76,6 +76,28 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
         self.assertEqual(profile.transcription_engine, "faster_whisper")
         self.assertEqual(profile.transcription_config, "faster-whisper-large-v3")
 
+    def test_live_profile_can_disable_alignment_and_diarization(self):
+        speech_config = {
+            "transcription": {"engine": "parakeet", "config": "parakeet"},
+            "alignment": {"enabled": True, "engine": "wav2vec2_external", "config": "wav2vec2"},
+            "diarization": {
+                "enabled": True,
+                "engine": "community_external",
+                "config": "diarization-community",
+            },
+        }
+
+        profile = resolve_pipeline_profile(
+            speech_config,
+            model="parakeet",
+            device="cpu",
+            alignment_enabled=False,
+            diarization_enabled=False,
+        )
+
+        self.assertFalse(profile.alignment_enabled)
+        self.assertFalse(profile.diarization_enabled)
+
 
 if __name__ == "__main__":
     unittest.main()

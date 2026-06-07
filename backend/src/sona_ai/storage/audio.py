@@ -20,31 +20,36 @@ class SavedAudio:
 
 
 def save_upload(project_id: str, recording_id: str, upload_file: UploadFile) -> SavedAudio:
-    extension = Path(upload_file.filename or "").suffix.lower()
-    if not extension:
-        extension = ".audio"
-
     project_dir = _safe_project_dir(project_id)
     project_dir.mkdir(parents=True, exist_ok=True)
 
-    raw_destination = project_dir / f"{recording_id}.upload{extension}"
     destination = project_dir / f"{recording_id}.wav"
-
-    try:
-        _write_upload(raw_destination, upload_file)
-        _convert_to_wav(raw_destination, destination)
-        size = destination.stat().st_size
-    except Exception:
-        destination.unlink(missing_ok=True)
-        raise
-    finally:
-        raw_destination.unlink(missing_ok=True)
+    size = save_upload_as_wav(upload_file, destination)
 
     return SavedAudio(
         stored_path=str(destination.relative_to(PROJECT_ROOT)),
         mime_type="audio/wav",
         file_size_bytes=size,
     )
+
+
+def save_upload_as_wav(upload_file: UploadFile, destination: Path) -> int:
+    extension = Path(upload_file.filename or "").suffix.lower()
+    if not extension:
+        extension = ".audio"
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    raw_destination = destination.with_name(f"{destination.stem}.upload{extension}")
+
+    try:
+        _write_upload(raw_destination, upload_file)
+        _convert_to_wav(raw_destination, destination)
+        return destination.stat().st_size
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+    finally:
+        raw_destination.unlink(missing_ok=True)
 
 
 def normalize_recording_file(stored_path: str) -> SavedAudio:

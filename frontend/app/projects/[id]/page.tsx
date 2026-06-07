@@ -29,6 +29,7 @@ import {
     updateRecordingSummary,
 } from "@/src/api/sonaApi";
 import BYOKSettingsModal from "@/src/components/BYOKSettingsModal";
+import LiveTranscriptionPanel from "@/src/components/LiveTranscriptionPanel";
 import RecordingDetail from "@/src/components/RecordingDetail";
 import RecordingSidebar from "@/src/components/RecordingSidebar";
 import { useBYOKSettings } from "@/src/hooks/useBYOKSettings";
@@ -154,6 +155,12 @@ export default function ProjectDetailPage() {
         } finally {
             setIsUploading(false);
         }
+    };
+
+    const handleLiveRecordingSaved = async (recording: Recording) => {
+        setSelectedRecordingId(recording.id);
+        setSelectedRecording(recording);
+        await refreshProject();
     };
 
     const handleDeleteRecording = async (recordingId: string) => {
@@ -369,6 +376,12 @@ export default function ProjectDetailPage() {
                         {error}
                     </div>
                 )}
+
+                <LiveTranscriptionPanel
+                    projectId={projectId}
+                    runtimeDevices={runtimeDevices}
+                    onSaved={handleLiveRecordingSaved}
+                />
 
                 <div className="grid overflow-hidden rounded-lg border border-zinc-200 bg-white lg:grid-cols-[360px_1fr]">
                     <RecordingSidebar

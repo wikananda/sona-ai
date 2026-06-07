@@ -3,6 +3,7 @@ from .audio import (
     delete_project_dir,
     delete_recording_file,
     normalize_recording_file,
+    save_upload_as_wav,
     save_upload,
 )
 
@@ -11,5 +12,6 @@ __all__ = [
     "delete_project_dir",
     "delete_recording_file",
     "normalize_recording_file",
+    "save_upload_as_wav",
     "save_upload",
 ]

@@ -3,6 +3,13 @@ export interface SpeakerSegment {
     text: string;
     start: number;
     end: number;
+    words?: {
+        word: string;
+        start?: number | null;
+        end?: number | null;
+        score?: number | null;
+        speaker?: string | null;
+    }[];
 }
 
 export type RecordingStatus = "pending" | "processing" | "done" | "failed" | "canceled";
@@ -126,6 +133,32 @@ export interface UploadProjectRecordingParams extends TranscribeParams {
     projectId: string;
 }
 
+export interface LiveTranscriptionChunkParams {
+    projectId: string;
+    file: File;
+    chunkIndex: number;
+    chunkStart: number;
+    language?: string;
+    model: TranscriptionModel;
+    device: RuntimeDevice;
+}
+
+export interface LiveTranscriptionChunkResult {
+    chunk_index: number;
+    chunk_start: number;
+    segments: SpeakerSegment[];
+    language?: string | null;
+}
+
+export interface SaveLiveRecordingParams {
+    projectId: string;
+    file: File;
+    segments: SpeakerSegment[];
+    language?: string;
+    model: TranscriptionModel;
+    device: RuntimeDevice;
+}
+
 export interface RetranscribeParams {
     language?: string;
     model: TranscriptionModel;
@@ -213,6 +246,39 @@ export async function uploadProjectRecording(
 ): Promise<Recording> {
     const formData = buildRecordingFormData(params);
     return requestJson(`/projects/${params.projectId}/recordings`, {
+        method: "POST",
+        body: formData,
+    });
+}
+
+export async function transcribeLiveChunk(
+    params: LiveTranscriptionChunkParams,
+): Promise<LiveTranscriptionChunkResult> {
+    const formData = new FormData();
+    formData.append("file", params.file);
+    appendFormValue(formData, "chunk_index", params.chunkIndex);
+    appendFormValue(formData, "chunk_start", params.chunkStart);
+    appendFormValue(formData, "language", params.language);
+    appendFormValue(formData, "model", params.model);
+    appendFormValue(formData, "device", params.device);
+
+    return requestJson(`/projects/${params.projectId}/live-transcription/chunks`, {
+        method: "POST",
+        body: formData,
+    });
+}
+
+export async function saveLiveRecording(
+    params: SaveLiveRecordingParams,
+): Promise<Recording> {
+    const formData = new FormData();
+    formData.append("file", params.file);
+    formData.append("segments_json", JSON.stringify(params.segments));
+    appendFormValue(formData, "language", params.language);
+    appendFormValue(formData, "model", params.model);
+    appendFormValue(formData, "device", params.device);
+
+    return requestJson(`/projects/${params.projectId}/live-transcription/recordings`, {
         method: "POST",
         body: formData,
     });

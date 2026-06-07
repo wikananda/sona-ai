@@ -88,6 +88,24 @@ class TranscriptionService:
                 progress_callback=progress_callback,
             )
 
+    def transcribe_live_chunk(
+        self,
+        audio_path: str,
+        language: Optional[str] = None,
+        model: Optional[str] = None,
+        device: Optional[str] = None,
+    ) -> TranscriptionResult:
+        pipeline = self._get_pipeline(
+            model,
+            device,
+            alignment_enabled=False,
+            extract_speakers=False,
+        )
+        logger.info("Waiting for transcription lock...")
+        with self._transcription_lock:
+            logger.info("Transcription lock acquired for live chunk.")
+            return pipeline.transcriber.transcribe(audio_path, language=language)
+
     def close(self):
         for pipeline in self._pipelines.values():
             pipeline.cleanup_models()
@@ -96,9 +114,15 @@ class TranscriptionService:
         self,
         model: Optional[str],
         device: Optional[str],
+        alignment_enabled: Optional[bool] = None,
         extract_speakers: bool = True,
     ) -> SpeechPipeline:
-        profile = self.resolve_profile(model, device, extract_speakers=extract_speakers)
+        profile = self.resolve_profile(
+            model,
+            device,
+            alignment_enabled=alignment_enabled,
+            extract_speakers=extract_speakers,
+        )
         key = profile.cache_key()
         logger.info(
             "Using speech pipeline: transcription=%s/%s alignment=%s/%s/%s "
@@ -140,6 +164,7 @@ class TranscriptionService:
         self,
         model: Optional[str] = None,
         device: Optional[str] = None,
+        alignment_enabled: Optional[bool] = None,
         extract_speakers: bool = True,
     ) -> PipelineProfile:
         model_name = self._normalize_model(model or self.default_model)
@@ -148,5 +173,6 @@ class TranscriptionService:
             self.speech_config,
             model=model_name,
             device=device_name,
+            alignment_enabled=alignment_enabled,
             diarization_enabled=extract_speakers,
         )
