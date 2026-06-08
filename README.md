@@ -1,155 +1,293 @@
-# Sona AI 🎙️✨
+# Sona AI
 
-Sona AI is an interview-focused audio transcription and summarization platform. It leverages state-of-the-art AI models to provide fast, accurate transcription with speaker diarization, followed by summarization of the interview.
+Sona AI is a privacy-first, local-first speech workspace for working with personal and team audio recordings. It lets you create projects, upload or record audio, run transcription, optionally extract speakers, summarize transcripts, chat with a recording, and export results while keeping the core workflow under your control.
 
----
+The app is designed around replaceable speech components instead of one locked pipeline. Transcription, alignment, diarization, and summarization are configured separately so models can be swapped without rewriting the whole app.
 
-## ✨ Features
+The default product direction is not interview-specific. Sona is meant for private audio workflows such as meetings, notes, calls, research sessions, lectures, voice memos, and any recording where the user wants control over where audio, transcripts, summaries, and API keys go.
 
-- **Transcription**: Powered by [WhisperX](https://github.com/m-bain/whisperX) for faster-whisper inference and precise word-level alignment.
-- **Speaker Diarization**: Automatically detects, identifies, and labels different speakers in your audio files.
-- **Summarization**: Uses **Llama** to generate concise and meaningful summaries of transcribed conversations.
-- **Multilingual Support**: Supports English, Indonesian, and automatic language detection.
-- **Frontend Support**: Uses [Next.js](https://nextjs.org/) for a modern, responsive web interface.
+## Features
 
----
+- Project-based workspace with multiple recordings per project.
+- Upload audio, record in the browser, or run basic live transcription.
+- Browser recording can capture microphone audio, system audio, or both.
+- Local storage by default for audio, transcripts, summaries, and chat data.
+- Transcription engines include Parakeet and Faster-Whisper large-v3/turbo.
+- Optional Wav2Vec2 alignment through an external WhisperX-based aligner environment.
+- Optional speaker diarization through an external pyannote Community-1 environment.
+- Speaker extraction can run during transcription or later.
+- Audio playback with clickable transcript timestamps.
+- Transcript text editing and speaker rename/edit support.
+- Adaptive markdown summaries with local LLM or BYOK OpenAI-compatible providers.
+- Per-recording chat using OpenAI-compatible BYOK settings.
+- Frontend-only PDF export for transcript or summary.
+- Original audio is preserved for playback while a normalized ASR copy is generated for models.
 
-## 🚀 Getting Started
+## Privacy Model
 
-### Prerequisites
+Sona is built around local ownership first:
 
-- **Python 3.10+**
-- **Node.js 18+** & **npm**
-- **Hugging Face Token**: Required for speaker diarization models (pyannote). Get it [here](https://huggingface.co/settings/tokens).
+- Audio files are stored locally under `data/projects/`.
+- The local database stores project, recording, transcript, summary, and chat records.
+- Local ASR, alignment, diarization, and LLM paths can run without sending recording content to a hosted API.
+- BYOK features are explicit opt-in. When used, only the requested summary or chat payload is sent to the selected OpenAI-compatible provider.
+- Browser-stored API keys are intended for prototype use. Prefer short-lived or limited-scope keys when testing BYOK.
 
-### Backend Setup
+This does not make the app automatically production-secure. For shared deployment, add proper authentication, encrypted storage, secrets management, and a clear data retention policy.
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/wikananda/sona-ai.git
-   cd sona-ai
-   ```
+## Architecture
 
-2. **Install Python dependencies**:
-   ```bash
-   pip install -r backend/requirements.txt
-   pip install -e backend
-   ```
+```text
+frontend/                 Next.js app
+backend/src/sona_ai/      FastAPI backend package
+configs/                  Runtime model and pipeline config
+tools/                    Standalone helper scripts
+tests/                    Backend tests and smoke scripts
+data/projects/            Local project audio, transcripts, summaries, chat data
+cp/hf_cache/              Hugging Face/model cache target
+```
 
-3. **Configure Environment Variables**:
-   Create a `.env` file in the root directory:
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env` and add your Hugging Face token:
-   ```env
-   HF_TOKEN=your_huggingface_token_here
-   ```
+Important backend modules:
 
-4. **Run the API**:
-   ```bash
-   uvicorn sona_ai.api.main:app --app-dir backend/src --host 0.0.0.0 --port 8000 --reload
-   ```
+```text
+backend/src/sona_ai/api/              FastAPI routes
+backend/src/sona_ai/services/         App orchestration services
+backend/src/sona_ai/pipelines/        Speech pipeline composition
+backend/src/sona_ai/transcription/    ASR engines
+backend/src/sona_ai/alignment/        Alignment engines
+backend/src/sona_ai/diarization/      Diarization engines
+backend/src/sona_ai/summarization/    Local and BYOK LLM summarizers
+backend/src/sona_ai/storage/          Audio and file storage helpers
+backend/src/sona_ai/db/               SQLite/SQLAlchemy persistence
+```
 
-### Parakeet ASR
+## Environments
 
-To run the API with Parakeet instead of WhisperX, set:
+The main app runs in `sona-ai`. Two optional environments keep dependency-heavy speech tools isolated:
+
+- `sona-ai`: backend API, frontend integration, ASR, summarization, storage.
+- `sona-aligner`: external WhisperX/Wav2Vec2 alignment.
+- `sona-diarization`: external pyannote Community-1 diarization.
+
+This split avoids forcing WhisperX and pyannote dependency constraints into the main backend environment.
+
+## Prerequisites
+
+- Conda or another Python environment manager.
+- Python 3.12 for the main environment.
+- Node.js and npm for the frontend.
+- `ffmpeg` available on your PATH.
+- Hugging Face token if you use gated models such as pyannote.
+
+On macOS, install ffmpeg with:
 
 ```bash
-SONA_TRANSCRIPTION_ENGINE=parakeet SONA_TRANSCRIPTION_CONFIG=parakeet \
+brew install ffmpeg
+```
+
+## Backend Setup
+
+Create and install the main backend environment:
+
+```bash
+conda create -n sona-ai python=3.12
+conda activate sona-ai
+pip install -r backend/requirements.txt
+pip install -e backend
+```
+
+Create a `.env` file if you need Hugging Face access:
+
+```bash
+cp .env.example .env
+```
+
+Example `.env` values:
+
+```bash
+HF_TOKEN=your_huggingface_token
+HF_HOME=cp/hf_cache
+HUGGINGFACE_HUB_CACHE=cp/hf_cache
+TRANSFORMERS_CACHE=cp/hf_cache
+```
+
+Start the backend:
+
+```bash
+conda activate sona-ai
 uvicorn sona_ai.api.main:app --app-dir backend/src --host 0.0.0.0 --port 8000 --reload
 ```
 
-`configs/parakeet.yaml` defaults to `nvidia/parakeet-tdt-0.6b-v2`, which is English-only.
-
-### Frontend Setup
-
-1. **Navigate to the frontend directory**:
-   ```bash
-   cd frontend
-   ```
-
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Run the development server**:
-   ```bash
-   npm run dev
-   ```
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
-
----
-
-## 🛠️ Tech Stack
-
-### Backend
-- **Framework**: [FastAPI](https://fastapi.tiangolo.com/)
-- **ASR Engine**: [WhisperX](https://github.com/m-bain/whisperX) (faster-whisper + wav2vec2 alignment)
-- **Diarization**: [pyannote.audio](https://github.com/pyannote/pyannote-audio)
-- **Summarization**: [Hugging Face Transformers](https://huggingface.co/meta-llama) (Llama)
-- **Deep Learning**: PyTorch
-
-### Frontend
-- **Framework**: [Next.js](https://nextjs.org/) (App Router)
-- **Language**: TypeScript
-- **Styling**: [Tailwind CSS 4](https://tailwindcss.com/)
-
----
-
-## 📂 Project Structure
+The API will run at:
 
 ```text
-sona-ai/
-├── backend/            # FastAPI runtime package
-│   └── src/sona_ai/
-│       ├── api/        # FastAPI app, routes, schemas
-│       ├── services/   # Runtime orchestration layer
-│       ├── pipelines/  # Speech pipeline orchestration
-│       ├── transcription/ # ASR adapters, e.g. WhisperX
-│       ├── diarization/   # Diarization adapters, e.g. pyannote
-│       ├── summarization/ # LLM summarization runtime
-│       ├── retrieval/  # Future RAG/vector-store integration points
-│       └── core/       # Config, paths, logging, serialization helpers
-├── experiments/        # Legacy research and fine-tuning code
-├── configs/            # Model and application configurations (.yaml)
-├── frontend/           # Next.js web application
-├── data/               # Local data storage (raw audio, etc.)
-└── outputs/            # Generated transcripts and summaries
+http://localhost:8000
 ```
 
----
+## Optional Aligner Environment
 
-## 📖 Usage
+Use this when `configs/speech.yaml` enables `wav2vec2_external`.
 
-### Transcription API
-Send a `POST` request to `/transcribe` with an audio file:
-- **Endpoint**: `http://localhost:8000/transcribe`
-- **Parameters**:
-    - `file`: Audio file (mp3, wav, etc.)
-    - `language`: (Optional) Language code (e.g., `en`, `id`)
-    - `min_speakers`: (Optional) Minimum number of speakers
-    - `max_speakers`: (Optional) Maximum number of speakers
+```bash
+conda create -n sona-aligner python=3.12
+conda activate sona-aligner
+pip install -r backend/requirements-aligner.txt
+```
 
-### Summarization API
-Send a `POST` request to `/summarize` with a transcript:
-- **Endpoint**: `http://localhost:8000/summarize`
-- **Parameters**:
-    - `text`: The transcript to summarize
-    - `prompt`: (Optional) Custom instruction prompt
-    - `max_length`: (Optional) Maximum token length for the input
+The backend calls the aligner as an external tool, so the main `sona-ai` environment does not need WhisperX installed.
 
-### Web Interface
-1. Upload an audio file through the dashboard.
-2. Select the language or use auto-detection.
-3. Configure speaker settings if necessary.
-4. Click **Upload & Transcribe** to generate transcription.
-5. Click **Summarize** to generate summary once the transcription is generated.
+## Optional Diarization Environment
 
----
+Use this when `configs/speech.yaml` enables `community_external`.
 
-## 📝 TODO
-- [x] Implement basic API for transcription and summarization
-- [x] Implement basic UI for transcription and summarization
-- [ ] UI Overhaul
+```bash
+conda create -n sona-diarization python=3.12
+conda activate sona-diarization
+pip install -r backend/requirements-diarization.txt
+```
+
+The diarization tool writes speaker turns that the backend later assigns to transcript segments.
+
+## Frontend Setup
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend will run at:
+
+```text
+http://localhost:3000
+```
+
+If the frontend is not running on the same machine as the backend, set:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
+For Vercel or a tunneled backend, set `NEXT_PUBLIC_API_BASE_URL` to the public backend URL without a trailing slash.
+
+## Configuration
+
+The main speech pipeline is controlled by:
+
+```text
+configs/speech.yaml
+```
+
+Current default shape:
+
+```yaml
+transcription:
+  engine: "parakeet"
+  config: "parakeet"
+  device: "auto"
+
+alignment:
+  enabled: true
+  engine: "wav2vec2_external"
+  config: "wav2vec2"
+  device: "cpu"
+
+diarization:
+  enabled: true
+  engine: "community_external"
+  config: "diarization-community"
+  device: "cpu"
+
+summarization:
+  config: "qwen"
+```
+
+Dedicated config files live beside it:
+
+- `configs/parakeet.yaml`
+- `configs/faster-whisper-large-v3.yaml`
+- `configs/faster-whisper-turbo.yaml`
+- `configs/wav2vec2.yaml`
+- `configs/diarization-community.yaml`
+- `configs/qwen.yaml`
+- `configs/llama.yaml`
+- `configs/gemma.yaml`
+
+The UI can choose language, model, device, and speaker options for a recording. The backend maps those choices onto the configured engines.
+
+## Typical Workflow
+
+1. Start the backend and frontend.
+2. Create a project.
+3. Click `+` in the recording sidebar.
+4. Choose upload, browser recording, or live transcription.
+5. Select language, model, device, and whether to extract speakers.
+6. Review the transcript and use the audio player to verify timestamps.
+7. Edit transcript text or speaker names if needed.
+8. Use the Summary tab for local or BYOK summarization.
+9. Use the Chat tab to ask questions about the recording.
+10. Export transcript or summary as PDF.
+
+## Audio Storage
+
+Uploaded and recorded audio is preserved in its original format for playback:
+
+```text
+data/projects/<project_id>/<recording_id>.<original_extension>
+```
+
+For transcription, the backend creates a normalized ASR copy:
+
+```text
+data/projects/<project_id>/<recording_id>.asr.wav
+```
+
+This is intentional. Playback uses the original file, while ASR/alignment/diarization use the normalized 16 kHz mono WAV copy.
+
+## BYOK Providers
+
+BYOK currently targets OpenAI-compatible chat completion APIs. This includes providers such as:
+
+- OpenAI
+- Groq
+- OpenRouter
+- Other providers that expose an OpenAI-compatible `/chat/completions` API
+
+API keys entered in the frontend are handled client-side and sent only when making the requested summarization or chat call. Avoid using production keys in a shared or untrusted browser.
+
+## Checks
+
+Backend targeted test:
+
+```bash
+PYTHONPATH=backend/src conda run -n sona-ai python -m unittest discover -s tests -p 'test_audio_storage.py'
+```
+
+Frontend checks:
+
+```bash
+cd frontend
+npx tsc --noEmit
+npm run lint
+```
+
+## Deployment Notes
+
+The frontend can be deployed to Vercel.
+
+The backend is model-heavy and should usually run on your laptop, a VM, or a GPU/CPU machine with enough memory. For a prototype, you can expose the local backend through a tunnel and set the deployed frontend's `NEXT_PUBLIC_API_BASE_URL` to that tunnel URL.
+
+For wider deployment, use persistent storage for:
+
+- SQLite or another database.
+- `data/projects/`.
+- `cp/hf_cache/`.
+
+## Status
+
+This is an active prototype. The main architecture goal is to keep the app independent from any single speech stack:
+
+- ASR can change without replacing diarization.
+- Diarization can run later.
+- Alignment can be isolated from the main backend.
+- Local LLM and BYOK LLM paths can coexist.
