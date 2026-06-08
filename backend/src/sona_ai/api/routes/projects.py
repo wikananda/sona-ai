@@ -36,7 +36,13 @@ from sona_ai.db.models import Project, Recording, RecordingStatus, RecordingSumm
 from sona_ai.db.session import get_db
 from sona_ai.services.recording_worker import run_speaker_extraction, run_transcription
 from sona_ai.services.transcription_service import SUPPORTED_TRANSCRIPTION_MODELS
-from sona_ai.storage import delete_project_dir, delete_recording_file, save_upload, save_upload_as_wav
+from sona_ai.storage import (
+    delete_project_dir,
+    delete_recording_file,
+    ensure_transcription_audio,
+    save_upload,
+    save_upload_as_wav,
+)
 from sona_ai.transcription.live_timestamps import segment_live_timestamps
 from sona_ai.transcription.schemas import TranscriptionResult
 
@@ -279,6 +285,7 @@ def save_live_recording(
         )
         alignment_used = False
         alignment_error = None
+        transcription_audio = ensure_transcription_audio(saved_audio.stored_path)
         rough_transcription = TranscriptionResult.from_aligned_result(
             {
                 "language": language,
@@ -288,14 +295,14 @@ def save_live_recording(
         final_segments = segments
         try:
             aligned_transcription = request.app.state.transcription_service.align_transcript(
-                str(PROJECT_ROOT / saved_audio.stored_path),
+                str(PROJECT_ROOT / transcription_audio.stored_path),
                 rough_transcription,
                 model=model,
                 device=device,
             )
             aligned_transcription = segment_live_timestamps(
                 aligned_transcription,
-                str(PROJECT_ROOT / saved_audio.stored_path),
+                str(PROJECT_ROOT / transcription_audio.stored_path),
             )
             final_segments = aligned_transcription.to_segment_dicts()
             alignment_used = (

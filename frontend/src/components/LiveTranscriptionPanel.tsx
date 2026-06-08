@@ -32,6 +32,14 @@ const MIME_TYPES = [
     "audio/mp4",
     "audio/ogg;codecs=opus",
 ];
+const AUDIO_BITS_PER_SECOND = 256000;
+const AUDIO_CAPTURE_CONSTRAINTS: MediaTrackConstraints = {
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false,
+    sampleRate: { ideal: 48000 },
+    channelCount: { ideal: 2 },
+};
 
 export default function LiveTranscriptionPanel({
     projectId,
@@ -113,9 +121,10 @@ export default function LiveTranscriptionPanel({
                 includeSystemAudio,
             });
             const mimeType = chooseMimeType();
-            const recorder = mimeType
-                ? new MediaRecorder(stream.recordingStream, { mimeType })
-                : new MediaRecorder(stream.recordingStream);
+            const recorder = new MediaRecorder(
+                stream.recordingStream,
+                mediaRecorderOptions(mimeType),
+            );
             const startedAt = Date.now();
 
             streamRef.current = stream.cleanupStream;
@@ -452,7 +461,9 @@ async function createCaptureStream({
     audioContext: AudioContext | null;
 }> {
     if (includeMicrophone && !includeSystemAudio) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: AUDIO_CAPTURE_CONSTRAINTS,
+        });
         return {
             recordingStream: stream,
             cleanupStream: stream,
@@ -470,7 +481,7 @@ async function createCaptureStream({
     }
 
     const [micStream, displayStream] = await Promise.all([
-        navigator.mediaDevices.getUserMedia({ audio: true }),
+        navigator.mediaDevices.getUserMedia({ audio: AUDIO_CAPTURE_CONSTRAINTS }),
         captureSystemAudio(),
     ]);
     const audioContext = new AudioContext();
@@ -492,7 +503,7 @@ async function createCaptureStream({
 async function captureSystemAudio(): Promise<MediaStream> {
     const displayStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
-        audio: true,
+        audio: AUDIO_CAPTURE_CONSTRAINTS,
     });
     if (displayStream.getAudioTracks().length === 0) {
         displayStream.getTracks().forEach((track) => track.stop());
@@ -504,6 +515,13 @@ async function captureSystemAudio(): Promise<MediaStream> {
 function chooseMimeType(): string {
     if (!hasMediaRecorderSupport()) return "";
     return MIME_TYPES.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? "";
+}
+
+function mediaRecorderOptions(mimeType: string): MediaRecorderOptions {
+    return {
+        ...(mimeType ? { mimeType } : {}),
+        audioBitsPerSecond: AUDIO_BITS_PER_SECOND,
+    };
 }
 
 function hasMediaRecorderSupport(): boolean {

@@ -7,7 +7,7 @@ from sona_ai.core import PROJECT_ROOT, sanitize_for_json, setup_logging
 from sona_ai.db.engine import SessionLocal
 from sona_ai.db.models import Recording, RecordingStatus, Transcript
 from sona_ai.services.transcription_service import TranscriptionService
-from sona_ai.storage import normalize_recording_file
+from sona_ai.storage import ensure_transcription_audio
 from sona_ai.transcription.schemas import TranscriptSegment, TranscriptionResult
 
 
@@ -46,7 +46,7 @@ def run_transcription(
             total_steps=total_steps,
             job_id=job_id,
         )
-        _normalize_recording_audio(db, recording)
+        transcription_audio = _ensure_transcription_audio(recording)
         _raise_if_canceled_or_stale(db, recording.id, job_id)
         logger.info(
             "Recording %s marked processing: file=%s model=%s device=%s language=%s",
@@ -65,7 +65,7 @@ def run_transcription(
         )
 
         result = transcription_service.transcribe(
-            str(PROJECT_ROOT / recording.stored_path),
+            str(PROJECT_ROOT / transcription_audio.stored_path),
             language=recording.language_hint,
             model=recording.model,
             device=recording.device,
@@ -150,7 +150,7 @@ def run_speaker_extraction(
             total_steps=total_steps,
             job_id=job_id,
         )
-        _normalize_recording_audio(db, recording)
+        transcription_audio = _ensure_transcription_audio(recording)
         _raise_if_canceled_or_stale(db, recording.id, job_id)
         segments = json.loads(recording.transcript.segments_json)
         transcription = TranscriptionResult(
@@ -179,7 +179,7 @@ def run_speaker_extraction(
             )
 
         result = transcription_service.extract_speakers(
-            str(PROJECT_ROOT / recording.stored_path),
+            str(PROJECT_ROOT / transcription_audio.stored_path),
             transcription,
             model=recording.model,
             device=recording.device,
@@ -233,26 +233,15 @@ def run_speaker_extraction(
         db.close()
 
 
-def _normalize_recording_audio(db: Session, recording: Recording) -> None:
-    normalized = normalize_recording_file(recording.stored_path)
-    if (
-        normalized.stored_path == recording.stored_path
-        and normalized.mime_type == recording.mime_type
-        and normalized.file_size_bytes == recording.file_size_bytes
-    ):
-        return
-
+def _ensure_transcription_audio(recording: Recording):
+    normalized = ensure_transcription_audio(recording.stored_path)
     logger.info(
-        "Normalized recording audio for recording_id=%s: %s -> %s",
+        "Prepared ASR audio for recording_id=%s: playback=%s asr=%s",
         recording.id,
         recording.stored_path,
         normalized.stored_path,
     )
-    recording.stored_path = normalized.stored_path
-    recording.mime_type = normalized.mime_type
-    recording.file_size_bytes = normalized.file_size_bytes
-    db.commit()
-    db.refresh(recording)
+    return normalized
 
 
 def _set_status(

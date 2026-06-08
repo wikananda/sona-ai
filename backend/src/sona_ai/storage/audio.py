@@ -23,20 +23,23 @@ def save_upload(project_id: str, recording_id: str, upload_file: UploadFile) -> 
     project_dir = _safe_project_dir(project_id)
     project_dir.mkdir(parents=True, exist_ok=True)
 
-    destination = project_dir / f"{recording_id}.wav"
-    size = save_upload_as_wav(upload_file, destination)
+    extension = _upload_extension(upload_file)
+    destination = project_dir / f"{recording_id}{extension}"
 
-    return SavedAudio(
-        stored_path=str(destination.relative_to(PROJECT_ROOT)),
-        mime_type="audio/wav",
-        file_size_bytes=size,
-    )
+    try:
+        size = _write_upload(destination, upload_file)
+        return SavedAudio(
+            stored_path=str(destination.relative_to(PROJECT_ROOT)),
+            mime_type=upload_file.content_type,
+            file_size_bytes=size,
+        )
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
 
 
 def save_upload_as_wav(upload_file: UploadFile, destination: Path) -> int:
-    extension = Path(upload_file.filename or "").suffix.lower()
-    if not extension:
-        extension = ".audio"
+    extension = _upload_extension(upload_file)
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     raw_destination = destination.with_name(f"{destination.stem}.upload{extension}")
@@ -50,6 +53,38 @@ def save_upload_as_wav(upload_file: UploadFile, destination: Path) -> int:
         raise
     finally:
         raw_destination.unlink(missing_ok=True)
+
+
+def ensure_transcription_audio(stored_path: str) -> SavedAudio:
+    source = _safe_project_path(stored_path)
+    if not source.is_file():
+        raise FileNotFoundError(f"Recording audio file not found: {stored_path}")
+
+    destination = transcription_audio_path(stored_path)
+    if destination.is_file() and destination.stat().st_mtime >= source.stat().st_mtime:
+        return SavedAudio(
+            stored_path=str(destination.relative_to(PROJECT_ROOT)),
+            mime_type="audio/wav",
+            file_size_bytes=destination.stat().st_size,
+        )
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        _convert_to_wav(source, destination)
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+
+    return SavedAudio(
+        stored_path=str(destination.relative_to(PROJECT_ROOT)),
+        mime_type="audio/wav",
+        file_size_bytes=destination.stat().st_size,
+    )
+
+
+def transcription_audio_path(stored_path: str) -> Path:
+    source = _safe_project_path(stored_path)
+    return source.with_name(f"{source.stem}.asr.wav")
 
 
 def normalize_recording_file(stored_path: str) -> SavedAudio:
@@ -122,6 +157,10 @@ def delete_recording_file(stored_path: str) -> None:
     if path.exists() and path.is_file():
         path.unlink()
 
+    transcription_path = transcription_audio_path(stored_path)
+    if transcription_path.exists() and transcription_path.is_file():
+        transcription_path.unlink()
+
 
 def delete_project_dir(project_id: str) -> None:
     project_dir = _safe_project_dir(project_id)
@@ -144,3 +183,8 @@ def _safe_project_path(stored_path: str) -> Path:
     if root != path and root not in path.parents:
         raise ValueError("Invalid recording path")
     return path
+
+
+def _upload_extension(upload_file: UploadFile) -> str:
+    extension = Path(upload_file.filename or "").suffix.lower()
+    return extension or ".audio"
