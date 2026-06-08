@@ -64,6 +64,7 @@ export default function LiveTranscriptionPanel({
         : runtimeDevices.default;
     const isBusy = state === "requesting" || state === "stopping" || state === "saving";
     const isRecording = state === "recording";
+    const isSetupMode = state === "idle" || state === "requesting";
     const hasNonEnglishLanguage = !["auto", "en"].includes(language);
 
     useEffect(() => {
@@ -152,7 +153,7 @@ export default function LiveTranscriptionPanel({
         recorder.stop();
     };
 
-    const discardLiveTranscription = () => {
+    const resetLiveTranscription = () => {
         stopActiveStream();
         chunksRef.current = [];
         chunkIndexRef.current = 0;
@@ -231,33 +232,28 @@ export default function LiveTranscriptionPanel({
                 device: selectedDevice,
             });
             onSaved(recording);
-            discardLiveTranscription();
+            resetLiveTranscription();
         } catch (err) {
             setState("idle");
             setError(err instanceof Error ? err.message : "Failed to save live recording");
         }
     };
 
-    return (
-        <section className="rounded-lg border border-zinc-200 bg-white">
-            <div className="border-b border-zinc-200 px-4 py-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
+    if (isSetupMode) {
+        return (
+            <section className="rounded-lg border border-zinc-200 bg-white">
+                <div className="border-b border-zinc-200 px-4 py-3">
                     <div>
                         <h2 className="text-sm font-semibold text-zinc-900">
                             Live transcription
                         </h2>
                         <p className="mt-1 text-sm text-zinc-500">
-                            Record short chunks and save the final transcript into this project.
+                            Choose sources and model settings before starting.
                         </p>
                     </div>
-                    <span className="rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-700">
-                        {formatDuration(elapsedSeconds)}
-                    </span>
                 </div>
-            </div>
 
-            <div className="grid gap-4 p-4 lg:grid-cols-[280px_1fr]">
-                <div className="flex flex-col gap-3">
+                <div className="flex max-w-xl flex-col gap-4 p-4">
                     <div className="flex flex-col gap-2 rounded-md border border-zinc-200 p-3">
                         <p className="text-xs font-medium text-zinc-500">Audio sources</p>
                         <SourceCheckbox
@@ -333,45 +329,58 @@ export default function LiveTranscriptionPanel({
                         </select>
                     </label>
 
-                    <div className="flex gap-2">
-                        {isRecording ? (
-                            <button
-                                type="button"
-                                onClick={stopLiveTranscription}
-                                className="min-h-10 flex-1 rounded-md bg-red-700 px-4 text-sm font-medium text-white hover:bg-red-800"
-                            >
-                                Stop and save
-                            </button>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={startLiveTranscription}
-                                disabled={isBusy}
-                                className="min-h-10 flex-1 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                {state === "requesting"
-                                    ? "Requesting access"
-                                    : state === "saving"
-                                        ? "Saving"
-                                        : "Start live"}
-                            </button>
-                        )}
-                        <button
-                            type="button"
-                            onClick={discardLiveTranscription}
-                            disabled={isRecording || isBusy || (!segments.length && !elapsedSeconds)}
-                            className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            Discard
-                        </button>
-                    </div>
+                    <button
+                        type="button"
+                        onClick={startLiveTranscription}
+                        disabled={isBusy}
+                        className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                        {state === "requesting" ? "Requesting access" : "Start live"}
+                    </button>
 
                     {error && <p className="text-sm text-red-700">{error}</p>}
                 </div>
+            </section>
+        );
+    }
 
-                <div className="min-h-[260px] rounded-md border border-zinc-200 bg-zinc-50 p-4">
+    return (
+        <section className="rounded-lg border border-zinc-200 bg-white">
+            <div className="border-b border-zinc-200 px-4 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h2 className="text-sm font-semibold text-zinc-900">
+                            Live transcription
+                        </h2>
+                        <p className="mt-1 text-sm text-zinc-500">
+                            Record short chunks and save the final transcript into this project.
+                        </p>
+                    </div>
+                    <span className="rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-700">
+                        {formatDuration(elapsedSeconds)}
+                    </span>
+                </div>
+            </div>
+
+            <div className="flex flex-col gap-4 p-4">
+                <div className="flex justify-end">
+                    <button
+                        type="button"
+                        onClick={stopLiveTranscription}
+                        disabled={!isRecording}
+                        className="min-h-10 rounded-md bg-red-700 px-4 text-sm font-medium text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {state === "stopping"
+                            ? "Stopping"
+                            : state === "saving"
+                                ? "Saving"
+                                : "Stop and save"}
+                    </button>
+                </div>
+
+                <div className="h-[min(520px,60vh)] overflow-y-auto rounded-md border border-zinc-200 bg-zinc-50 p-4 pr-2">
                     {segments.length === 0 ? (
-                        <div className="flex h-full items-center text-sm text-zinc-500">
+                        <div className="flex min-h-full items-center text-sm text-zinc-500">
                             Live transcript chunks will appear here.
                         </div>
                     ) : (
@@ -387,6 +396,8 @@ export default function LiveTranscriptionPanel({
                         </div>
                     )}
                 </div>
+
+                {error && <p className="text-sm text-red-700">{error}</p>}
             </div>
         </section>
     );
