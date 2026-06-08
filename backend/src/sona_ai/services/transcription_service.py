@@ -106,6 +106,27 @@ class TranscriptionService:
             logger.info("Transcription lock acquired for live chunk.")
             return pipeline.transcriber.transcribe(audio_path, language=language)
 
+    def align_transcript(
+        self,
+        audio_path: str,
+        transcription: TranscriptionResult,
+        model: Optional[str] = None,
+        device: Optional[str] = None,
+    ) -> TranscriptionResult:
+        pipeline = self._get_pipeline(
+            model,
+            device,
+            alignment_enabled=True,
+            extract_speakers=False,
+        )
+        if pipeline.aligner is None:
+            return transcription
+
+        logger.info("Waiting for transcription lock...")
+        with self._transcription_lock:
+            logger.info("Transcription lock acquired for transcript alignment.")
+            return pipeline.aligner.align(transcription, audio_path)
+
     def close(self):
         for pipeline in self._pipelines.values():
             pipeline.cleanup_models()

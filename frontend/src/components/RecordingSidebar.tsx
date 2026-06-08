@@ -7,13 +7,15 @@ import {
     TranscriptionModel,
 } from "@/src/api/sonaApi";
 import BrowserAudioRecorder from "@/src/components/BrowserAudioRecorder";
+import LiveTranscriptionPanel from "@/src/components/LiveTranscriptionPanel";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import RecordingUploader from "@/src/components/RecordingUploader";
 import { useState } from "react";
 
-type AddRecordingMode = "upload" | "record";
+type AddRecordingMode = "upload" | "record" | "live";
 
 interface Props {
+    projectId: string;
     recordings: Recording[];
     selectedId?: string;
     onSelect: (recordingId: string) => void;
@@ -29,11 +31,13 @@ interface Props {
         maxSpeakers?: number | "";
         extractSpeakers?: boolean;
     }) => Promise<void>;
+    onLiveSaved: (recording: Recording) => Promise<void>;
     isUploading: boolean;
     runtimeDevices: RuntimeDevices;
 }
 
 export default function RecordingSidebar({
+    projectId,
     recordings,
     selectedId,
     onSelect,
@@ -41,6 +45,7 @@ export default function RecordingSidebar({
     onRename,
     renamingId,
     onUpload,
+    onLiveSaved,
     isUploading,
     runtimeDevices,
 }: Props) {
@@ -182,14 +187,14 @@ export default function RecordingSidebar({
             </div>
             {isUploadOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                    <div className="w-full max-w-xl rounded-lg bg-white shadow-xl">
+                    <div className="w-full max-w-4xl rounded-lg bg-white shadow-xl">
                         <div className="flex items-start justify-between gap-4 border-b border-zinc-200 px-5 py-4">
                             <div>
                                 <h2 className="text-base font-semibold text-zinc-950">
                                     Add recording
                                 </h2>
                                 <p className="mt-1 text-sm text-zinc-500">
-                                    Upload audio or record from this browser.
+                                    Upload audio, record first, or transcribe live.
                                 </p>
                             </div>
                             <button
@@ -203,7 +208,7 @@ export default function RecordingSidebar({
                             </button>
                         </div>
                         <div className="p-5">
-                            <div className="mb-4 grid grid-cols-2 gap-2 rounded-lg bg-zinc-100 p-1">
+                            <div className="mb-4 grid grid-cols-3 gap-2 rounded-lg bg-zinc-100 p-1">
                                 <button
                                     type="button"
                                     onClick={() => setAddMode("upload")}
@@ -226,6 +231,17 @@ export default function RecordingSidebar({
                                 >
                                     Record audio
                                 </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setAddMode("live")}
+                                    disabled={isUploading}
+                                    className={`min-h-10 rounded-md text-sm font-medium transition-colors ${addMode === "live"
+                                        ? "bg-white text-zinc-950 shadow-sm"
+                                        : "text-zinc-600 hover:text-zinc-950"
+                                        } disabled:cursor-not-allowed disabled:opacity-50`}
+                                >
+                                    Live transcription
+                                </button>
                             </div>
 
                             {addMode === "upload" ? (
@@ -237,7 +253,7 @@ export default function RecordingSidebar({
                                     isUploading={isUploading}
                                     runtimeDevices={runtimeDevices}
                                 />
-                            ) : (
+                            ) : addMode === "record" ? (
                                 <BrowserAudioRecorder
                                     onUpload={async (params) => {
                                         await onUpload(params);
@@ -245,6 +261,15 @@ export default function RecordingSidebar({
                                     }}
                                     isUploading={isUploading}
                                     runtimeDevices={runtimeDevices}
+                                />
+                            ) : (
+                                <LiveTranscriptionPanel
+                                    projectId={projectId}
+                                    runtimeDevices={runtimeDevices}
+                                    onSaved={async (recording) => {
+                                        await onLiveSaved(recording);
+                                        setIsUploadOpen(false);
+                                    }}
                                 />
                             )}
                         </div>

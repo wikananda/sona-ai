@@ -37,6 +37,8 @@ from sona_ai.db.session import get_db
 from sona_ai.services.recording_worker import run_speaker_extraction, run_transcription
 from sona_ai.services.transcription_service import SUPPORTED_TRANSCRIPTION_MODELS
 from sona_ai.storage import delete_project_dir, delete_recording_file, save_upload, save_upload_as_wav
+from sona_ai.transcription.live_timestamps import segment_live_timestamps
+from sona_ai.transcription.schemas import TranscriptionResult
 
 
 logger = setup_logging()
@@ -216,6 +218,7 @@ async def transcribe_live_chunk(
                 model=model,
                 device=device,
             )
+            transcription = segment_live_timestamps(transcription, str(audio_path))
         except (RuntimeError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -249,7 +252,7 @@ def save_live_recording(
     profile = request.app.state.transcription_service.resolve_profile(
         model=model,
         device=device,
-        alignment_enabled=False,
+        alignment_enabled=True,
         extract_speakers=False,
     )
 
@@ -274,12 +277,49 @@ def save_live_recording(
             progress_total_steps=1,
             error=None,
         )
+        alignment_used = False
+        alignment_error = None
+        rough_transcription = TranscriptionResult.from_aligned_result(
+            {
+                "language": language,
+                "segments": segments,
+            }
+        )
+        final_segments = segments
+        try:
+            aligned_transcription = request.app.state.transcription_service.align_transcript(
+                str(PROJECT_ROOT / saved_audio.stored_path),
+                rough_transcription,
+                model=model,
+                device=device,
+            )
+            aligned_transcription = segment_live_timestamps(
+                aligned_transcription,
+                str(PROJECT_ROOT / saved_audio.stored_path),
+            )
+            final_segments = aligned_transcription.to_segment_dicts()
+            alignment_used = (
+                aligned_transcription is not rough_transcription
+                and _has_usable_segment_timestamps(final_segments)
+            )
+        except Exception as exc:
+            alignment_error = str(exc)
+            logger.warning(
+                "Failed to align live recording %s; saving rough live timestamps: %s",
+                recording_id,
+                exc,
+            )
+
         transcript_metadata = profile.to_metadata()
         transcript_metadata["runtime"]["language"] = language
+        transcript_metadata["runtime"]["live_transcription"] = True
+        transcript_metadata["runtime"]["live_alignment_used"] = alignment_used
+        if alignment_error:
+            transcript_metadata["runtime"]["live_alignment_error"] = alignment_error
         transcript = Transcript(
             id=str(uuid.uuid4()),
             recording_id=recording_id,
-            segments_json=json.dumps(segments),
+            segments_json=json.dumps(sanitize_for_json(final_segments)),
             language=language,
             transcription_engine=profile.transcription_engine,
             diarization_engine=None,
@@ -914,6 +954,14 @@ def _offset_segments(segments: list[dict], offset_seconds: float) -> list[dict]:
             shifted["words"] = words
         offset_segments.append(shifted)
     return sanitize_for_json(offset_segments)
+
+
+def _has_usable_segment_timestamps(segments: list[dict]) -> bool:
+    return any(
+        float(segment.get("end") or 0.0) > float(segment.get("start") or 0.0)
+        for segment in segments
+        if isinstance(segment, dict)
+    )
 
 
 def _parse_live_segments(segments_json: str) -> list[dict]:

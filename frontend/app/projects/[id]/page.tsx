@@ -29,7 +29,6 @@ import {
     updateRecordingSummary,
 } from "@/src/api/sonaApi";
 import BYOKSettingsModal from "@/src/components/BYOKSettingsModal";
-import LiveTranscriptionPanel from "@/src/components/LiveTranscriptionPanel";
 import RecordingDetail from "@/src/components/RecordingDetail";
 import RecordingSidebar from "@/src/components/RecordingSidebar";
 import { useBYOKSettings } from "@/src/hooks/useBYOKSettings";
@@ -377,14 +376,9 @@ export default function ProjectDetailPage() {
                     </div>
                 )}
 
-                <LiveTranscriptionPanel
-                    projectId={projectId}
-                    runtimeDevices={runtimeDevices}
-                    onSaved={handleLiveRecordingSaved}
-                />
-
                 <div className="grid overflow-hidden rounded-lg border border-zinc-200 bg-white lg:grid-cols-[360px_1fr]">
                     <RecordingSidebar
+                        projectId={projectId}
                         recordings={recordings}
                         selectedId={selectedRecordingId}
                         onSelect={setSelectedRecordingId}
@@ -392,6 +386,7 @@ export default function ProjectDetailPage() {
                         onRename={handleRenameRecording}
                         renamingId={renamingRecordingId}
                         onUpload={handleUpload}
+                        onLiveSaved={handleLiveRecordingSaved}
                         isUploading={isUploading}
                         runtimeDevices={runtimeDevices}
                     />
