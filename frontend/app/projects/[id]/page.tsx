@@ -28,10 +28,13 @@ import {
     updateTranscriptSegment,
     updateRecordingSummary,
 } from "@/src/api/sonaApi";
+import AddRecordingPanel, { AddRecordingMode } from "@/src/components/AddRecordingPanel";
 import BYOKSettingsModal from "@/src/components/BYOKSettingsModal";
 import RecordingDetail from "@/src/components/RecordingDetail";
 import RecordingSidebar from "@/src/components/RecordingSidebar";
 import { useBYOKSettings } from "@/src/hooks/useBYOKSettings";
+
+const DRAFT_RECORDING_ID = "draft-recording";
 
 export default function ProjectDetailPage() {
     const params = useParams<{ id: string }>();
@@ -41,6 +44,8 @@ export default function ProjectDetailPage() {
     const [project, setProject] = useState<Project | null>(null);
     const [selectedRecordingId, setSelectedRecordingId] = useState<string>();
     const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
+    const [draftMode, setDraftMode] = useState<AddRecordingMode | null>(null);
+    const [previousRecordingId, setPreviousRecordingId] = useState<string>();
     const [isLoadingProject, setIsLoadingProject] = useState(true);
     const [isLoadingRecording, setIsLoadingRecording] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -61,6 +66,8 @@ export default function ProjectDetailPage() {
     const [error, setError] = useState("");
 
     const recordings = useMemo(() => project?.recordings ?? [], [project]);
+    const hasDraft = draftMode !== null;
+    const isDraftSelected = selectedRecordingId === DRAFT_RECORDING_ID;
     const hasActiveRecordings = recordings.some((recording) =>
         recording.status === "pending" || recording.status === "processing"
     );
@@ -69,6 +76,9 @@ export default function ProjectDetailPage() {
         const data = await getProject(projectId);
         setProject(data);
         setSelectedRecordingId((current) => {
+            if (current === DRAFT_RECORDING_ID) {
+                return current;
+            }
             if (current && data.recordings?.some((recording) => recording.id === current)) {
                 return current;
             }
@@ -77,7 +87,7 @@ export default function ProjectDetailPage() {
     }, [projectId]);
 
     const refreshSelectedRecording = useCallback(async () => {
-        if (!selectedRecordingId) {
+        if (!selectedRecordingId || selectedRecordingId === DRAFT_RECORDING_ID) {
             setSelectedRecording(null);
             return;
         }
@@ -118,6 +128,45 @@ export default function ProjectDetailPage() {
         return () => window.clearInterval(intervalId);
     }, [hasActiveRecordings, refreshProject, refreshSelectedRecording]);
 
+    const handleStartDraft = () => {
+        setDraftMode((current) => current ?? "upload");
+        setPreviousRecordingId((current) => {
+            if (draftMode) return current;
+            return selectedRecordingId !== DRAFT_RECORDING_ID
+                ? selectedRecordingId
+                : current;
+        });
+        setSelectedRecording(null);
+        setSelectedRecordingId(DRAFT_RECORDING_ID);
+    };
+
+    const handleSelectDraft = () => {
+        if (!draftMode) return;
+
+        setSelectedRecording(null);
+        setSelectedRecordingId(DRAFT_RECORDING_ID);
+    };
+
+    const handleCancelDraft = () => {
+        const fallbackRecordingId = previousRecordingId &&
+            recordings.some((recording) => recording.id === previousRecordingId)
+            ? previousRecordingId
+            : recordings[0]?.id;
+
+        setDraftMode(null);
+        setPreviousRecordingId(undefined);
+        setSelectedRecordingId(fallbackRecordingId);
+        if (!recordings.length) {
+            setSelectedRecording(null);
+        }
+    };
+
+    const handleSelectRecording = (recordingId: string) => {
+        setDraftMode(null);
+        setPreviousRecordingId(undefined);
+        setSelectedRecordingId(recordingId);
+    };
+
     const handleUpload = async (params: {
         files: File[];
         language?: string;
@@ -146,6 +195,8 @@ export default function ProjectDetailPage() {
             }
             await refreshProject();
             if (firstRecording) {
+                setDraftMode(null);
+                setPreviousRecordingId(undefined);
                 setSelectedRecordingId(firstRecording.id);
             }
         } catch (err) {
@@ -157,6 +208,8 @@ export default function ProjectDetailPage() {
     };
 
     const handleLiveRecordingSaved = async (recording: Recording) => {
+        setDraftMode(null);
+        setPreviousRecordingId(undefined);
         setSelectedRecordingId(recording.id);
         setSelectedRecording(recording);
         await refreshProject();
@@ -378,41 +431,55 @@ export default function ProjectDetailPage() {
 
                 <div className="grid overflow-hidden rounded-lg border border-zinc-200 bg-white lg:grid-cols-[360px_1fr]">
                     <RecordingSidebar
-                        projectId={projectId}
                         recordings={recordings}
                         selectedId={selectedRecordingId}
-                        onSelect={setSelectedRecordingId}
+                        isDraftSelected={isDraftSelected}
+                        hasDraft={hasDraft}
+                        onSelect={handleSelectRecording}
+                        onSelectDraft={handleSelectDraft}
+                        onStartDraft={handleStartDraft}
                         onDelete={handleDeleteRecording}
                         onRename={handleRenameRecording}
                         renamingId={renamingRecordingId}
-                        onUpload={handleUpload}
-                        onLiveSaved={handleLiveRecordingSaved}
                         isUploading={isUploading}
-                        runtimeDevices={runtimeDevices}
                     />
-                    <RecordingDetail
-                        key={selectedRecording?.id ?? "empty-recording"}
-                        recording={selectedRecording}
-                        isLoading={isLoadingRecording}
-                        runtimeDevices={runtimeDevices}
-                        isRetranscribing={retranscribingId === selectedRecording?.id}
-                        onRetranscribe={handleRetranscribeRecording}
-                        isCanceling={cancelingRecordingId === selectedRecording?.id}
-                        onCancel={handleCancelRecording}
-                        isRenamingSpeakers={renamingSpeakerId === selectedRecording?.id}
-                        onRenameSpeakers={handleRenameTranscriptSpeakers}
-                        isEditingTranscript={editingTranscriptId === selectedRecording?.id}
-                        onUpdateTranscriptSegment={handleUpdateTranscriptSegment}
-                        isExtractingSpeakers={extractingSpeakerId === selectedRecording?.id}
-                        onExtractSpeakers={handleExtractSpeakers}
-                        isSummarizing={summarizingId === selectedRecording?.id}
-                        onSummarize={handleSummarizeRecording}
-                        isUpdatingSummary={updatingSummaryId === selectedRecording?.id}
-                        onUpdateSummary={handleUpdateRecordingSummary}
-                        byokSettings={byokSettings.selectedBYOKSettings}
-                        isBYOKConfigured={byokSettings.isSelectedProviderConfigured}
-                        onOpenSettings={() => setIsSettingsOpen(true)}
-                    />
+                    {isDraftSelected && draftMode ? (
+                        <AddRecordingPanel
+                            key="draft-recording"
+                            projectId={projectId}
+                            mode={draftMode}
+                            onModeChange={setDraftMode}
+                            onCancel={handleCancelDraft}
+                            onUpload={handleUpload}
+                            onLiveSaved={handleLiveRecordingSaved}
+                            isUploading={isUploading}
+                            runtimeDevices={runtimeDevices}
+                        />
+                    ) : (
+                        <RecordingDetail
+                            key={selectedRecording?.id ?? "empty-recording"}
+                            recording={selectedRecording}
+                            isLoading={isLoadingRecording}
+                            runtimeDevices={runtimeDevices}
+                            isRetranscribing={retranscribingId === selectedRecording?.id}
+                            onRetranscribe={handleRetranscribeRecording}
+                            isCanceling={cancelingRecordingId === selectedRecording?.id}
+                            onCancel={handleCancelRecording}
+                            isRenamingSpeakers={renamingSpeakerId === selectedRecording?.id}
+                            onRenameSpeakers={handleRenameTranscriptSpeakers}
+                            isEditingTranscript={editingTranscriptId === selectedRecording?.id}
+                            onUpdateTranscriptSegment={handleUpdateTranscriptSegment}
+                            isExtractingSpeakers={extractingSpeakerId === selectedRecording?.id}
+                            onExtractSpeakers={handleExtractSpeakers}
+                            isSummarizing={summarizingId === selectedRecording?.id}
+                            onSummarize={handleSummarizeRecording}
+                            isUpdatingSummary={updatingSummaryId === selectedRecording?.id}
+                            onUpdateSummary={handleUpdateRecordingSummary}
+                            byokSettings={byokSettings.selectedBYOKSettings}
+                            isBYOKConfigured={byokSettings.isSelectedProviderConfigured}
+                            onOpenSettings={() => setIsSettingsOpen(true)}
+                        />
+                    )}
                 </div>
             </div>
             {isSettingsOpen && (
