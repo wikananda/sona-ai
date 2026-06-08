@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { RuntimeDevice, RuntimeDevices, TranscriptionModel } from "@/src/api/sonaApi";
 import RecordingSettingsForm from "@/src/components/RecordingSettingsForm";
 
-type RecordingSource = "microphone" | "screen";
 type RecorderState = "idle" | "requesting" | "recording" | "stopping" | "preview";
 
 interface Props {
@@ -35,9 +34,11 @@ export default function BrowserAudioRecorder({
 }: Props) {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const startedAtRef = useRef<number>(0);
-    const [source, setSource] = useState<RecordingSource>("microphone");
+    const [includeMicrophone, setIncludeMicrophone] = useState(true);
+    const [includeSystemAudio, setIncludeSystemAudio] = useState(false);
     const [recorderState, setRecorderState] = useState<RecorderState>("idle");
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const [recordedFile, setRecordedFile] = useState<File | null>(null);
@@ -78,13 +79,20 @@ export default function BrowserAudioRecorder({
 
         setRecorderState("requesting");
         try {
-            const stream = await createCaptureStream(source);
+            if (!includeMicrophone && !includeSystemAudio) {
+                throw new Error("Choose microphone, system audio, or both.");
+            }
+            const stream = await createCaptureStream({
+                includeMicrophone,
+                includeSystemAudio,
+            });
             const mimeType = chooseMimeType();
             const recorder = mimeType
                 ? new MediaRecorder(stream.recordingStream, { mimeType })
                 : new MediaRecorder(stream.recordingStream);
 
             streamRef.current = stream.cleanupStream;
+            audioContextRef.current = stream.audioContext;
             chunksRef.current = [];
             mediaRecorderRef.current = recorder;
             startedAtRef.current = Date.now();
@@ -101,7 +109,10 @@ export default function BrowserAudioRecorder({
                 const blob = new Blob(chunksRef.current, { type: finalMimeType });
                 const file = new File(
                     [blob],
-                    buildRecordingFilename(source, finalMimeType),
+                    buildRecordingFilename(
+                        sourceLabelForFilename({ includeMicrophone, includeSystemAudio }),
+                        finalMimeType,
+                    ),
                     { type: finalMimeType },
                 );
 
@@ -119,7 +130,7 @@ export default function BrowserAudioRecorder({
             stopActiveStream();
             mediaRecorderRef.current = null;
             setRecorderState("idle");
-            setError(errorMessage(err, source));
+            setError(errorMessage(err, includeMicrophone));
         }
     };
 
@@ -147,46 +158,37 @@ export default function BrowserAudioRecorder({
 
     return (
         <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-2 rounded-lg bg-zinc-100 p-1">
-                <button
-                    type="button"
-                    onClick={() => setSource("microphone")}
-                    disabled={!canChangeSource || isUploading}
-                    className={`min-h-10 rounded-md text-sm font-medium transition-colors ${source === "microphone"
-                        ? "bg-white text-zinc-950 shadow-sm"
-                        : "text-zinc-600 hover:text-zinc-950"
-                        } disabled:cursor-not-allowed disabled:opacity-50`}
-                >
-                    Microphone
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setSource("screen")}
-                    disabled={!canChangeSource || isUploading}
-                    className={`min-h-10 rounded-md text-sm font-medium transition-colors ${source === "screen"
-                        ? "bg-white text-zinc-950 shadow-sm"
-                        : "text-zinc-600 hover:text-zinc-950"
-                        } disabled:cursor-not-allowed disabled:opacity-50`}
-                >
-                    Screen audio
-                </button>
-            </div>
-
             <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <p className="text-sm font-medium text-zinc-900">
-                            {source === "microphone" ? "Record microphone" : "Record screen or meeting audio"}
+                            Record audio
                         </p>
                         <p className="mt-1 text-xs text-zinc-500">
-                            {source === "microphone"
-                                ? "Your browser will ask for microphone permission."
-                                : "Choose a tab, window, or screen that includes audio when prompted."}
+                            Choose microphone, system audio, or both before recording.
                         </p>
                     </div>
                     <span className="rounded-full bg-white px-3 py-1 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200">
                         {formatDuration(elapsedSeconds)}
                     </span>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-2 rounded-md border border-zinc-200 bg-white p-3">
+                    <p className="text-xs font-medium text-zinc-500">Audio sources</p>
+                    <SourceCheckbox
+                        label="Microphone"
+                        description="Capture your voice."
+                        checked={includeMicrophone}
+                        disabled={!canChangeSource || isUploading}
+                        onChange={(event) => setIncludeMicrophone(event.target.checked)}
+                    />
+                    <SourceCheckbox
+                        label="System audio"
+                        description="Capture shared tab, window, or meeting audio."
+                        checked={includeSystemAudio}
+                        disabled={!canChangeSource || isUploading}
+                        onChange={(event) => setIncludeSystemAudio(event.target.checked)}
+                    />
                 </div>
 
                 <div className="mt-4 flex gap-2">
@@ -253,35 +255,100 @@ export default function BrowserAudioRecorder({
     function stopActiveStream() {
         streamRef.current?.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
+        audioContextRef.current?.close().catch(() => undefined);
+        audioContextRef.current = null;
     }
 }
 
-async function createCaptureStream(source: RecordingSource): Promise<{
+function SourceCheckbox({
+    label,
+    description,
+    checked,
+    disabled,
+    onChange,
+}: {
+    label: string;
+    description: string;
+    checked: boolean;
+    disabled: boolean;
+    onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+}) {
+    return (
+        <label className="flex items-start gap-2 text-sm text-zinc-700">
+            <input
+                type="checkbox"
+                checked={checked}
+                disabled={disabled}
+                onChange={onChange}
+                className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-950 focus:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <span>
+                {label}
+                <span className="block text-xs text-zinc-500">{description}</span>
+            </span>
+        </label>
+    );
+}
+
+async function createCaptureStream({
+    includeMicrophone,
+    includeSystemAudio,
+}: {
+    includeMicrophone: boolean;
+    includeSystemAudio: boolean;
+}): Promise<{
     recordingStream: MediaStream;
     cleanupStream: MediaStream;
+    audioContext: AudioContext | null;
 }> {
-    if (source === "microphone") {
+    if (includeMicrophone && !includeSystemAudio) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         return {
             recordingStream: stream,
             cleanupStream: stream,
+            audioContext: null,
         };
     }
 
+    if (!includeMicrophone && includeSystemAudio) {
+        const displayStream = await captureSystemAudio();
+        return {
+            recordingStream: new MediaStream(displayStream.getAudioTracks()),
+            cleanupStream: displayStream,
+            audioContext: null,
+        };
+    }
+
+    const [micStream, displayStream] = await Promise.all([
+        navigator.mediaDevices.getUserMedia({ audio: true }),
+        captureSystemAudio(),
+    ]);
+    const audioContext = new AudioContext();
+    const destination = audioContext.createMediaStreamDestination();
+    audioContext.createMediaStreamSource(micStream).connect(destination);
+    audioContext.createMediaStreamSource(displayStream).connect(destination);
+    const cleanupStream = new MediaStream([
+        ...micStream.getTracks(),
+        ...displayStream.getTracks(),
+    ]);
+
+    return {
+        recordingStream: destination.stream,
+        cleanupStream,
+        audioContext,
+    };
+}
+
+async function captureSystemAudio(): Promise<MediaStream> {
     const displayStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: true,
     });
-    const audioTracks = displayStream.getAudioTracks();
-    if (audioTracks.length === 0) {
+    if (displayStream.getAudioTracks().length === 0) {
         displayStream.getTracks().forEach((track) => track.stop());
         throw new Error("NO_SCREEN_AUDIO");
     }
-
-    return {
-        recordingStream: new MediaStream(audioTracks),
-        cleanupStream: displayStream,
-    };
+    return displayStream;
 }
 
 function chooseMimeType(): string {
@@ -294,12 +361,24 @@ function hasMediaRecorderSupport(): boolean {
     return typeof MediaRecorder !== "undefined" && Boolean(navigator.mediaDevices);
 }
 
-function buildRecordingFilename(source: RecordingSource, mimeType: string): string {
+function buildRecordingFilename(source: string, mimeType: string): string {
     const timestamp = new Date()
         .toISOString()
         .replace(/[:.]/g, "-")
         .slice(0, 19);
     return `${source}-recording-${timestamp}.${extensionForMimeType(mimeType)}`;
+}
+
+function sourceLabelForFilename({
+    includeMicrophone,
+    includeSystemAudio,
+}: {
+    includeMicrophone: boolean;
+    includeSystemAudio: boolean;
+}): string {
+    if (includeMicrophone && includeSystemAudio) return "mixed";
+    if (includeSystemAudio) return "system";
+    return "microphone";
 }
 
 function extensionForMimeType(mimeType: string): string {
@@ -314,7 +393,7 @@ function formatDuration(seconds: number): string {
     return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
-function errorMessage(err: unknown, source: RecordingSource): string {
+function errorMessage(err: unknown, hasMicrophone: boolean): string {
     if (err instanceof Error && err.message === "NO_SCREEN_AUDIO") {
         return "No audio track was shared. Choose a tab/window with audio enabled, or use microphone mode.";
     }
@@ -322,7 +401,7 @@ function errorMessage(err: unknown, source: RecordingSource): string {
         return "Recording permission was denied.";
     }
     if (err instanceof DOMException && err.name === "NotFoundError") {
-        return source === "microphone"
+        return hasMicrophone
             ? "No microphone was found."
             : "No screen or audio source was selected.";
     }
