@@ -14,10 +14,15 @@ import {
 } from "@/src/api/sonaApi";
 import { BYOK_PROVIDERS } from "@/src/utils/constants";
 import {
-    BYOKProviderSettings,
+    BYOKEntry,
+    BYOKEntryDraft,
     BYOKSettingsState,
+    byokEntryLabel,
     clearAllKeys,
-    defaultBYOKSettings,
+    createBYOKEntry,
+    isBYOKEntryConfigured,
+    providerDefaultModel,
+    providerLabel,
 } from "@/src/hooks/useBYOKSettings";
 
 type SettingsTab = "api" | "models";
@@ -26,6 +31,10 @@ type ConfirmableModelAction = Extract<ModelJobAction, "uninstall" | "redownload"
 interface PendingModelAction {
     model: RuntimeModel;
     action: ConfirmableModelAction;
+}
+
+interface PendingApiEntryDelete {
+    entry: BYOKEntry;
 }
 
 interface Props {
@@ -48,9 +57,10 @@ export default function BYOKSettingsModal({
     const [modelError, setModelError] = useState<string | null>(null);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
     const [pendingModelAction, setPendingModelAction] = useState<PendingModelAction | null>(null);
-
-    const selectedProvider = draft.selectedProvider;
-    const selectedSettings = draft.providers[selectedProvider];
+    const [editingEntry, setEditingEntry] = useState<BYOKEntry | null>(null);
+    const [isAddingEntry, setIsAddingEntry] = useState(false);
+    const [pendingApiEntryDelete, setPendingApiEntryDelete] =
+        useState<PendingApiEntryDelete | null>(null);
 
     const activeDownloadJobs = useMemo(
         () => Object.values(jobs).filter((job) => isActiveJob(job)),
@@ -104,45 +114,11 @@ export default function BYOKSettingsModal({
         }));
     };
 
-    const updateSelectedProvider = (provider: BYOKProvider) => {
-        setDraft((current) => ({
-            ...current,
-            selectedProvider: provider,
-        }));
-    };
-
-    const updateSelectedSettings = (patch: Partial<BYOKProviderSettings>) => {
-        setDraft((current) => ({
-            ...current,
-            providers: {
-                ...current.providers,
-                [current.selectedProvider]: {
-                    ...current.providers[current.selectedProvider],
-                    ...patch,
-                },
-            },
-        }));
-    };
-
-    const clearSelectedProvider = () => {
-        const defaults = defaultBYOKSettings();
-        setDraft((current) => ({
-            ...current,
-            providers: {
-                ...current.providers,
-                [current.selectedProvider]: {
-                    ...defaults.providers[current.selectedProvider],
-                },
-            },
-        }));
-    };
-
     const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         onSave({
             rememberKeys: draft.rememberKeys,
-            selectedProvider: draft.selectedProvider,
-            providers: trimSettings(draft.providers),
+            entries: draft.entries.map(trimEntry),
         });
     };
 
@@ -180,6 +156,45 @@ export default function BYOKSettingsModal({
         const nextAction = pendingModelAction;
         setPendingModelAction(null);
         await startModelAction(nextAction.model, nextAction.action);
+    };
+
+    const handleSaveApiEntry = (entryDraft: BYOKEntryDraft, entryId?: string) => {
+        const nextEntry: BYOKEntry = {
+            id: entryId ?? createBYOKEntry().id,
+            provider: entryDraft.provider,
+            apiKey: entryDraft.apiKey.trim(),
+            model: entryDraft.model.trim(),
+            baseUrl: entryDraft.provider === "custom" ? entryDraft.baseUrl.trim() : "",
+        };
+
+        setDraft((current) => {
+            if (entryId) {
+                return {
+                    ...current,
+                    entries: current.entries.map((entry) =>
+                        entry.id === entryId ? nextEntry : entry,
+                    ),
+                };
+            }
+
+            return {
+                ...current,
+                entries: [...current.entries, nextEntry],
+            };
+        });
+        setEditingEntry(null);
+        setIsAddingEntry(false);
+    };
+
+    const handleConfirmDeleteApiEntry = () => {
+        if (!pendingApiEntryDelete) return;
+
+        const deleteId = pendingApiEntryDelete.entry.id;
+        setDraft((current) => ({
+            ...current,
+            entries: current.entries.filter((entry) => entry.id !== deleteId),
+        }));
+        setPendingApiEntryDelete(null);
     };
 
     return (
@@ -228,10 +243,9 @@ export default function BYOKSettingsModal({
                     {activeTab === "api" ? (
                         <ApiProviderSettings
                             draft={draft}
-                            selectedProvider={selectedProvider}
-                            selectedSettings={selectedSettings}
-                            onProviderChange={updateSelectedProvider}
-                            onSelectedSettingsChange={updateSelectedSettings}
+                            onAdd={() => setIsAddingEntry(true)}
+                            onEdit={setEditingEntry}
+                            onDelete={(entry) => setPendingApiEntryDelete({ entry })}
                             onRememberKeysChange={updateRememberKeys}
                         />
                     ) : (
@@ -250,13 +264,6 @@ export default function BYOKSettingsModal({
                     {activeTab === "api" ? (
                         <>
                             <div className="flex flex-wrap gap-3">
-                                <button
-                                    type="button"
-                                    onClick={clearSelectedProvider}
-                                    className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
-                                >
-                                    Clear provider
-                                </button>
                                 <button
                                     type="button"
                                     onClick={handleClearSavedKeys}
@@ -302,6 +309,23 @@ export default function BYOKSettingsModal({
                     onConfirm={() => void handleConfirmModelAction()}
                 />
             )}
+            {(isAddingEntry || editingEntry) && (
+                <ApiEntryFormModal
+                    entry={editingEntry}
+                    onCancel={() => {
+                        setEditingEntry(null);
+                        setIsAddingEntry(false);
+                    }}
+                    onSave={handleSaveApiEntry}
+                />
+            )}
+            {pendingApiEntryDelete && (
+                <ConfirmApiEntryDeleteModal
+                    entry={pendingApiEntryDelete.entry}
+                    onCancel={() => setPendingApiEntryDelete(null)}
+                    onConfirm={handleConfirmDeleteApiEntry}
+                />
+            )}
         </div>
     );
 }
@@ -332,84 +356,53 @@ function TabButton({
 
 function ApiProviderSettings({
     draft,
-    selectedProvider,
-    selectedSettings,
-    onProviderChange,
-    onSelectedSettingsChange,
+    onAdd,
+    onEdit,
+    onDelete,
     onRememberKeysChange,
 }: {
     draft: BYOKSettingsState;
-    selectedProvider: BYOKProvider;
-    selectedSettings: BYOKProviderSettings;
-    onProviderChange: (provider: BYOKProvider) => void;
-    onSelectedSettingsChange: (patch: Partial<BYOKProviderSettings>) => void;
+    onAdd: () => void;
+    onEdit: (entry: BYOKEntry) => void;
+    onDelete: (entry: BYOKEntry) => void;
     onRememberKeysChange: (rememberKeys: boolean) => void;
 }) {
     return (
         <div className="flex flex-col gap-4">
-            <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-zinc-500">
-                    Provider
-                </span>
-                <select
-                    value={selectedProvider}
-                    onChange={(event) => onProviderChange(event.target.value as BYOKProvider)}
-                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900"
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h3 className="text-sm font-semibold text-zinc-950">
+                        API provider presets
+                    </h3>
+                    <p className="mt-1 text-sm text-zinc-500">
+                        Save OpenAI-compatible API presets for summary and chat.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={onAdd}
+                    className="min-h-9 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white"
                 >
-                    {BYOK_PROVIDERS.map((provider) => (
-                        <option key={provider.value} value={provider.value}>
-                            {provider.label}
-                        </option>
-                    ))}
-                </select>
-            </label>
+                    + Add
+                </button>
+            </div>
 
-            <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-zinc-500">
-                    API key
-                </span>
-                <input
-                    type="password"
-                    value={selectedSettings.apiKey}
-                    onChange={(event) =>
-                        onSelectedSettingsChange({ apiKey: event.target.value })
-                    }
-                    placeholder="sk-..."
-                    className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
-                />
-            </label>
-
-            <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-zinc-500">
-                    Model
-                </span>
-                <input
-                    type="text"
-                    value={selectedSettings.model}
-                    onChange={(event) =>
-                        onSelectedSettingsChange({ model: event.target.value })
-                    }
-                    placeholder="Model name"
-                    className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
-                />
-            </label>
-
-            {selectedProvider === "custom" && (
-                <label className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-zinc-500">
-                        Base URL
-                    </span>
-                    <input
-                        type="text"
-                        value={selectedSettings.baseUrl}
-                        onChange={(event) =>
-                            onSelectedSettingsChange({ baseUrl: event.target.value })
-                        }
-                        placeholder="https://.../v1"
-                        className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
-                    />
-                </label>
-            )}
+            <div className="flex flex-col gap-3">
+                {draft.entries.length === 0 ? (
+                    <div className="rounded-md border border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500">
+                        No API provider presets yet.
+                    </div>
+                ) : (
+                    draft.entries.map((entry) => (
+                        <ApiEntryRow
+                            key={entry.id}
+                            entry={entry}
+                            onEdit={() => onEdit(entry)}
+                            onDelete={() => onDelete(entry)}
+                        />
+                    ))
+                )}
+            </div>
 
             <label className="flex items-start gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
                 <input
@@ -427,6 +420,280 @@ function ApiProviderSettings({
                         : "Keys stay only in this tab session and disappear on refresh."}
                 </span>
             </label>
+        </div>
+    );
+}
+
+function ApiEntryRow({
+    entry,
+    onEdit,
+    onDelete,
+}: {
+    entry: BYOKEntry;
+    onEdit: () => void;
+    onDelete: () => void;
+}) {
+    const isConfigured = isBYOKEntryConfigured(entry);
+
+    return (
+        <div className="rounded-md border border-zinc-200 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-sm font-semibold text-zinc-950">
+                            {byokEntryLabel(entry)}
+                        </h4>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            isConfigured
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-amber-100 text-amber-800"
+                        }`}
+                        >
+                            {isConfigured ? "Ready" : "Incomplete"}
+                        </span>
+                    </div>
+                    <p className="mt-1 text-xs text-zinc-500">
+                        {providerLabel(entry.provider)}
+                    </p>
+                    {entry.provider === "custom" && (
+                        <p className="mt-1 break-all text-xs text-zinc-400">
+                            Base URL: {entry.baseUrl || "Missing"}
+                        </p>
+                    )}
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={onEdit}
+                        className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                    >
+                        Edit
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onDelete}
+                        className="min-h-9 rounded-md border border-red-200 px-3 text-sm font-medium text-red-700 hover:border-red-300 hover:text-red-800"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ApiEntryFormModal({
+    entry,
+    onCancel,
+    onSave,
+}: {
+    entry: BYOKEntry | null;
+    onCancel: () => void;
+    onSave: (draft: BYOKEntryDraft, entryId?: string) => void;
+}) {
+    const [draft, setDraft] = useState<BYOKEntryDraft>(() => ({
+        provider: entry?.provider ?? "openai",
+        apiKey: entry?.apiKey ?? "",
+        model: entry?.model ?? providerDefaultModel(entry?.provider ?? "openai"),
+        baseUrl: entry?.baseUrl ?? "",
+    }));
+    const [error, setError] = useState("");
+
+    const updateProvider = (provider: BYOKProvider) => {
+        setDraft((current) => ({
+            ...current,
+            provider,
+            model: current.model.trim() ? current.model : providerDefaultModel(provider),
+            baseUrl: provider === "custom" ? current.baseUrl : "",
+        }));
+        setError("");
+    };
+
+    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        const nextDraft = {
+            provider: draft.provider,
+            apiKey: draft.apiKey.trim(),
+            model: draft.model.trim(),
+            baseUrl: draft.baseUrl.trim(),
+        };
+
+        if (!nextDraft.apiKey) {
+            setError("API key is required.");
+            return;
+        }
+        if (!nextDraft.model) {
+            setError("Model name is required.");
+            return;
+        }
+        if (nextDraft.provider === "custom" && !nextDraft.baseUrl) {
+            setError("Base URL is required for custom providers.");
+            return;
+        }
+
+        onSave(nextDraft, entry?.id);
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+            <form
+                onSubmit={handleSubmit}
+                className="w-full max-w-lg rounded-lg bg-white shadow-xl"
+            >
+                <div className="border-b border-zinc-200 px-5 py-4">
+                    <h3 className="text-base font-semibold text-zinc-950">
+                        {entry ? "Edit API preset" : "Add API preset"}
+                    </h3>
+                    <p className="mt-1 text-sm text-zinc-500">
+                        Configure an OpenAI-compatible provider preset.
+                    </p>
+                </div>
+
+                <div className="flex flex-col gap-4 px-5 py-4">
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-zinc-500">
+                            Provider
+                        </span>
+                        <select
+                            value={draft.provider}
+                            onChange={(event) => updateProvider(event.target.value as BYOKProvider)}
+                            className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900"
+                        >
+                            {BYOK_PROVIDERS.map((provider) => (
+                                <option key={provider.value} value={provider.value}>
+                                    {provider.label}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-zinc-500">
+                            API key
+                        </span>
+                        <input
+                            type="password"
+                            value={draft.apiKey}
+                            onChange={(event) => {
+                                setDraft((current) => ({ ...current, apiKey: event.target.value }));
+                                setError("");
+                            }}
+                            placeholder="sk-..."
+                            className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
+                        />
+                    </label>
+
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-zinc-500">
+                            Model name
+                        </span>
+                        <input
+                            type="text"
+                            value={draft.model}
+                            onChange={(event) => {
+                                setDraft((current) => ({ ...current, model: event.target.value }));
+                                setError("");
+                            }}
+                            placeholder="gpt-4o-mini"
+                            className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
+                        />
+                    </label>
+
+                    {draft.provider === "custom" && (
+                        <label className="flex flex-col gap-1">
+                            <span className="text-xs font-medium text-zinc-500">
+                                Base URL
+                            </span>
+                            <input
+                                type="text"
+                                value={draft.baseUrl}
+                                onChange={(event) => {
+                                    setDraft((current) => ({ ...current, baseUrl: event.target.value }));
+                                    setError("");
+                                }}
+                                placeholder="https://.../v1"
+                                className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
+                            />
+                        </label>
+                    )}
+
+                    {error && (
+                        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                            {error}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-zinc-200 px-5 py-4">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white"
+                    >
+                        {entry ? "Save preset" : "Add preset"}
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+}
+
+function ConfirmApiEntryDeleteModal({
+    entry,
+    onCancel,
+    onConfirm,
+}: {
+    entry: BYOKEntry;
+    onCancel: () => void;
+    onConfirm: () => void;
+}) {
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+            <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
+                <div className="border-b border-zinc-200 px-5 py-4">
+                    <h3 className="text-base font-semibold text-zinc-950">
+                        Delete API preset
+                    </h3>
+                    <p className="mt-1 text-sm text-zinc-500">
+                        This removes the saved provider preset from this browser.
+                    </p>
+                </div>
+
+                <div className="px-5 py-4">
+                    <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-3">
+                        <p className="text-sm font-medium text-zinc-950">
+                            {byokEntryLabel(entry)}
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-500">
+                            {providerLabel(entry.provider)}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-zinc-200 px-5 py-4">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        className="min-h-10 rounded-md bg-red-700 px-4 text-sm font-medium text-white hover:bg-red-800"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
@@ -672,22 +939,12 @@ function ModelRow({
     );
 }
 
-function trimSettings(
-    providers: BYOKSettingsState["providers"],
-): BYOKSettingsState["providers"] {
+function trimEntry(entry: BYOKEntry): BYOKEntry {
     return {
-        openai: trimProvider(providers.openai),
-        groq: trimProvider(providers.groq),
-        openrouter: trimProvider(providers.openrouter),
-        custom: trimProvider(providers.custom),
-    };
-}
-
-function trimProvider(settings: BYOKProviderSettings): BYOKProviderSettings {
-    return {
-        apiKey: settings.apiKey.trim(),
-        model: settings.model.trim(),
-        baseUrl: settings.baseUrl.trim(),
+        ...entry,
+        apiKey: entry.apiKey.trim(),
+        model: entry.model.trim(),
+        baseUrl: entry.provider === "custom" ? entry.baseUrl.trim() : "",
     };
 }
 

@@ -6,8 +6,18 @@ import { BYOK_PROVIDERS } from "@/src/utils/constants";
 
 const STORAGE_KEY_V1 = "sona-ai.byok-settings.v1";
 const STORAGE_KEY_V2 = "sona-ai.byok-settings.v2";
+const STORAGE_KEY_V3 = "sona-ai.byok-settings.v3";
 
-export interface BYOKProviderSettings {
+export interface BYOKEntry {
+    id: string;
+    provider: BYOKProvider;
+    apiKey: string;
+    model: string;
+    baseUrl: string;
+}
+
+export interface BYOKEntryDraft {
+    provider: BYOKProvider;
     apiKey: string;
     model: string;
     baseUrl: string;
@@ -15,8 +25,7 @@ export interface BYOKProviderSettings {
 
 export interface BYOKSettingsState {
     rememberKeys: boolean;
-    selectedProvider: BYOKProvider;
-    providers: Record<BYOKProvider, BYOKProviderSettings>;
+    entries: BYOKEntry[];
 }
 
 const PROVIDER_VALUES = BYOK_PROVIDERS.map((provider) => provider.value);
@@ -28,42 +37,33 @@ export function useBYOKSettings() {
 
     useEffect(() => persistSettings(settings), [settings]);
 
-    const selectedSettings = settings.providers[settings.selectedProvider];
-    const isSelectedProviderConfigured = isProviderConfigured(
-        settings.selectedProvider,
-        selectedSettings,
+    const validEntries = useMemo(
+        () => settings.entries.filter(isBYOKEntryConfigured),
+        [settings.entries],
     );
-    const selectedBYOKSettings = useMemo<BYOKSummarySettings | undefined>(() => {
-        if (!isSelectedProviderConfigured) return undefined;
-
-        return {
-            provider: settings.selectedProvider,
-            apiKey: selectedSettings.apiKey.trim(),
-            model: selectedSettings.model.trim(),
-            baseUrl: selectedSettings.baseUrl.trim() || undefined,
-        };
-    }, [isSelectedProviderConfigured, selectedSettings, settings.selectedProvider]);
 
     return {
         settings,
         setSettings,
         clearSavedKeys: () => setSettings((current) => clearAllKeys(current)),
-        selectedSettings,
-        selectedBYOKSettings,
-        isSelectedProviderConfigured,
+        validEntries,
     };
 }
 
 export function defaultBYOKSettings(): BYOKSettingsState {
     return {
         rememberKeys: false,
-        selectedProvider: "openai",
-        providers: {
-            openai: providerDefaults("openai"),
-            groq: providerDefaults("groq"),
-            openrouter: providerDefaults("openrouter"),
-            custom: providerDefaults("custom"),
-        },
+        entries: [],
+    };
+}
+
+export function createBYOKEntry(draft?: Partial<BYOKEntryDraft>): BYOKEntry {
+    return {
+        id: createEntryId(),
+        provider: draft?.provider ?? "openai",
+        apiKey: draft?.apiKey ?? "",
+        model: draft?.model ?? providerDefaultModel(draft?.provider ?? "openai"),
+        baseUrl: draft?.baseUrl ?? "",
     };
 }
 
@@ -71,41 +71,52 @@ export function clearAllKeys(settings: BYOKSettingsState): BYOKSettingsState {
     return {
         ...settings,
         rememberKeys: false,
-        providers: {
-            openai: { ...settings.providers.openai, apiKey: "" },
-            groq: { ...settings.providers.groq, apiKey: "" },
-            openrouter: { ...settings.providers.openrouter, apiKey: "" },
-            custom: { ...settings.providers.custom, apiKey: "" },
-        },
+        entries: settings.entries.map((entry) => ({
+            ...entry,
+            apiKey: "",
+        })),
     };
 }
 
-export function isProviderConfigured(
-    provider: BYOKProvider,
-    settings: BYOKProviderSettings,
-): boolean {
-    return Boolean(settings.apiKey.trim()) &&
-        Boolean(settings.model.trim()) &&
-        (provider !== "custom" || Boolean(settings.baseUrl.trim()));
+export function isBYOKEntryConfigured(entry: BYOKEntry): boolean {
+    return Boolean(entry.apiKey.trim()) &&
+        Boolean(entry.model.trim()) &&
+        (entry.provider !== "custom" || Boolean(entry.baseUrl.trim()));
 }
 
-function providerDefaults(provider: BYOKProvider): BYOKProviderSettings {
+export function byokEntryToSettings(entry: BYOKEntry): BYOKSummarySettings {
     return {
-        apiKey: "",
-        model: BYOK_PROVIDERS.find((item) => item.value === provider)?.defaultModel ?? "",
-        baseUrl: "",
+        provider: entry.provider,
+        apiKey: entry.apiKey.trim(),
+        model: entry.model.trim(),
+        baseUrl: entry.baseUrl.trim() || undefined,
     };
+}
+
+export function byokEntryLabel(entry: Pick<BYOKEntry, "provider" | "model">): string {
+    return `${providerLabel(entry.provider)} / ${entry.model || "No model"}`;
+}
+
+export function providerLabel(provider: BYOKProvider): string {
+    return BYOK_PROVIDERS.find((item) => item.value === provider)?.label ?? provider;
+}
+
+export function providerDefaultModel(provider: BYOKProvider): string {
+    return BYOK_PROVIDERS.find((item) => item.value === provider)?.defaultModel ?? "";
 }
 
 function readStoredSettings(): BYOKSettingsState {
     try {
+        const v3 = window.localStorage.getItem(STORAGE_KEY_V3);
+        if (v3) return normalizeEntrySettings(JSON.parse(v3), true);
+
         const v2 = window.localStorage.getItem(STORAGE_KEY_V2);
-        if (v2) return normalizeSettings(JSON.parse(v2), true);
+        if (v2) return migrateLegacySettings(JSON.parse(v2), true);
 
         const v1 = window.localStorage.getItem(STORAGE_KEY_V1);
         if (v1) {
             window.localStorage.removeItem(STORAGE_KEY_V1);
-            return normalizeSettings(JSON.parse(v1), false);
+            return migrateLegacySettings(JSON.parse(v1), false);
         }
 
         return defaultBYOKSettings();
@@ -120,38 +131,73 @@ function persistSettings(settings: BYOKSettingsState) {
     if (!settings.rememberKeys) {
         window.localStorage.removeItem(STORAGE_KEY_V1);
         window.localStorage.removeItem(STORAGE_KEY_V2);
+        window.localStorage.removeItem(STORAGE_KEY_V3);
         return;
     }
 
     window.localStorage.removeItem(STORAGE_KEY_V1);
-    window.localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(settings));
+    window.localStorage.removeItem(STORAGE_KEY_V2);
+    window.localStorage.setItem(STORAGE_KEY_V3, JSON.stringify(settings));
 }
 
-function normalizeSettings(value: unknown, allowRememberKeys: boolean): BYOKSettingsState {
-    const defaults = defaultBYOKSettings();
-    if (!value || typeof value !== "object") return defaults;
+function normalizeEntrySettings(value: unknown, allowRememberKeys: boolean): BYOKSettingsState {
+    if (!value || typeof value !== "object") return defaultBYOKSettings();
 
     const candidate = value as Partial<BYOKSettingsState>;
     const rememberKeys = allowRememberKeys && candidate.rememberKeys === true;
-    const selectedProvider = isBYOKProvider(candidate.selectedProvider)
-        ? candidate.selectedProvider
-        : defaults.selectedProvider;
+    const entries = Array.isArray(candidate.entries)
+        ? candidate.entries.flatMap(normalizeEntry)
+        : [];
 
-    const providers = { ...defaults.providers };
+    return { rememberKeys, entries };
+}
+
+function migrateLegacySettings(value: unknown, allowRememberKeys: boolean): BYOKSettingsState {
+    if (!value || typeof value !== "object") return defaultBYOKSettings();
+
+    const candidate = value as {
+        rememberKeys?: unknown;
+        providers?: Record<string, unknown>;
+    };
+    const rememberKeys = allowRememberKeys && candidate.rememberKeys === true;
+    const entries: BYOKEntry[] = [];
+
     if (candidate.providers && typeof candidate.providers === "object") {
         for (const provider of PROVIDER_VALUES) {
             const stored = candidate.providers[provider];
             if (!stored || typeof stored !== "object") continue;
 
-            providers[provider] = {
-                apiKey: stringValue(stored.apiKey),
-                model: stringValue(stored.model) || providers[provider].model,
-                baseUrl: stringValue(stored.baseUrl),
-            };
+            const legacy = stored as Record<string, unknown>;
+            const entry = createBYOKEntry({
+                provider,
+                apiKey: stringValue(legacy.apiKey),
+                model: stringValue(legacy.model) || providerDefaultModel(provider),
+                baseUrl: stringValue(legacy.baseUrl),
+            });
+            if (isBYOKEntryConfigured(entry)) {
+                entries.push(entry);
+            }
         }
     }
 
-    return { rememberKeys, selectedProvider, providers };
+    return { rememberKeys, entries };
+}
+
+function normalizeEntry(value: unknown): BYOKEntry[] {
+    if (!value || typeof value !== "object") return [];
+
+    const candidate = value as Partial<BYOKEntry>;
+    if (!isBYOKProvider(candidate.provider)) return [];
+
+    return [
+        {
+            id: stringValue(candidate.id) || createEntryId(),
+            provider: candidate.provider,
+            apiKey: stringValue(candidate.apiKey),
+            model: stringValue(candidate.model) || providerDefaultModel(candidate.provider),
+            baseUrl: stringValue(candidate.baseUrl),
+        },
+    ];
 }
 
 function isBYOKProvider(value: unknown): value is BYOKProvider {
@@ -160,4 +206,11 @@ function isBYOKProvider(value: unknown): value is BYOKProvider {
 
 function stringValue(value: unknown): string {
     return typeof value === "string" ? value : "";
+}
+
+function createEntryId(): string {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+        return crypto.randomUUID();
+    }
+    return `byok-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }

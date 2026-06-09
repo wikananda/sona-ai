@@ -13,9 +13,13 @@ import {
     LocalLLMModel,
     TranscriptionModel,
     SummaryMode,
-    BYOKSummarySettings,
     TranscriptSegmentUpdateParams,
 } from "@/src/api/sonaApi";
+import {
+    BYOKEntry,
+    byokEntryToSettings,
+    isBYOKEntryConfigured,
+} from "@/src/hooks/useBYOKSettings";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import RecordingChatPanel from "@/src/components/RecordingChatPanel";
 import SummaryPanel from "@/src/components/SummaryPanel";
@@ -67,8 +71,7 @@ interface Props {
         recordingId: string,
         params: RecordingSummaryUpdateParams,
     ) => Promise<void>;
-    byokSettings?: BYOKSummarySettings;
-    isBYOKConfigured: boolean;
+    byokEntries: BYOKEntry[];
     onOpenSettings: () => void;
 }
 
@@ -90,8 +93,7 @@ export default function RecordingDetail({
     onSummarize,
     isUpdatingSummary = false,
     onUpdateSummary,
-    byokSettings,
-    isBYOKConfigured,
+    byokEntries,
     onOpenSettings,
 }: Props) {
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -117,6 +119,23 @@ export default function RecordingDetail({
     const [localLLMModel, setLocalLLMModel] = useState<LocalLLMModel>("qwen");
     const [summaryDevice, setSummaryDevice] = useState<RuntimeDevice>(runtimeDevices.default);
     const [summaryMode, setSummaryMode] = useState<SummaryMode>("local");
+    const [summaryBYOKEntryId, setSummaryBYOKEntryId] = useState("");
+    const [chatBYOKEntryId, setChatBYOKEntryId] = useState("");
+    const validBYOKEntries = byokEntries.filter(isBYOKEntryConfigured);
+    const effectiveSummaryBYOKEntryId =
+        validBYOKEntries.find((entry) => entry.id === summaryBYOKEntryId)?.id ??
+        validBYOKEntries[0]?.id ??
+        "";
+    const effectiveChatBYOKEntryId =
+        validBYOKEntries.find((entry) => entry.id === chatBYOKEntryId)?.id ??
+        validBYOKEntries[0]?.id ??
+        "";
+    const selectedSummaryEntry = validBYOKEntries.find(
+        (entry) => entry.id === effectiveSummaryBYOKEntryId,
+    );
+    const selectedSummaryBYOKSettings = selectedSummaryEntry
+        ? byokEntryToSettings(selectedSummaryEntry)
+        : undefined;
     const selectedSummaryDevice = runtimeDevices.available.includes(summaryDevice)
         ? summaryDevice
         : runtimeDevices.default;
@@ -167,7 +186,7 @@ export default function RecordingDetail({
             device: selectedSummaryDevice,
             mode: summaryMode,
             prompt: summaryInstruction.trim() || undefined,
-            byok: summaryMode === "byok" ? byokSettings : undefined,
+            byok: summaryMode === "byok" ? selectedSummaryBYOKSettings : undefined,
         });
     };
 
@@ -480,8 +499,9 @@ export default function RecordingDetail({
                                 runtimeDevices={runtimeDevices}
                                 selectedMode={summaryMode}
                                 onModeChange={setSummaryMode}
-                                byokSettings={byokSettings}
-                                isBYOKConfigured={isBYOKConfigured}
+                                byokEntries={validBYOKEntries}
+                                selectedBYOKEntryId={effectiveSummaryBYOKEntryId}
+                                onBYOKEntryChange={setSummaryBYOKEntryId}
                                 onOpenSettings={onOpenSettings}
                                 customInstruction={summaryInstruction}
                                 onCustomInstructionChange={setSummaryInstruction}
@@ -492,7 +512,7 @@ export default function RecordingDetail({
                                     Boolean(onSummarize) &&
                                     segments.length > 0 &&
                                     !isProcessingRecording &&
-                                    (summaryMode === "local" || isBYOKConfigured)
+                                    (summaryMode === "local" || Boolean(selectedSummaryBYOKSettings))
                                 }
                             />
                         )}
@@ -500,8 +520,9 @@ export default function RecordingDetail({
                             <RecordingChatPanel
                                 recordingId={recording.id}
                                 canChat={segments.length > 0}
-                                byokSettings={byokSettings}
-                                isBYOKConfigured={isBYOKConfigured}
+                                byokEntries={validBYOKEntries}
+                                selectedBYOKEntryId={effectiveChatBYOKEntryId}
+                                onBYOKEntryChange={setChatBYOKEntryId}
                                 onOpenSettings={onOpenSettings}
                             />
                         )}

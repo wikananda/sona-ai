@@ -4,43 +4,53 @@ import { FormEvent, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
-    BYOKSummarySettings,
     chatWithRecording,
     RecordingChatMessage,
 } from "@/src/api/sonaApi";
-import { BYOK_PROVIDERS } from "@/src/utils/constants";
+import {
+    BYOKEntry,
+    byokEntryLabel,
+    byokEntryToSettings,
+    isBYOKEntryConfigured,
+} from "@/src/hooks/useBYOKSettings";
 import { remarkHtmlLineBreaks } from "@/src/utils/markdownPlugins";
 
 interface Props {
     recordingId: string;
     canChat: boolean;
-    byokSettings?: BYOKSummarySettings;
-    isBYOKConfigured: boolean;
+    byokEntries: BYOKEntry[];
+    selectedBYOKEntryId: string;
+    onBYOKEntryChange: (entryId: string) => void;
     onOpenSettings: () => void;
 }
 
 export default function RecordingChatPanel({
     recordingId,
     canChat,
-    byokSettings,
-    isBYOKConfigured,
+    byokEntries,
+    selectedBYOKEntryId,
+    onBYOKEntryChange,
     onOpenSettings,
 }: Props) {
     const [messages, setMessages] = useState<RecordingChatMessage[]>([]);
     const [question, setQuestion] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
+    const selectedEntry = byokEntries.find((entry) => entry.id === selectedBYOKEntryId);
+    const selectedSettings = selectedEntry && isBYOKEntryConfigured(selectedEntry)
+        ? byokEntryToSettings(selectedEntry)
+        : undefined;
+    const hasBYOKEntries = byokEntries.length > 0;
 
     const canSend =
         canChat &&
         !isLoading &&
         Boolean(question.trim()) &&
-        isBYOKConfigured &&
-        Boolean(byokSettings);
+        Boolean(selectedSettings);
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        if (!canSend || !byokSettings) return;
+        if (!canSend || !selectedSettings) return;
 
         const nextQuestion = question.trim();
         const userMessage: RecordingChatMessage = {
@@ -58,7 +68,7 @@ export default function RecordingChatPanel({
             const answer = await chatWithRecording(recordingId, {
                 question: nextQuestion,
                 history: messages.slice(-8),
-                byok: byokSettings,
+                byok: selectedSettings,
             });
 
             setMessages([
@@ -85,11 +95,22 @@ export default function RecordingChatPanel({
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-                <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-                    {isBYOKConfigured && byokSettings
-                        ? `${providerLabel(byokSettings.provider)} / ${byokSettings.model}`
-                        : "API settings required"}
-                </div>
+                <select
+                    value={hasBYOKEntries ? selectedBYOKEntryId : ""}
+                    onChange={(event) => onBYOKEntryChange(event.target.value)}
+                    disabled={isLoading || !hasBYOKEntries}
+                    className="min-h-10 min-w-56 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    {hasBYOKEntries ? (
+                        byokEntries.map((entry) => (
+                            <option key={entry.id} value={entry.id}>
+                                {byokEntryLabel(entry)}
+                            </option>
+                        ))
+                    ) : (
+                        <option value="">No API presets</option>
+                    )}
+                </select>
                 <button
                     type="button"
                     onClick={onOpenSettings}
@@ -100,9 +121,9 @@ export default function RecordingChatPanel({
                 </button>
             </div>
 
-            {!isBYOKConfigured && (
+            {!hasBYOKEntries && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                    Add API settings before chatting with this recording.
+                    Add an API preset before chatting with this recording.
                 </div>
             )}
 
@@ -167,10 +188,6 @@ export default function RecordingChatPanel({
             </form>
         </div>
     );
-}
-
-function providerLabel(provider: BYOKSummarySettings["provider"]): string {
-    return BYOK_PROVIDERS.find((item) => item.value === provider)?.label ?? provider;
 }
 
 function AssistantMarkdown({ content }: { content: string }) {

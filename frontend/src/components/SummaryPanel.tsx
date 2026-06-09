@@ -5,18 +5,17 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import {
-    BYOKSummarySettings,
     RuntimeDevice,
     RuntimeDevices,
     SummaryMode,
     LocalLLMModel
 } from "@/src/api/sonaApi";
+import { BYOKEntry, byokEntryLabel } from "@/src/hooks/useBYOKSettings";
 import { exportSummaryPdf } from "@/src/utils/pdfExport";
 import { remarkHtmlLineBreaks } from "@/src/utils/markdownPlugins";
 
 import {
     LOCAL_LLM_MODELS,
-    BYOK_PROVIDERS
 } from "@/src/utils/constants";
 
 interface Props {
@@ -30,8 +29,9 @@ interface Props {
     runtimeDevices: RuntimeDevices;
     selectedMode: SummaryMode;
     onModeChange: (mode: SummaryMode) => void;
-    byokSettings?: BYOKSummarySettings;
-    isBYOKConfigured: boolean;
+    byokEntries: BYOKEntry[];
+    selectedBYOKEntryId: string;
+    onBYOKEntryChange: (entryId: string) => void;
     onOpenSettings: () => void;
     customInstruction: string;
     onCustomInstructionChange: (instruction: string) => void;
@@ -52,8 +52,9 @@ export default function SummaryPanel({
     runtimeDevices,
     selectedMode,
     onModeChange,
-    byokSettings,
-    isBYOKConfigured,
+    byokEntries,
+    selectedBYOKEntryId,
+    onBYOKEntryChange,
     onOpenSettings,
     customInstruction,
     onCustomInstructionChange,
@@ -69,6 +70,7 @@ export default function SummaryPanel({
     const [isExportingPdf, setIsExportingPdf] = useState(false);
     const [exportError, setExportError] = useState("");
     const isBusy = isLoading || isSavingSummary;
+    const hasBYOKEntries = byokEntries.length > 0;
 
     const openSummaryEditor = () => {
         setSummaryDraft(summary);
@@ -206,11 +208,22 @@ export default function SummaryPanel({
 
                     {selectedMode === "byok" && (
                         <div className="flex flex-wrap items-center gap-3">
-                            <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-                                {isBYOKConfigured && byokSettings
-                                    ? `${providerLabel(byokSettings.provider)} / ${byokSettings.model}`
-                                    : "BYOK settings required"}
-                            </div>
+                            <select
+                                value={hasBYOKEntries ? selectedBYOKEntryId : ""}
+                                onChange={(event) => onBYOKEntryChange(event.target.value)}
+                                disabled={isBusy || !hasBYOKEntries}
+                                className="min-h-10 min-w-56 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {hasBYOKEntries ? (
+                                    byokEntries.map((entry) => (
+                                        <option key={entry.id} value={entry.id}>
+                                            {byokEntryLabel(entry)}
+                                        </option>
+                                    ))
+                                ) : (
+                                    <option value="">No API presets</option>
+                                )}
+                            </select>
                             <button
                                 type="button"
                                 onClick={onOpenSettings}
@@ -255,9 +268,9 @@ export default function SummaryPanel({
                 </div>
             </div>
 
-            {selectedMode === "byok" && !isBYOKConfigured && (
+            {selectedMode === "byok" && !hasBYOKEntries && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                    Add API settings before running BYOK summary.
+                    Add an API preset before running BYOK summary.
                 </div>
             )}
 
@@ -450,8 +463,4 @@ export default function SummaryPanel({
 function deviceLabel(device: RuntimeDevice): string {
     if (device === "auto") return "Auto";
     return device.toUpperCase();
-}
-
-function providerLabel(provider: BYOKSummarySettings["provider"]): string {
-    return BYOK_PROVIDERS.find((item) => item.value === provider)?.label ?? provider;
 }

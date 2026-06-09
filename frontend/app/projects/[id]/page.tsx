@@ -569,8 +569,7 @@ export default function ProjectDetailPage() {
                             onSummarize={handleSummarizeRecording}
                             isUpdatingSummary={updatingSummaryId === selectedRecording?.id}
                             onUpdateSummary={handleUpdateRecordingSummary}
-                            byokSettings={byokSettings.selectedBYOKSettings}
-                            isBYOKConfigured={byokSettings.isSelectedProviderConfigured}
+                            byokEntries={byokSettings.validEntries}
                             onOpenSettings={() => setIsSettingsOpen(true)}
                         />
                     )}
