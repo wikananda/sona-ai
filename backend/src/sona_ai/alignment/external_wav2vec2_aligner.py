@@ -23,7 +23,7 @@ class ExternalWav2Vec2Aligner:
             "tools/alignment/align_whisperx_wav2vec2.py",
         )
         self.device = resolve_device(config.get("model", {}).get("device", "cpu"), no_mps=True)
-        self.cache_dir = model_cache_root() / "wav2vec2-align"
+        self.cache_dir = model_cache_root(self.config) / "wav2vec2-align"
         self.timeout_seconds = int(alignment_config.get("timeout_seconds", 900))
 
     def load_models(self) -> None:

@@ -52,6 +52,7 @@ def _build_transcriber(
     )
 
     engine_config = deepcopy(load_config(resolved_config_name))
+    engine_config["_sona_managed_model_id"] = resolved_config_name
     effective_device = device or transcription_config.get("device")
     if effective_device is not None:
         resolved_device = (
@@ -92,6 +93,8 @@ def _build_diarizer(speech_config: dict):
         or diarization_engine_config.get("diarization", {}).get("engine")
         or "community_external"
     )
+    if engine == "community_external":
+        diarization_engine_config["_sona_managed_model_id"] = "pyannote-community"
     logger.info(f"Diarization engine: {engine}")
     if engine == "community_external":
         from sona_ai.diarization import ExternalCommunityDiarizer
@@ -117,6 +120,8 @@ def _build_aligner(speech_config: dict, device: Optional[str]):
     
     config_name = alignment_config.get("config")
     aligner_config = deepcopy(load_config(config_name)) if config_name else {}
+    if engine in {"wav2vec2", "wav2vec2_external"}:
+        aligner_config["_sona_managed_model_id"] = "wav2vec2-aligner"
     effective_device = device or alignment_config.get("device")
     if effective_device is not None:
         aligner_config.setdefault("model", {})["device"] = resolve_device(effective_device)

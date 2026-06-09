@@ -26,14 +26,41 @@ def download_runtime_model(model_id: str):
         return asdict(model_download_service.start_download(model_id))
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=f"Unknown model: {model_id}") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/runtime/models/{model_id}/uninstall")
+def uninstall_runtime_model(model_id: str):
+    try:
+        return asdict(model_download_service.start_uninstall(model_id))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown model: {model_id}") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/runtime/models/{model_id}/redownload")
+def redownload_runtime_model(model_id: str):
+    try:
+        return asdict(model_download_service.start_redownload(model_id))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown model: {model_id}") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/runtime/model-jobs/{job_id}")
+def get_model_job(job_id: str):
+    try:
+        return asdict(model_download_service.get_job(job_id))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown model job: {job_id}") from exc
 
 
 @router.get("/runtime/model-downloads/{job_id}")
 def get_model_download_job(job_id: str):
-    try:
-        return asdict(model_download_service.get_job(job_id))
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=f"Unknown model download job: {job_id}") from exc
+    return get_model_job(job_id)
 
 
 @router.post("/runtime/transcription-preflight")

@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import {
-    ModelDownloadJob,
+    ModelJob,
     RuntimeModel,
-    getRuntimeModelDownloadJob,
+    getRuntimeModelJob,
     startRuntimeModelDownload,
 } from "@/src/api/sonaApi";
 
@@ -109,6 +109,21 @@ export default function MissingSpeechModelsModal({
                                     {statusLabel(statuses[model.id] ?? "missing")}
                                 </span>
                             </div>
+                            {statuses[model.id] === "downloading" && (
+                                <div className="mt-3">
+                                    <div className="mb-1 flex items-center justify-between gap-3">
+                                        <span className="text-xs font-medium text-zinc-700">
+                                            Downloading
+                                        </span>
+                                        <span className="text-xs text-zinc-500">
+                                            In progress
+                                        </span>
+                                    </div>
+                                    <div className="h-2 overflow-hidden rounded-full bg-zinc-200">
+                                        <div className="h-full w-2/5 animate-pulse rounded-full bg-zinc-900" />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ))}
 
@@ -142,9 +157,9 @@ export default function MissingSpeechModelsModal({
     );
 }
 
-async function waitForJob(jobId: string): Promise<ModelDownloadJob> {
+async function waitForJob(jobId: string): Promise<ModelJob> {
     while (true) {
-        const job = await getRuntimeModelDownloadJob(jobId);
+        const job = await getRuntimeModelJob(jobId);
         if (job.status === "installed" || job.status === "failed") {
             return job;
         }

@@ -9,7 +9,7 @@ MODEL_NAME = "pyannote/speaker-diarization-community-1"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Download pyannote Community-1 diarization model.")
-    parser.add_argument("--cache-dir", default=".models/pyannote-community")
+    parser.add_argument("--cache-dir", default=".models/pyannote-community/pyannote-community")
     return parser.parse_args()
 
 

@@ -5,7 +5,7 @@ from pathlib import Path
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Download WhisperX Wav2Vec2 aligner models.")
     parser.add_argument("--model-name", action="append", required=True)
-    parser.add_argument("--cache-dir", default=".models/wav2vec2-align")
+    parser.add_argument("--cache-dir", default=".models/wav2vec2-aligner/wav2vec2-align")
     parser.add_argument("--device", default="cpu")
     return parser.parse_args()
 

@@ -23,7 +23,16 @@ export type LocalLLMModel = "qwen" | "llama" | "gemma";
 export type RuntimeDevice = "auto" | "cpu" | "mps" | "cuda";
 export type RecordingChatRole = "user" | "assistant";
 export type RuntimeModelStatus = "missing" | "installed" | "running" | "failed";
-export type ModelDownloadJobStatus = "queued" | "running" | "installed" | "failed";
+export type ModelJobStatus = "queued" | "running" | "installed" | "uninstalled" | "failed";
+export type ModelJobAction = "download" | "uninstall" | "redownload";
+export type ModelJobStage =
+    | "queued"
+    | "preparing"
+    | "downloading"
+    | "removing"
+    | "verifying"
+    | "done"
+    | "failed";
 export type RecordingProgressStage =
     | "queued"
     | "preparing"
@@ -59,14 +68,22 @@ export interface RuntimeModel {
     installed: boolean;
     status: RuntimeModelStatus;
     active_job_id?: string | null;
+    is_busy: boolean;
+    can_uninstall: boolean;
+    can_redownload: boolean;
+    unsupported_reason?: string | null;
+    management_note?: string | null;
     error?: string | null;
 }
 
-export interface ModelDownloadJob {
+export interface ModelJob {
     job_id: string;
     model_id: string;
-    status: ModelDownloadJobStatus;
+    action: ModelJobAction;
+    status: ModelJobStatus;
+    stage: ModelJobStage;
     message: string;
+    indeterminate: boolean;
     started_at: string;
     finished_at?: string | null;
     error?: string | null;
@@ -287,14 +304,30 @@ export async function getRuntimeModels(): Promise<RuntimeModel[]> {
     return requestJson("/runtime/models");
 }
 
-export async function startRuntimeModelDownload(modelId: string): Promise<ModelDownloadJob> {
+export async function startRuntimeModelDownload(modelId: string): Promise<ModelJob> {
     return requestJson(`/runtime/models/${modelId}/download`, {
         method: "POST",
     });
 }
 
-export async function getRuntimeModelDownloadJob(jobId: string): Promise<ModelDownloadJob> {
-    return requestJson(`/runtime/model-downloads/${jobId}`);
+export async function uninstallRuntimeModel(modelId: string): Promise<ModelJob> {
+    return requestJson(`/runtime/models/${modelId}/uninstall`, {
+        method: "POST",
+    });
+}
+
+export async function redownloadRuntimeModel(modelId: string): Promise<ModelJob> {
+    return requestJson(`/runtime/models/${modelId}/redownload`, {
+        method: "POST",
+    });
+}
+
+export async function getRuntimeModelJob(jobId: string): Promise<ModelJob> {
+    return requestJson(`/runtime/model-jobs/${jobId}`);
+}
+
+export async function getRuntimeModelDownloadJob(jobId: string): Promise<ModelJob> {
+    return getRuntimeModelJob(jobId);
 }
 
 export async function preflightTranscriptionModels(

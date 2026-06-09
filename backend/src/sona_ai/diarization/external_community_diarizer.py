@@ -21,7 +21,7 @@ class ExternalCommunityDiarizer:
             "tools/diarization/diarize_community.py",
         )
         self.device = config.get("model", {}).get("device", "cpu")
-        self.cache_dir = model_cache_root() / "pyannote-community"
+        self.cache_dir = model_cache_root(self.config) / "pyannote-community"
         self.timeout_seconds = int(diarization_config.get("timeout_seconds", 1800))
 
     def load_models(self) -> None:

@@ -1,16 +1,26 @@
 import json
 import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from sona_ai.core import model_manifest_dir
+from sona_ai.core import model_cache_root, model_manifest_dir
 from sona_ai.services.model_download_service import model_download_service
 from sona_ai.services.pipeline_profile import PipelineProfile
 
 
 class ModelDownloadServiceTest(unittest.TestCase):
+    def wait_for_job(self, job_id: str, timeout: float = 5.0):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            job = model_download_service.get_job(job_id)
+            if job.status in {"installed", "uninstalled", "failed"}:
+                return job
+            time.sleep(0.05)
+        self.fail(f"Model job {job_id} did not finish within {timeout} seconds.")
+
     def test_required_model_ids_include_transcription_alignment_and_diarization(self):
         profile = PipelineProfile(
             transcription_engine="faster_whisper",
@@ -57,7 +67,97 @@ class ModelDownloadServiceTest(unittest.TestCase):
                 self.assertEqual(manifest["id"], "parakeet")
                 self.assertEqual(
                     Path(manifest["cache_path"]).resolve(),
-                    Path(temp_dir).resolve(),
+                    (Path(temp_dir) / "parakeet").resolve(),
+                )
+
+    def test_list_models_exposes_management_capabilities(self):
+        models = {
+            model["id"]: model
+            for model in model_download_service.list_models()
+        }
+
+        self.assertTrue(models["parakeet"]["can_uninstall"])
+        self.assertTrue(models["parakeet"]["can_redownload"])
+        self.assertTrue(models["faster-whisper-large-v3"]["can_uninstall"])
+        self.assertTrue(models["wav2vec2-aligner"]["can_redownload"])
+        self.assertTrue(models["parakeet"]["cache_path"].endswith(".models/parakeet"))
+
+    def test_uninstall_wav2vec2_removes_manifest_and_cache_dir(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.dict(os.environ, {"SONA_HF_CACHE": temp_dir}, clear=False):
+                entry = model_download_service._entry("wav2vec2-aligner")
+                cache_path = Path(temp_dir) / "wav2vec2-aligner"
+                cache_path.mkdir(parents=True, exist_ok=True)
+                (cache_path / "wav2vec2-align").mkdir(parents=True, exist_ok=True)
+                (cache_path / "wav2vec2-align" / "marker.txt").write_text("ok")
+                model_download_service.mark_installed("wav2vec2-aligner")
+
+                job = self.wait_for_job(
+                    model_download_service.start_uninstall("wav2vec2-aligner").job_id,
+                )
+                self.assertEqual(job.status, "uninstalled")
+                self.assertFalse(cache_path.exists())
+                self.assertFalse((model_manifest_dir() / "wav2vec2-aligner.json").exists())
+                self.assertEqual(entry.runtime_cache_subdir, "wav2vec2-align")
+
+    def test_redownload_faster_whisper_clears_only_selected_model_root(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.dict(os.environ, {"SONA_HF_CACHE": temp_dir}, clear=False):
+                selected_cache = Path(temp_dir) / "faster-whisper-large-v3"
+                selected_cache.mkdir(parents=True, exist_ok=True)
+                (selected_cache / "old.bin").write_text("old")
+                sibling_cache = Path(temp_dir) / "faster-whisper-turbo"
+                sibling_cache.mkdir(parents=True, exist_ok=True)
+                (sibling_cache / "keep.bin").write_text("keep")
+                model_download_service.mark_installed("faster-whisper-large-v3")
+                model_download_service.mark_installed("faster-whisper-turbo")
+
+                def fake_downloader(entry):
+                    selected_cache.mkdir(parents=True, exist_ok=True)
+                    (selected_cache / f"{entry.id}.bin").write_text("new")
+
+                with patch.dict(
+                    "sona_ai.services.model_download_service.DOWNLOADERS",
+                    {"faster-whisper-large-v3": fake_downloader},
+                    clear=False,
+                ):
+                    job = self.wait_for_job(
+                        model_download_service.start_redownload("faster-whisper-large-v3").job_id,
+                    )
+
+                self.assertEqual(job.status, "installed")
+                self.assertFalse((selected_cache / "old.bin").exists())
+                self.assertTrue((selected_cache / "faster-whisper-large-v3.bin").exists())
+                self.assertTrue((sibling_cache / "keep.bin").exists())
+                self.assertTrue((model_manifest_dir() / "faster-whisper-large-v3.json").exists())
+                self.assertTrue((model_manifest_dir() / "faster-whisper-turbo.json").exists())
+
+    def test_uninstall_parakeet_removes_isolated_root(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.dict(os.environ, {"SONA_HF_CACHE": temp_dir}, clear=False):
+                cache_path = Path(temp_dir) / "parakeet"
+                (cache_path / "nemo").mkdir(parents=True, exist_ok=True)
+                (cache_path / "nemo" / "marker.txt").write_text("ok")
+                model_download_service.mark_installed("parakeet")
+
+                job = self.wait_for_job(
+                    model_download_service.start_uninstall("parakeet").job_id,
+                )
+
+                self.assertEqual(job.status, "uninstalled")
+                self.assertFalse(cache_path.exists())
+                self.assertFalse((model_manifest_dir() / "parakeet.json").exists())
+
+    def test_managed_model_root_uses_per_model_directory(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.dict(os.environ, {"SONA_HF_CACHE": temp_dir}, clear=False):
+                self.assertEqual(
+                    model_cache_root(model_id="parakeet").resolve(),
+                    (Path(temp_dir) / "parakeet").resolve(),
+                )
+                self.assertEqual(
+                    model_cache_root({"_sona_managed_model_id": "wav2vec2-aligner"}).resolve(),
+                    (Path(temp_dir) / "wav2vec2-aligner").resolve(),
                 )
 
 

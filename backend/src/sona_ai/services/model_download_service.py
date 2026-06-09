@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import threading
 import traceback
@@ -25,7 +26,9 @@ from sona_ai.services.pipeline_profile import PipelineProfile
 
 logger = setup_logging()
 ModelStatus = Literal["missing", "installed", "running", "failed"]
-JobStatus = Literal["queued", "running", "installed", "failed"]
+JobStatus = Literal["queued", "running", "installed", "uninstalled", "failed"]
+JobAction = Literal["download", "uninstall", "redownload"]
+JobStage = Literal["queued", "preparing", "downloading", "removing", "verifying", "done", "failed"]
 
 
 @dataclass(frozen=True)
@@ -36,16 +39,23 @@ class ModelCatalogEntry:
     model_names: list[str]
     config_name: str
     environment: str
-    cache_subdir: Optional[str] = None
+    runtime_cache_subdir: Optional[str] = None
     requires_hf_token: bool = False
+    can_uninstall: bool = True
+    can_redownload: bool = True
+    unsupported_reason: Optional[str] = None
+    management_note: Optional[str] = None
 
 
 @dataclass
-class DownloadJob:
+class ModelJob:
     job_id: str
     model_id: str
+    action: JobAction
     status: JobStatus
+    stage: JobStage
     message: str
+    indeterminate: bool
     started_at: str
     finished_at: Optional[str] = None
     error: Optional[str] = None
@@ -53,20 +63,23 @@ class DownloadJob:
 
 class ModelDownloadService:
     def __init__(self):
-        self._jobs: dict[str, DownloadJob] = {}
+        self._jobs: dict[str, ModelJob] = {}
         self._lock = threading.Lock()
 
     def list_models(self) -> list[dict]:
-        active_jobs = self._active_jobs_by_model()
+        latest_jobs = self._latest_jobs_by_model()
         models = []
         for entry in MODEL_CATALOG:
-            active_job = active_jobs.get(entry.id)
+            latest_job = latest_jobs.get(entry.id)
             installed = self._manifest_path(entry.id).is_file()
             status: ModelStatus = "installed" if installed else "missing"
             error = None
-            if active_job:
-                status = "running" if active_job.status in {"queued", "running"} else active_job.status
-                error = active_job.error
+            if latest_job:
+                if latest_job.status in {"queued", "running"}:
+                    status = "running"
+                elif latest_job.status == "failed":
+                    status = "failed"
+                error = latest_job.error
 
             models.append(
                 {
@@ -76,40 +89,75 @@ class ModelDownloadService:
                     "cache_path": self._display_cache_path(self._cache_path(entry)),
                     "requires_hf_token": entry.requires_hf_token,
                     "hf_token_available": self._hf_token_available(),
-                    "active_job_id": active_job.job_id if active_job else None,
+                    "active_job_id": (
+                        latest_job.job_id
+                        if latest_job and latest_job.status in {"queued", "running", "failed"}
+                        else None
+                    ),
+                    "is_busy": bool(latest_job and latest_job.status in {"queued", "running"}),
                     "error": error,
                 }
             )
         return models
 
-    def start_download(self, model_id: str) -> DownloadJob:
+    def start_download(self, model_id: str) -> ModelJob:
         entry = self._entry(model_id)
         if self._manifest_path(model_id).is_file():
             return self._create_finished_job(
                 model_id=model_id,
+                action="download",
                 status="installed",
+                stage="done",
                 message=f"{entry.label} is already installed.",
             )
 
+        return self._start_job(entry, action="download")
+
+    def start_uninstall(self, model_id: str) -> ModelJob:
+        entry = self._entry(model_id)
+        if not entry.can_uninstall:
+            raise ValueError(entry.unsupported_reason or f"{entry.label} cannot be uninstalled safely.")
+        if not self._manifest_path(model_id).is_file():
+            return self._create_finished_job(
+                model_id=model_id,
+                action="uninstall",
+                status="uninstalled",
+                stage="done",
+                message=f"{entry.label} is already removed.",
+            )
+
+        return self._start_job(entry, action="uninstall")
+
+    def start_redownload(self, model_id: str) -> ModelJob:
+        entry = self._entry(model_id)
+        if not entry.can_redownload:
+            raise ValueError(entry.unsupported_reason or f"{entry.label} cannot be re-downloaded safely.")
+        return self._start_job(entry, action="redownload")
+
+    def _start_job(self, entry: ModelCatalogEntry, action: JobAction) -> ModelJob:
         with self._lock:
             for job in self._jobs.values():
-                if job.model_id == model_id and job.status in {"queued", "running"}:
+                if job.model_id == entry.id and job.status in {"queued", "running"}:
                     return job
 
-            job = DownloadJob(
+            verb = self._action_label(action)
+            job = ModelJob(
                 job_id=str(uuid4()),
-                model_id=model_id,
+                model_id=entry.id,
+                action=action,
                 status="queued",
-                message=f"Queued {entry.label} download.",
+                stage="queued",
+                message=f"Queued {entry.label} {verb}.",
+                indeterminate=True,
                 started_at=self._now(),
             )
             self._jobs[job.job_id] = job
 
-        thread = threading.Thread(target=self._run_download, args=(entry, job.job_id), daemon=True)
+        thread = threading.Thread(target=self._run_job, args=(entry, job.job_id), daemon=True)
         thread.start()
         return job
 
-    def get_job(self, job_id: str) -> DownloadJob:
+    def get_job(self, job_id: str) -> ModelJob:
         with self._lock:
             if job_id not in self._jobs:
                 raise KeyError(job_id)
@@ -146,39 +194,140 @@ class ModelDownloadService:
         for model_id in self.required_model_ids_for_profile(profile):
             self.mark_installed(model_id)
 
-    def _run_download(self, entry: ModelCatalogEntry, job_id: str) -> None:
-        self._update_job(job_id, status="running", message=f"Downloading {entry.label}...")
+    def _run_job(self, entry: ModelCatalogEntry, job_id: str) -> None:
+        job = self.get_job(job_id)
         try:
             load_dotenv(PROJECT_ROOT / ".env")
-            if entry.requires_hf_token and not self._hf_token_available():
+            if job.action in {"download", "redownload"} and entry.requires_hf_token and not self._hf_token_available():
                 raise EnvironmentError("HF_TOKEN is required for this model.")
 
-            downloader = DOWNLOADERS[entry.id]
-            downloader(entry)
-            self._write_manifest(entry)
-            self._update_job(
-                job_id,
-                status="installed",
-                message=f"{entry.label} is installed.",
-                finished_at=self._now(),
-            )
+            if job.action == "download":
+                self._run_download(entry, job_id)
+            elif job.action == "uninstall":
+                self._run_uninstall(entry, job_id)
+            elif job.action == "redownload":
+                self._run_redownload(entry, job_id)
+            else:
+                raise ValueError(f"Unsupported model job action: {job.action}")
         except Exception as exc:
-            logger.error("Model download failed for %s: %s", entry.id, exc)
+            logger.error("Model job failed for %s (%s): %s", entry.id, job.action, exc)
             logger.debug(traceback.format_exc())
             self._update_job(
                 job_id,
                 status="failed",
-                message=f"{entry.label} download failed.",
+                stage="failed",
+                message=f"{entry.label} {self._action_label(job.action)} failed.",
                 finished_at=self._now(),
                 error=str(exc),
             )
 
-    def _create_finished_job(self, model_id: str, status: JobStatus, message: str) -> DownloadJob:
-        job = DownloadJob(
+    def _run_download(self, entry: ModelCatalogEntry, job_id: str) -> None:
+        self._update_job(
+            job_id,
+            status="running",
+            stage="preparing",
+            message=f"Preparing {entry.label} download...",
+        )
+        downloader = DOWNLOADERS[entry.id]
+        self._update_job(
+            job_id,
+            status="running",
+            stage="downloading",
+            message=f"Downloading {entry.label}...",
+        )
+        downloader(entry)
+        self._update_job(
+            job_id,
+            status="running",
+            stage="verifying",
+            message=f"Verifying {entry.label} files...",
+        )
+        self._write_manifest(entry)
+        self._update_job(
+            job_id,
+            status="installed",
+            stage="done",
+            message=f"{entry.label} is installed.",
+            finished_at=self._now(),
+        )
+
+    def _run_uninstall(self, entry: ModelCatalogEntry, job_id: str) -> None:
+        self._update_job(
+            job_id,
+            status="running",
+            stage="removing",
+            message=f"Removing {entry.label}...",
+        )
+        self._remove_managed_files(entry)
+        self._update_job(
+            job_id,
+            status="running",
+            stage="verifying",
+            message=f"Verifying {entry.label} removal...",
+        )
+        self._clear_install_state(entry)
+        self._update_job(
+            job_id,
+            status="uninstalled",
+            stage="done",
+            message=f"{entry.label} was removed.",
+            finished_at=self._now(),
+        )
+
+    def _run_redownload(self, entry: ModelCatalogEntry, job_id: str) -> None:
+        self._update_job(
+            job_id,
+            status="running",
+            stage="removing",
+            message=f"Removing previous {entry.label} files...",
+        )
+        self._remove_managed_files(entry)
+        self._clear_install_state(entry)
+        self._update_job(
+            job_id,
+            status="running",
+            stage="preparing",
+            message=f"Preparing fresh {entry.label} download...",
+        )
+        downloader = DOWNLOADERS[entry.id]
+        self._update_job(
+            job_id,
+            status="running",
+            stage="downloading",
+            message=f"Downloading {entry.label} again...",
+        )
+        downloader(entry)
+        self._update_job(
+            job_id,
+            status="running",
+            stage="verifying",
+            message=f"Verifying fresh {entry.label} files...",
+        )
+        self._write_manifest(entry)
+        self._update_job(
+            job_id,
+            status="installed",
+            stage="done",
+            message=f"{entry.label} is installed.",
+            finished_at=self._now(),
+        )
+
+    def _create_finished_job(
+        self,
+        model_id: str,
+        action: JobAction,
+        status: JobStatus,
+        stage: JobStage,
+        message: str,
+    ) -> ModelJob:
+        job = ModelJob(
             job_id=str(uuid4()),
             model_id=model_id,
+            action=action,
             status=status,
+            stage=stage,
             message=message,
+            indeterminate=True,
             started_at=self._now(),
             finished_at=self._now(),
         )
@@ -192,13 +341,12 @@ class ModelDownloadService:
             for key, value in patch.items():
                 setattr(job, key, value)
 
-    def _active_jobs_by_model(self) -> dict[str, DownloadJob]:
-        active: dict[str, DownloadJob] = {}
+    def _latest_jobs_by_model(self) -> dict[str, ModelJob]:
+        latest: dict[str, ModelJob] = {}
         with self._lock:
             for job in self._jobs.values():
-                if job.status in {"queued", "running", "failed"}:
-                    active[job.model_id] = job
-        return active
+                latest[job.model_id] = job
+        return latest
 
     def _entry(self, model_id: str) -> ModelCatalogEntry:
         for entry in MODEL_CATALOG:
@@ -216,8 +364,7 @@ class ModelDownloadService:
         return None
 
     def _cache_path(self, entry: ModelCatalogEntry) -> Path:
-        root = model_cache_root(load_config(entry.config_name))
-        return root / entry.cache_subdir if entry.cache_subdir else root
+        return model_cache_root(model_id=entry.id)
 
     def _display_cache_path(self, path: Path) -> str:
         try:
@@ -227,6 +374,25 @@ class ModelDownloadService:
 
     def _manifest_path(self, model_id: str) -> Path:
         return model_manifest_dir() / f"{model_id}.json"
+
+    def _clear_manifest(self, model_id: str) -> None:
+        manifest_path = self._manifest_path(model_id)
+        if manifest_path.is_file():
+            manifest_path.unlink()
+
+    def _clear_install_state(self, entry: ModelCatalogEntry) -> None:
+        self._clear_manifest(entry.id)
+
+    def _remove_managed_files(self, entry: ModelCatalogEntry) -> None:
+        targets = self._managed_paths(entry)
+        for path in targets:
+            if path.is_dir():
+                shutil.rmtree(path)
+            elif path.exists():
+                path.unlink()
+
+    def _managed_paths(self, entry: ModelCatalogEntry) -> list[Path]:
+        return [self._cache_path(entry)]
 
     def _write_manifest(self, entry: ModelCatalogEntry) -> None:
         manifest_dir = model_manifest_dir()
@@ -239,6 +405,7 @@ class ModelDownloadService:
             "cache_path": str(self._cache_path(entry)),
             "status": "installed",
             "downloaded_at": self._now(),
+            "management_note": entry.management_note,
         }
         self._manifest_path(entry.id).write_text(json.dumps(manifest, indent=2))
 
@@ -249,11 +416,19 @@ class ModelDownloadService:
     def _now(self) -> str:
         return datetime.now(timezone.utc).isoformat()
 
+    def _action_label(self, action: JobAction) -> str:
+        if action == "download":
+            return "download"
+        if action == "uninstall":
+            return "removal"
+        return "re-download"
+
 
 def _download_parakeet(entry: ModelCatalogEntry) -> None:
     from sona_ai.transcription.parakeet_transcriber import ParakeetTranscriber
 
     config = deepcopy(load_config(entry.config_name))
+    config["_sona_managed_model_id"] = entry.id
     config.setdefault("model", {})["device"] = "cpu"
     transcriber = ParakeetTranscriber(config)
     try:
@@ -266,6 +441,7 @@ def _download_faster_whisper(entry: ModelCatalogEntry) -> None:
     from sona_ai.transcription.faster_whisper_transcriber import FasterWhisperTranscriber
 
     config = deepcopy(load_config(entry.config_name))
+    config["_sona_managed_model_id"] = entry.id
     config.setdefault("model", {})["device"] = "cpu"
     transcriber = FasterWhisperTranscriber(config)
     try:
@@ -276,8 +452,9 @@ def _download_faster_whisper(entry: ModelCatalogEntry) -> None:
 
 def _download_wav2vec2(entry: ModelCatalogEntry) -> None:
     config = load_config(entry.config_name)
+    config["_sona_managed_model_id"] = entry.id
     setup_model_cache_environment(config)
-    cache_dir = model_cache_root(config) / "wav2vec2-align"
+    cache_dir = model_cache_root(config) / (entry.runtime_cache_subdir or "wav2vec2-align")
     script_path = PROJECT_ROOT / "tools" / "alignment" / "download_wav2vec2_models.py"
     cmd = [
         "conda",
@@ -297,8 +474,9 @@ def _download_wav2vec2(entry: ModelCatalogEntry) -> None:
 
 def _download_pyannote(entry: ModelCatalogEntry) -> None:
     config = load_config(entry.config_name)
+    config["_sona_managed_model_id"] = entry.id
     setup_model_cache_environment(config)
-    cache_dir = model_cache_root(config) / "pyannote-community"
+    cache_dir = model_cache_root(config) / (entry.runtime_cache_subdir or "pyannote-community")
     script_path = PROJECT_ROOT / "tools" / "diarization" / "download_community_model.py"
     cmd = [
         "conda",
@@ -328,6 +506,7 @@ MODEL_CATALOG = [
         model_names=["nvidia/parakeet-tdt-0.6b-v3"],
         config_name="parakeet",
         environment="sona-ai",
+        management_note="Uses an isolated NeMo/Hugging Face cache root under .models/parakeet.",
     ),
     ModelCatalogEntry(
         id="faster-whisper-large-v3",
@@ -336,7 +515,7 @@ MODEL_CATALOG = [
         model_names=["large-v3"],
         config_name="faster-whisper-large-v3",
         environment="sona-ai",
-        cache_subdir="faster-whisper",
+        runtime_cache_subdir="faster-whisper",
     ),
     ModelCatalogEntry(
         id="faster-whisper-turbo",
@@ -345,7 +524,7 @@ MODEL_CATALOG = [
         model_names=["turbo"],
         config_name="faster-whisper-turbo",
         environment="sona-ai",
-        cache_subdir="faster-whisper",
+        runtime_cache_subdir="faster-whisper",
     ),
     ModelCatalogEntry(
         id="wav2vec2-aligner",
@@ -357,7 +536,7 @@ MODEL_CATALOG = [
         ],
         config_name="wav2vec2",
         environment="sona-aligner",
-        cache_subdir="wav2vec2-align",
+        runtime_cache_subdir="wav2vec2-align",
     ),
     ModelCatalogEntry(
         id="pyannote-community",
@@ -366,7 +545,7 @@ MODEL_CATALOG = [
         model_names=["pyannote/speaker-diarization-community-1"],
         config_name="diarization-community",
         environment="sona-diarization",
-        cache_subdir="pyannote-community",
+        runtime_cache_subdir="pyannote-community",
         requires_hf_token=True,
     ),
 ]

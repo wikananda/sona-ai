@@ -3,11 +3,14 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
     BYOKProvider,
-    ModelDownloadJob,
+    ModelJob,
+    ModelJobAction,
     RuntimeModel,
-    getRuntimeModelDownloadJob,
+    getRuntimeModelJob,
     getRuntimeModels,
+    redownloadRuntimeModel,
     startRuntimeModelDownload,
+    uninstallRuntimeModel,
 } from "@/src/api/sonaApi";
 import { BYOK_PROVIDERS } from "@/src/utils/constants";
 import {
@@ -35,7 +38,7 @@ export default function BYOKSettingsModal({
     const [activeTab, setActiveTab] = useState<SettingsTab>("api");
     const [draft, setDraft] = useState<BYOKSettingsState>(settings);
     const [models, setModels] = useState<RuntimeModel[]>([]);
-    const [downloadJobs, setDownloadJobs] = useState<Record<string, ModelDownloadJob>>({});
+    const [jobs, setJobs] = useState<Record<string, ModelJob>>({});
     const [modelError, setModelError] = useState<string | null>(null);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
 
@@ -43,8 +46,8 @@ export default function BYOKSettingsModal({
     const selectedSettings = draft.providers[selectedProvider];
 
     const activeDownloadJobs = useMemo(
-        () => Object.values(downloadJobs).filter((job) => isActiveJob(job)),
-        [downloadJobs],
+        () => Object.values(jobs).filter((job) => isActiveJob(job)),
+        [jobs],
     );
 
     const loadModels = useCallback(async () => {
@@ -70,9 +73,9 @@ export default function BYOKSettingsModal({
 
         const interval = window.setInterval(async () => {
             const updates = await Promise.allSettled(
-                activeDownloadJobs.map((job) => getRuntimeModelDownloadJob(job.job_id)),
+                activeDownloadJobs.map((job) => getRuntimeModelJob(job.job_id)),
             );
-            setDownloadJobs((current) => {
+            setJobs((current) => {
                 const next = { ...current };
                 for (const update of updates) {
                     if (update.status === "fulfilled") {
@@ -141,17 +144,17 @@ export default function BYOKSettingsModal({
         onClearSavedKeys();
     };
 
-    const handleDownloadModel = async (model: RuntimeModel) => {
+    const handleModelAction = async (model: RuntimeModel, action: ModelJobAction) => {
         setModelError(null);
         try {
-            const job = await startRuntimeModelDownload(model.id);
-            setDownloadJobs((current) => ({
+            const job = await startModelJob(model.id, action);
+            setJobs((current) => ({
                 ...current,
                 [job.job_id]: job,
             }));
             void loadModels();
         } catch (error) {
-            setModelError(error instanceof Error ? error.message : "Failed to start download.");
+            setModelError(error instanceof Error ? error.message : `Failed to start ${action}.`);
         }
     };
 
@@ -210,11 +213,11 @@ export default function BYOKSettingsModal({
                     ) : (
                         <ModelSettings
                             models={models}
-                            jobs={downloadJobs}
+                            jobs={jobs}
                             error={modelError}
                             isLoading={isLoadingModels}
                             onRefresh={loadModels}
-                            onDownload={handleDownloadModel}
+                            onAction={handleModelAction}
                         />
                     )}
                 </div>
@@ -402,14 +405,14 @@ function ModelSettings({
     error,
     isLoading,
     onRefresh,
-    onDownload,
+    onAction,
 }: {
     models: RuntimeModel[];
-    jobs: Record<string, ModelDownloadJob>;
+    jobs: Record<string, ModelJob>;
     error: string | null;
     isLoading: boolean;
     onRefresh: () => void;
-    onDownload: (model: RuntimeModel) => void;
+    onAction: (model: RuntimeModel, action: ModelJobAction) => void;
 }) {
     return (
         <div className="flex flex-col gap-4">
@@ -448,7 +451,7 @@ function ModelSettings({
                             key={model.id}
                             model={model}
                             job={model.active_job_id ? jobs[model.active_job_id] : undefined}
-                            onDownload={() => onDownload(model)}
+                            onAction={onAction}
                         />
                     ))
                 )}
@@ -460,20 +463,21 @@ function ModelSettings({
 function ModelRow({
     model,
     job,
-    onDownload,
+    onAction,
 }: {
     model: RuntimeModel;
-    job?: ModelDownloadJob;
-    onDownload: () => void;
+    job?: ModelJob;
+    onAction: (model: RuntimeModel, action: ModelJobAction) => void;
 }) {
     const isRunning = model.status === "running" || Boolean(job && isActiveJob(job));
     const isBlocked = model.requires_hf_token && !model.hf_token_available;
-    const message = job?.message ?? model.error ?? modelStatusLabel(model.status);
+    const message = job?.message ?? model.error ?? model.management_note ?? modelStatusLabel(model.status);
+    const progressLabel = job ? modelJobLabel(job) : null;
 
     return (
         <div className="rounded-md border border-zinc-200 p-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                         <h4 className="text-sm font-semibold text-zinc-950">
                             {model.label}
@@ -501,20 +505,64 @@ function ModelRow({
                             {message}
                         </p>
                     )}
+                    {job && isActiveJob(job) && (
+                        <div className="mt-3">
+                            <div className="mb-1 flex items-center justify-between gap-3">
+                                <span className="text-xs font-medium text-zinc-700">
+                                    {progressLabel}
+                                </span>
+                                <span className="text-xs text-zinc-500">
+                                    {modelJobStageLabel(job.stage)}
+                                </span>
+                            </div>
+                            <div className="h-2 overflow-hidden rounded-full bg-zinc-200">
+                                <div className="h-full w-2/5 animate-pulse rounded-full bg-zinc-900" />
+                            </div>
+                        </div>
+                    )}
                     {job?.error && (
                         <p className="mt-2 text-xs text-red-700">
                             {job.error}
                         </p>
                     )}
                 </div>
-                <button
-                    type="button"
-                    onClick={onDownload}
-                    disabled={model.installed || isRunning || isBlocked}
-                    className="min-h-9 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
-                >
-                    {model.installed ? "Installed" : isRunning ? "Downloading" : "Download"}
-                </button>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                    {!model.installed && (
+                        <button
+                            type="button"
+                            onClick={() => onAction(model, "download")}
+                            disabled={isRunning || isBlocked}
+                            className="min-h-9 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+                        >
+                            {isRunning ? modelJobLabel(job) : "Download"}
+                        </button>
+                    )}
+                    {model.installed && model.can_uninstall && (
+                        <button
+                            type="button"
+                            onClick={() => onAction(model, "uninstall")}
+                            disabled={isRunning}
+                            className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400"
+                        >
+                            {isRunning && job?.action === "uninstall" ? "Uninstalling" : "Uninstall"}
+                        </button>
+                    )}
+                    {model.installed && model.can_redownload && (
+                        <button
+                            type="button"
+                            onClick={() => onAction(model, "redownload")}
+                            disabled={isRunning || isBlocked}
+                            className="min-h-9 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+                        >
+                            {isRunning && job?.action === "redownload" ? "Re-downloading" : "Re-download"}
+                        </button>
+                    )}
+                    {model.installed && !model.can_uninstall && !model.can_redownload && (
+                        <span className="rounded-md border border-zinc-200 px-3 py-2 text-xs text-zinc-500">
+                            Managed only
+                        </span>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -539,13 +587,13 @@ function trimProvider(settings: BYOKProviderSettings): BYOKProviderSettings {
     };
 }
 
-function isActiveJob(job: ModelDownloadJob): boolean {
+function isActiveJob(job: ModelJob): boolean {
     return job.status === "queued" || job.status === "running";
 }
 
 function modelStatusLabel(status: RuntimeModel["status"]): string {
     if (status === "installed") return "Installed";
-    if (status === "running") return "Downloading";
+    if (status === "running") return "Working";
     if (status === "failed") return "Failed";
     return "Missing";
 }
@@ -555,4 +603,31 @@ function statusClassName(status: RuntimeModel["status"]): string {
     if (status === "running") return "bg-blue-100 text-blue-800";
     if (status === "failed") return "bg-red-100 text-red-800";
     return "bg-zinc-100 text-zinc-600";
+}
+
+function modelJobLabel(job?: ModelJob): string {
+    if (!job) return "Working";
+    if (job.action === "uninstall") return "Uninstalling";
+    if (job.action === "redownload") return "Re-downloading";
+    return "Downloading";
+}
+
+function modelJobStageLabel(stage: ModelJob["stage"]): string {
+    if (stage === "preparing") return "Preparing";
+    if (stage === "downloading") return "Downloading";
+    if (stage === "removing") return "Removing";
+    if (stage === "verifying") return "Verifying";
+    if (stage === "done") return "Done";
+    if (stage === "failed") return "Failed";
+    return "Queued";
+}
+
+async function startModelJob(modelId: string, action: ModelJobAction): Promise<ModelJob> {
+    if (action === "uninstall") {
+        return uninstallRuntimeModel(modelId);
+    }
+    if (action === "redownload") {
+        return redownloadRuntimeModel(modelId);
+    }
+    return startRuntimeModelDownload(modelId);
 }
