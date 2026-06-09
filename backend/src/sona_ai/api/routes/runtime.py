@@ -1,8 +1,9 @@
 from dataclasses import asdict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from sona_ai.core import runtime_devices
+from sona_ai.api.schemas.runtime import TranscriptionPreflightRequest
 from sona_ai.services.model_download_service import model_download_service
 
 
@@ -33,3 +34,29 @@ def get_model_download_job(job_id: str):
         return asdict(model_download_service.get_job(job_id))
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=f"Unknown model download job: {job_id}") from exc
+
+
+@router.post("/runtime/transcription-preflight")
+def transcription_preflight(
+    body: TranscriptionPreflightRequest,
+    request: Request,
+):
+    try:
+        profile = request.app.state.transcription_service.resolve_profile(
+            model=body.model,
+            device=body.device,
+            alignment_enabled=body.alignment_enabled,
+            extract_speakers=body.extract_speakers,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    required_models = model_download_service.required_models_for_profile(profile)
+    missing_model_ids = [
+        model["id"]
+        for model in required_models
+        if not model["installed"]
+    ]
+    return {
+        "required_models": required_models,
+        "missing_model_ids": missing_model_ids,
+    }

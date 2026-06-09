@@ -25,7 +25,12 @@ interface Props {
         minSpeakers?: number | "";
         maxSpeakers?: number | "";
         extractSpeakers?: boolean;
-    }) => Promise<void>;
+    }) => Promise<boolean>;
+    onBeforeLiveStart: (params: {
+        model: TranscriptionModel;
+        device: RuntimeDevice;
+        language?: string;
+    }) => Promise<boolean>;
     onLiveSaved: (recording: Recording) => Promise<void>;
     isUploading: boolean;
     runtimeDevices: RuntimeDevices;
@@ -43,6 +48,7 @@ export default function AddRecordingPanel({
     onModeChange,
     onCancel,
     onUpload,
+    onBeforeLiveStart,
     onLiveSaved,
     isUploading,
     runtimeDevices,
@@ -104,6 +110,7 @@ export default function AddRecordingPanel({
                     <LiveTranscriptionPanel
                         projectId={projectId}
                         runtimeDevices={runtimeDevices}
+                        onBeforeStart={onBeforeLiveStart}
                         onSaved={onLiveSaved}
                     />
                 )}

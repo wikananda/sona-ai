@@ -19,7 +19,7 @@ interface Props {
         minSpeakers?: number | "";
         maxSpeakers?: number | "";
         extractSpeakers?: boolean;
-    }) => Promise<void>;
+    }) => Promise<boolean>;
     isUploading: boolean;
     runtimeDevices: RuntimeDevices;
     onClear: () => void;

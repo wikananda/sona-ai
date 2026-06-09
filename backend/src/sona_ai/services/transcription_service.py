@@ -11,6 +11,7 @@ from sona_ai.services.pipeline_profile import (
     resolve_pipeline_profile,
     speech_config_for_profile,
 )
+from sona_ai.services.model_download_service import model_download_service
 
 
 SUPPORTED_TRANSCRIPTION_MODELS = set(TRANSCRIPTION_MODEL_PROFILES)
@@ -39,6 +40,7 @@ class TranscriptionService:
         self._pipelines = {
             default_profile.cache_key(): pipeline
         }
+        model_download_service.mark_profile_installed(default_profile)
 
         self._pipeline_lock = threading.Lock()
         self._transcription_lock = threading.Lock()
@@ -159,10 +161,12 @@ class TranscriptionService:
             profile.device,
         )
         if key in self._pipelines:
+            model_download_service.mark_profile_installed(profile)
             return self._pipelines[key]
 
         with self._pipeline_lock:
             if key in self._pipelines:
+                model_download_service.mark_profile_installed(profile)
                 return self._pipelines[key]
 
             profile_config = speech_config_for_profile(self.speech_config, profile)
@@ -171,6 +175,7 @@ class TranscriptionService:
                 device=profile.device,
             )
             pipeline.load_models()
+            model_download_service.mark_profile_installed(profile)
             self._pipelines[key] = pipeline
             return pipeline
 

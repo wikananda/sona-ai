@@ -72,6 +72,19 @@ export interface ModelDownloadJob {
     error?: string | null;
 }
 
+export interface TranscriptionPreflightParams {
+    language?: string;
+    model: TranscriptionModel;
+    device: RuntimeDevice;
+    extractSpeakers?: boolean;
+    alignmentEnabled?: boolean;
+}
+
+export interface TranscriptionPreflightResult {
+    required_models: RuntimeModel[];
+    missing_model_ids: string[];
+}
+
 export interface Project {
     id: string;
     name: string;
@@ -282,6 +295,22 @@ export async function startRuntimeModelDownload(modelId: string): Promise<ModelD
 
 export async function getRuntimeModelDownloadJob(jobId: string): Promise<ModelDownloadJob> {
     return requestJson(`/runtime/model-downloads/${jobId}`);
+}
+
+export async function preflightTranscriptionModels(
+    params: TranscriptionPreflightParams,
+): Promise<TranscriptionPreflightResult> {
+    return requestJson("/runtime/transcription-preflight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            language: params.language,
+            model: params.model,
+            device: params.device,
+            extract_speakers: params.extractSpeakers ?? true,
+            alignment_enabled: params.alignmentEnabled,
+        }),
+    });
 }
 
 export async function uploadProjectRecording(

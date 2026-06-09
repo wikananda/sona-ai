@@ -9,7 +9,9 @@ import {
     extractRecordingSpeakers,
     getProject,
     getRecording,
+    preflightTranscriptionModels,
     getRuntimeDevices,
+    RuntimeModel,
     Project,
     Recording,
     renameRecording,
@@ -30,11 +32,17 @@ import {
 } from "@/src/api/sonaApi";
 import AddRecordingPanel, { AddRecordingMode } from "@/src/components/AddRecordingPanel";
 import BYOKSettingsModal from "@/src/components/BYOKSettingsModal";
+import MissingSpeechModelsModal from "@/src/components/MissingSpeechModelsModal";
 import RecordingDetail from "@/src/components/RecordingDetail";
 import RecordingSidebar from "@/src/components/RecordingSidebar";
 import { useBYOKSettings } from "@/src/hooks/useBYOKSettings";
 
 const DRAFT_RECORDING_ID = "draft-recording";
+
+interface PendingSpeechModelGate {
+    models: RuntimeModel[];
+    resolve: (ready: boolean) => void;
+}
 
 export default function ProjectDetailPage() {
     const params = useParams<{ id: string }>();
@@ -63,6 +71,8 @@ export default function ProjectDetailPage() {
         available: ["auto", "cpu"],
         torch: { cuda: false, mps: false },
     });
+    const [pendingSpeechModelGate, setPendingSpeechModelGate] =
+        useState<PendingSpeechModelGate | null>(null);
     const [error, setError] = useState("");
 
     const recordings = useMemo(() => project?.recordings ?? [], [project]);
@@ -167,6 +177,36 @@ export default function ProjectDetailPage() {
         setSelectedRecordingId(recordingId);
     };
 
+    const ensureSpeechModelsReady = useCallback(async (params: {
+        model: TranscriptionModel;
+        device: RuntimeDevice;
+        language?: string;
+        extractSpeakers?: boolean;
+        alignmentEnabled?: boolean;
+    }): Promise<boolean> => {
+        const result = await preflightTranscriptionModels({
+            model: params.model,
+            device: params.device,
+            language: params.language,
+            extractSpeakers: params.extractSpeakers,
+            alignmentEnabled: params.alignmentEnabled,
+        });
+        if (result.missing_model_ids.length === 0) {
+            return true;
+        }
+
+        const missingModels = result.required_models.filter((model) =>
+            result.missing_model_ids.includes(model.id),
+        );
+
+        return new Promise<boolean>((resolve) => {
+            setPendingSpeechModelGate({
+                models: missingModels,
+                resolve,
+            });
+        });
+    }, []);
+
     const handleUpload = async (params: {
         files: File[];
         language?: string;
@@ -175,7 +215,23 @@ export default function ProjectDetailPage() {
         minSpeakers?: number | "";
         maxSpeakers?: number | "";
         extractSpeakers?: boolean;
-    }) => {
+    }): Promise<boolean> => {
+        let modelsReady: boolean;
+        try {
+            modelsReady = await ensureSpeechModelsReady({
+                model: params.model,
+                device: params.device,
+                language: params.language,
+                extractSpeakers: params.extractSpeakers,
+            });
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to check model availability");
+            throw err;
+        }
+        if (!modelsReady) {
+            return false;
+        }
+
         setIsUploading(true);
         setError("");
         try {
@@ -199,6 +255,7 @@ export default function ProjectDetailPage() {
                 setPreviousRecordingId(undefined);
                 setSelectedRecordingId(firstRecording.id);
             }
+            return true;
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to upload recording");
             throw err;
@@ -260,18 +317,54 @@ export default function ProjectDetailPage() {
     const handleRetranscribeRecording = async (
         recordingId: string,
         settings: RetranscribeParams,
-    ) => {
+    ): Promise<boolean> => {
+        let modelsReady: boolean;
+        try {
+            modelsReady = await ensureSpeechModelsReady({
+                model: settings.model,
+                device: settings.device,
+                language: settings.language,
+                extractSpeakers: settings.extractSpeakers,
+            });
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to check model availability");
+            throw err;
+        }
+        if (!modelsReady) {
+            return false;
+        }
+
         setError("");
         setRetranscribingId(recordingId);
         try {
             const recording = await retranscribeRecording(recordingId, settings);
             setSelectedRecording(recording);
             await refreshProject();
+            return true;
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to re-transcribe recording");
             throw err;
         } finally {
             setRetranscribingId(undefined);
+        }
+    };
+
+    const handleLiveStartRequest = async (params: {
+        model: TranscriptionModel;
+        device: RuntimeDevice;
+        language?: string;
+    }): Promise<boolean> => {
+        try {
+            return await ensureSpeechModelsReady({
+                model: params.model,
+                device: params.device,
+                language: params.language,
+                extractSpeakers: false,
+                alignmentEnabled: false,
+            });
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to check model availability");
+            throw err;
         }
     };
 
@@ -451,6 +544,7 @@ export default function ProjectDetailPage() {
                             onModeChange={setDraftMode}
                             onCancel={handleCancelDraft}
                             onUpload={handleUpload}
+                            onBeforeLiveStart={handleLiveStartRequest}
                             onLiveSaved={handleLiveRecordingSaved}
                             isUploading={isUploading}
                             runtimeDevices={runtimeDevices}
@@ -491,6 +585,19 @@ export default function ProjectDetailPage() {
                     }}
                     onClearSavedKeys={byokSettings.clearSavedKeys}
                     onClose={() => setIsSettingsOpen(false)}
+                />
+            )}
+            {pendingSpeechModelGate && (
+                <MissingSpeechModelsModal
+                    models={pendingSpeechModelGate.models}
+                    onInstalled={() => {
+                        pendingSpeechModelGate.resolve(true);
+                        setPendingSpeechModelGate(null);
+                    }}
+                    onCancel={() => {
+                        pendingSpeechModelGate.resolve(false);
+                        setPendingSpeechModelGate(null);
+                    }}
                 />
             )}
         </main>

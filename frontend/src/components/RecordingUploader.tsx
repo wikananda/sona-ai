@@ -14,7 +14,7 @@ interface Props {
         minSpeakers?: number | "";
         maxSpeakers?: number | "";
         extractSpeakers?: boolean;
-    }) => Promise<void>;
+    }) => Promise<boolean>;
     isUploading: boolean;
     runtimeDevices: RuntimeDevices;
 }
@@ -36,8 +36,11 @@ export default function RecordingUploader({ onUpload, isUploading, runtimeDevice
                 <RecordingSettingsForm
                     file={file}
                     onUpload={async (params) => {
-                        await onUpload(params);
-                        setFile(null);
+                        const started = await onUpload(params);
+                        if (started) {
+                            setFile(null);
+                        }
+                        return started;
                     }}
                     isUploading={isUploading}
                     runtimeDevices={runtimeDevices}

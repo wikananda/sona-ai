@@ -20,6 +20,7 @@ from sona_ai.core import (
     setup_logging,
     setup_model_cache_environment,
 )
+from sona_ai.services.pipeline_profile import PipelineProfile
 
 
 logger = setup_logging()
@@ -114,6 +115,37 @@ class ModelDownloadService:
                 raise KeyError(job_id)
             return self._jobs[job_id]
 
+    def required_model_ids_for_profile(self, profile: PipelineProfile) -> list[str]:
+        model_ids: list[str] = []
+
+        transcription_model_id = self._transcription_model_id(profile)
+        if transcription_model_id is not None:
+            model_ids.append(transcription_model_id)
+
+        if profile.alignment_enabled and profile.alignment_engine in {"wav2vec2", "wav2vec2_external"}:
+            model_ids.append("wav2vec2-aligner")
+
+        if profile.diarization_enabled and profile.diarization_engine == "community_external":
+            model_ids.append("pyannote-community")
+
+        return model_ids
+
+    def required_models_for_profile(self, profile: PipelineProfile) -> list[dict]:
+        by_id = {model["id"]: model for model in self.list_models()}
+        return [
+            by_id[model_id]
+            for model_id in self.required_model_ids_for_profile(profile)
+            if model_id in by_id
+        ]
+
+    def mark_installed(self, model_id: str) -> None:
+        entry = self._entry(model_id)
+        self._write_manifest(entry)
+
+    def mark_profile_installed(self, profile: PipelineProfile) -> None:
+        for model_id in self.required_model_ids_for_profile(profile):
+            self.mark_installed(model_id)
+
     def _run_download(self, entry: ModelCatalogEntry, job_id: str) -> None:
         self._update_job(job_id, status="running", message=f"Downloading {entry.label}...")
         try:
@@ -173,6 +205,15 @@ class ModelDownloadService:
             if entry.id == model_id:
                 return entry
         raise KeyError(model_id)
+
+    def _transcription_model_id(self, profile: PipelineProfile) -> Optional[str]:
+        if profile.transcription_config == "parakeet":
+            return "parakeet"
+        if profile.transcription_config == "faster-whisper-large-v3":
+            return "faster-whisper-large-v3"
+        if profile.transcription_config == "faster-whisper-turbo":
+            return "faster-whisper-turbo"
+        return None
 
     def _cache_path(self, entry: ModelCatalogEntry) -> Path:
         root = model_cache_root(load_config(entry.config_name))

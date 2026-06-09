@@ -38,7 +38,7 @@ interface Props {
     onRetranscribe?: (
         recordingId: string,
         settings: RetranscribeParams,
-    ) => Promise<void>;
+    ) => Promise<boolean>;
     isCanceling?: boolean;
     onCancel?: (recordingId: string) => Promise<void>;
     isRenamingSpeakers?: boolean;
@@ -252,7 +252,7 @@ export default function RecordingDetail({
         }
 
         setRetranscribeError("");
-        await onRetranscribe(recording.id, {
+        const started = await onRetranscribe(recording.id, {
             language: retranscribeLanguage,
             model: retranscribeModel,
             device: selectedDevice,
@@ -260,7 +260,9 @@ export default function RecordingDetail({
             maxSpeakers: retranscribeExtractSpeakers ? retranscribeMaxSpeakers : "",
             extractSpeakers: retranscribeExtractSpeakers,
         });
-        setIsRetranscribeEditorOpen(false);
+        if (started) {
+            setIsRetranscribeEditorOpen(false);
+        }
     };
 
     const handleSpeakerExtractionSubmit = async (event: FormEvent<HTMLFormElement>) => {

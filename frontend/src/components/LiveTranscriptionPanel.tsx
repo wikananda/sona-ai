@@ -21,6 +21,11 @@ type LiveState = "idle" | "requesting" | "recording" | "stopping" | "saving";
 interface Props {
     projectId: string;
     runtimeDevices: RuntimeDevices;
+    onBeforeStart: (params: {
+        model: TranscriptionModel;
+        device: RuntimeDevice;
+        language?: string;
+    }) => Promise<boolean>;
     onSaved: (recording: Recording) => void;
 }
 
@@ -44,6 +49,7 @@ const AUDIO_CAPTURE_CONSTRAINTS: MediaTrackConstraints = {
 export default function LiveTranscriptionPanel({
     projectId,
     runtimeDevices,
+    onBeforeStart,
     onSaved,
 }: Props) {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -113,6 +119,15 @@ export default function LiveTranscriptionPanel({
         processingQueueRef.current = Promise.resolve();
 
         try {
+            const canStart = await onBeforeStart({
+                model,
+                device: selectedDevice,
+                language,
+            });
+            if (!canStart) {
+                setState("idle");
+                return;
+            }
             if (!includeMicrophone && !includeSystemAudio) {
                 throw new Error("Choose microphone, system audio, or both.");
             }
