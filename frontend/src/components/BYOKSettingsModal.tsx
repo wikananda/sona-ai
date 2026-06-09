@@ -21,6 +21,12 @@ import {
 } from "@/src/hooks/useBYOKSettings";
 
 type SettingsTab = "api" | "models";
+type ConfirmableModelAction = Extract<ModelJobAction, "uninstall" | "redownload">;
+
+interface PendingModelAction {
+    model: RuntimeModel;
+    action: ConfirmableModelAction;
+}
 
 interface Props {
     settings: BYOKSettingsState;
@@ -41,6 +47,7 @@ export default function BYOKSettingsModal({
     const [jobs, setJobs] = useState<Record<string, ModelJob>>({});
     const [modelError, setModelError] = useState<string | null>(null);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
+    const [pendingModelAction, setPendingModelAction] = useState<PendingModelAction | null>(null);
 
     const selectedProvider = draft.selectedProvider;
     const selectedSettings = draft.providers[selectedProvider];
@@ -145,6 +152,15 @@ export default function BYOKSettingsModal({
     };
 
     const handleModelAction = async (model: RuntimeModel, action: ModelJobAction) => {
+        if (action === "uninstall" || action === "redownload") {
+            setPendingModelAction({ model, action });
+            return;
+        }
+
+        await startModelAction(model, action);
+    };
+
+    const startModelAction = async (model: RuntimeModel, action: ModelJobAction) => {
         setModelError(null);
         try {
             const job = await startModelJob(model.id, action);
@@ -156,6 +172,14 @@ export default function BYOKSettingsModal({
         } catch (error) {
             setModelError(error instanceof Error ? error.message : `Failed to start ${action}.`);
         }
+    };
+
+    const handleConfirmModelAction = async () => {
+        if (!pendingModelAction) return;
+
+        const nextAction = pendingModelAction;
+        setPendingModelAction(null);
+        await startModelAction(nextAction.model, nextAction.action);
     };
 
     return (
@@ -270,6 +294,14 @@ export default function BYOKSettingsModal({
                     )}
                 </div>
             </form>
+            {pendingModelAction && (
+                <ConfirmModelActionModal
+                    model={pendingModelAction.model}
+                    action={pendingModelAction.action}
+                    onCancel={() => setPendingModelAction(null)}
+                    onConfirm={() => void handleConfirmModelAction()}
+                />
+            )}
         </div>
     );
 }
@@ -455,6 +487,78 @@ function ModelSettings({
                         />
                     ))
                 )}
+            </div>
+        </div>
+    );
+}
+
+function ConfirmModelActionModal({
+    model,
+    action,
+    onCancel,
+    onConfirm,
+}: {
+    model: RuntimeModel;
+    action: ConfirmableModelAction;
+    onCancel: () => void;
+    onConfirm: () => void;
+}) {
+    const isRedownload = action === "redownload";
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+            <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
+                <div className="border-b border-zinc-200 px-5 py-4">
+                    <h3 className="text-base font-semibold text-zinc-950">
+                        {isRedownload ? "Re-download model" : "Uninstall model"}
+                    </h3>
+                    <p className="mt-1 text-sm text-zinc-500">
+                        {isRedownload
+                            ? "This will remove the current cached files before downloading the model again."
+                            : "This will remove the cached model files from local storage."}
+                    </p>
+                </div>
+
+                <div className="flex flex-col gap-3 px-5 py-4">
+                    <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-3">
+                        <p className="text-sm font-medium text-zinc-950">
+                            {model.label}
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-500">
+                            {model.type} / {model.environment}
+                        </p>
+                        <p className="mt-2 break-all text-xs text-zinc-500">
+                            Cache: {model.cache_path}
+                        </p>
+                    </div>
+
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                        {isRedownload
+                            ? "The model cache will be deleted first, then Sona will fetch a fresh copy."
+                            : "The model cache will be deleted. The next use will require downloading the model again."}
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-zinc-200 px-5 py-4">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        className={`min-h-10 rounded-md px-4 text-sm font-medium text-white ${
+                            isRedownload
+                                ? "bg-zinc-950"
+                                : "bg-red-700 hover:bg-red-800"
+                        }`}
+                    >
+                        {isRedownload ? "Re-download" : "Uninstall"}
+                    </button>
+                </div>
             </div>
         </div>
     );
