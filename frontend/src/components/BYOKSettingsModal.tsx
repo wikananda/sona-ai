@@ -14,13 +14,18 @@ import {
 } from "@/src/api/sonaApi";
 import { BYOK_PROVIDERS } from "@/src/utils/constants";
 import {
-    BYOKEntry,
-    BYOKEntryDraft,
+    BYOKConnection,
+    BYOKConnectionDraft,
+    BYOKModelPreset,
+    BYOKModelPresetDraft,
     BYOKSettingsState,
-    byokEntryLabel,
+    byokConnectionLabel,
+    byokResolvedModelPresetLabel,
     clearAllKeys,
-    createBYOKEntry,
-    isBYOKEntryConfigured,
+    createBYOKConnection,
+    createBYOKModelPreset,
+    isBYOKConnectionConfigured,
+    isBYOKModelPresetConfigured,
     providerDefaultModel,
     providerLabel,
 } from "@/src/hooks/useBYOKSettings";
@@ -33,8 +38,14 @@ interface PendingModelAction {
     action: ConfirmableModelAction;
 }
 
-interface PendingApiEntryDelete {
-    entry: BYOKEntry;
+interface PendingConnectionDelete {
+    connection: BYOKConnection;
+    linkedPresetCount: number;
+}
+
+interface PendingModelPresetDelete {
+    preset: BYOKModelPreset;
+    label: string;
 }
 
 interface Props {
@@ -57,14 +68,23 @@ export default function BYOKSettingsModal({
     const [modelError, setModelError] = useState<string | null>(null);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
     const [pendingModelAction, setPendingModelAction] = useState<PendingModelAction | null>(null);
-    const [editingEntry, setEditingEntry] = useState<BYOKEntry | null>(null);
-    const [isAddingEntry, setIsAddingEntry] = useState(false);
-    const [pendingApiEntryDelete, setPendingApiEntryDelete] =
-        useState<PendingApiEntryDelete | null>(null);
+    const [editingConnection, setEditingConnection] = useState<BYOKConnection | null>(null);
+    const [isAddingConnection, setIsAddingConnection] = useState(false);
+    const [pendingConnectionDelete, setPendingConnectionDelete] =
+        useState<PendingConnectionDelete | null>(null);
+    const [editingModelPreset, setEditingModelPreset] = useState<BYOKModelPreset | null>(null);
+    const [isAddingModelPreset, setIsAddingModelPreset] = useState(false);
+    const [pendingModelPresetDelete, setPendingModelPresetDelete] =
+        useState<PendingModelPresetDelete | null>(null);
 
     const activeDownloadJobs = useMemo(
         () => Object.values(jobs).filter((job) => isActiveJob(job)),
         [jobs],
+    );
+
+    const connectionMap = useMemo(
+        () => new Map(draft.connections.map((connection) => [connection.id, connection])),
+        [draft.connections],
     );
 
     const loadModels = useCallback(async () => {
@@ -118,7 +138,8 @@ export default function BYOKSettingsModal({
         event.preventDefault();
         onSave({
             rememberKeys: draft.rememberKeys,
-            entries: draft.entries.map(trimEntry),
+            connections: draft.connections.map(trimConnection),
+            modelPresets: draft.modelPresets.map(trimModelPreset),
         });
     };
 
@@ -158,50 +179,89 @@ export default function BYOKSettingsModal({
         await startModelAction(nextAction.model, nextAction.action);
     };
 
-    const handleSaveApiEntry = (entryDraft: BYOKEntryDraft, entryId?: string) => {
-        const nextEntry: BYOKEntry = {
-            id: entryId ?? createBYOKEntry().id,
-            provider: entryDraft.provider,
-            apiKey: entryDraft.apiKey.trim(),
-            model: entryDraft.model.trim(),
-            baseUrl: entryDraft.provider === "custom" ? entryDraft.baseUrl.trim() : "",
+    const handleSaveConnection = (connectionDraft: BYOKConnectionDraft, connectionId?: string) => {
+        const nextConnection: BYOKConnection = {
+            id: connectionId ?? createBYOKConnection().id,
+            name: connectionDraft.name.trim(),
+            provider: connectionDraft.provider,
+            apiKey: connectionDraft.apiKey.trim(),
+            baseUrl: connectionDraft.provider === "custom" ? connectionDraft.baseUrl.trim() : "",
         };
 
         setDraft((current) => {
-            if (entryId) {
+            if (connectionId) {
                 return {
                     ...current,
-                    entries: current.entries.map((entry) =>
-                        entry.id === entryId ? nextEntry : entry,
+                    connections: current.connections.map((connection) =>
+                        connection.id === connectionId ? nextConnection : connection,
                     ),
                 };
             }
 
             return {
                 ...current,
-                entries: [...current.entries, nextEntry],
+                connections: [...current.connections, nextConnection],
             };
         });
-        setEditingEntry(null);
-        setIsAddingEntry(false);
+        setEditingConnection(null);
+        setIsAddingConnection(false);
     };
 
-    const handleConfirmDeleteApiEntry = () => {
-        if (!pendingApiEntryDelete) return;
+    const handleSaveModelPreset = (presetDraft: BYOKModelPresetDraft, presetId?: string) => {
+        const nextPreset: BYOKModelPreset = {
+            id: presetId ?? createBYOKModelPreset().id,
+            connectionId: presetDraft.connectionId,
+            model: presetDraft.model.trim(),
+            name: presetDraft.name.trim(),
+        };
 
-        const deleteId = pendingApiEntryDelete.entry.id;
+        setDraft((current) => {
+            if (presetId) {
+                return {
+                    ...current,
+                    modelPresets: current.modelPresets.map((preset) =>
+                        preset.id === presetId ? nextPreset : preset,
+                    ),
+                };
+            }
+
+            return {
+                ...current,
+                modelPresets: [...current.modelPresets, nextPreset],
+            };
+        });
+        setEditingModelPreset(null);
+        setIsAddingModelPreset(false);
+    };
+
+    const handleConfirmDeleteConnection = () => {
+        if (!pendingConnectionDelete) return;
+
+        const deleteId = pendingConnectionDelete.connection.id;
         setDraft((current) => ({
             ...current,
-            entries: current.entries.filter((entry) => entry.id !== deleteId),
+            connections: current.connections.filter((connection) => connection.id !== deleteId),
+            modelPresets: current.modelPresets.filter((preset) => preset.connectionId !== deleteId),
         }));
-        setPendingApiEntryDelete(null);
+        setPendingConnectionDelete(null);
+    };
+
+    const handleConfirmDeleteModelPreset = () => {
+        if (!pendingModelPresetDelete) return;
+
+        const deleteId = pendingModelPresetDelete.preset.id;
+        setDraft((current) => ({
+            ...current,
+            modelPresets: current.modelPresets.filter((preset) => preset.id !== deleteId),
+        }));
+        setPendingModelPresetDelete(null);
     };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
             <form
                 onSubmit={handleSubmit}
-                className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-xl"
+                className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl"
             >
                 <div className="flex items-start justify-between gap-4 border-b border-zinc-200 px-5 py-4">
                     <div>
@@ -243,9 +303,24 @@ export default function BYOKSettingsModal({
                     {activeTab === "api" ? (
                         <ApiProviderSettings
                             draft={draft}
-                            onAdd={() => setIsAddingEntry(true)}
-                            onEdit={setEditingEntry}
-                            onDelete={(entry) => setPendingApiEntryDelete({ entry })}
+                            connectionMap={connectionMap}
+                            onAddConnection={() => setIsAddingConnection(true)}
+                            onEditConnection={setEditingConnection}
+                            onDeleteConnection={(connection) => {
+                                const linkedPresetCount = draft.modelPresets.filter(
+                                    (preset) => preset.connectionId === connection.id,
+                                ).length;
+                                setPendingConnectionDelete({ connection, linkedPresetCount });
+                            }}
+                            onAddModelPreset={() => setIsAddingModelPreset(true)}
+                            onEditModelPreset={setEditingModelPreset}
+                            onDeleteModelPreset={(preset) => {
+                                const connection = connectionMap.get(preset.connectionId);
+                                const label = connection
+                                    ? byokResolvedModelPresetLabel({ ...preset, connection })
+                                    : preset.name.trim() || preset.model.trim() || "Model preset";
+                                setPendingModelPresetDelete({ preset, label });
+                            }}
                             onRememberKeysChange={updateRememberKeys}
                         />
                     ) : (
@@ -309,21 +384,40 @@ export default function BYOKSettingsModal({
                     onConfirm={() => void handleConfirmModelAction()}
                 />
             )}
-            {(isAddingEntry || editingEntry) && (
-                <ApiEntryFormModal
-                    entry={editingEntry}
+            {(isAddingConnection || editingConnection) && (
+                <ConnectionFormModal
+                    connection={editingConnection}
                     onCancel={() => {
-                        setEditingEntry(null);
-                        setIsAddingEntry(false);
+                        setEditingConnection(null);
+                        setIsAddingConnection(false);
                     }}
-                    onSave={handleSaveApiEntry}
+                    onSave={handleSaveConnection}
                 />
             )}
-            {pendingApiEntryDelete && (
-                <ConfirmApiEntryDeleteModal
-                    entry={pendingApiEntryDelete.entry}
-                    onCancel={() => setPendingApiEntryDelete(null)}
-                    onConfirm={handleConfirmDeleteApiEntry}
+            {(isAddingModelPreset || editingModelPreset) && (
+                <ModelPresetFormModal
+                    preset={editingModelPreset}
+                    connections={draft.connections}
+                    onCancel={() => {
+                        setEditingModelPreset(null);
+                        setIsAddingModelPreset(false);
+                    }}
+                    onSave={handleSaveModelPreset}
+                />
+            )}
+            {pendingConnectionDelete && (
+                <ConfirmConnectionDeleteModal
+                    connection={pendingConnectionDelete.connection}
+                    linkedPresetCount={pendingConnectionDelete.linkedPresetCount}
+                    onCancel={() => setPendingConnectionDelete(null)}
+                    onConfirm={handleConfirmDeleteConnection}
+                />
+            )}
+            {pendingModelPresetDelete && (
+                <ConfirmModelPresetDeleteModal
+                    label={pendingModelPresetDelete.label}
+                    onCancel={() => setPendingModelPresetDelete(null)}
+                    onConfirm={handleConfirmDeleteModelPreset}
                 />
             )}
         </div>
@@ -356,53 +450,116 @@ function TabButton({
 
 function ApiProviderSettings({
     draft,
-    onAdd,
-    onEdit,
-    onDelete,
+    connectionMap,
+    onAddConnection,
+    onEditConnection,
+    onDeleteConnection,
+    onAddModelPreset,
+    onEditModelPreset,
+    onDeleteModelPreset,
     onRememberKeysChange,
 }: {
     draft: BYOKSettingsState;
-    onAdd: () => void;
-    onEdit: (entry: BYOKEntry) => void;
-    onDelete: (entry: BYOKEntry) => void;
+    connectionMap: Map<string, BYOKConnection>;
+    onAddConnection: () => void;
+    onEditConnection: (connection: BYOKConnection) => void;
+    onDeleteConnection: (connection: BYOKConnection) => void;
+    onAddModelPreset: () => void;
+    onEditModelPreset: (preset: BYOKModelPreset) => void;
+    onDeleteModelPreset: (preset: BYOKModelPreset) => void;
     onRememberKeysChange: (rememberKeys: boolean) => void;
 }) {
     return (
-        <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h3 className="text-sm font-semibold text-zinc-950">
-                        API provider presets
-                    </h3>
-                    <p className="mt-1 text-sm text-zinc-500">
-                        Save OpenAI-compatible API presets for summary and chat.
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    onClick={onAdd}
-                    className="min-h-9 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white"
-                >
-                    + Add
-                </button>
+        <div className="flex flex-col gap-6">
+            <div>
+                <h3 className="text-sm font-semibold text-zinc-950">
+                    API providers
+                </h3>
+                <p className="mt-1 text-sm text-zinc-500">
+                    Save credentials once as reusable connections, then create model presets that point to them.
+                </p>
             </div>
 
-            <div className="flex flex-col gap-3">
-                {draft.entries.length === 0 ? (
-                    <div className="rounded-md border border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500">
-                        No API provider presets yet.
+            <section className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h4 className="text-sm font-semibold text-zinc-950">
+                            Connections
+                        </h4>
+                        <p className="mt-1 text-sm text-zinc-500">
+                            A connection stores provider, API key, and base URL.
+                        </p>
                     </div>
-                ) : (
-                    draft.entries.map((entry) => (
-                        <ApiEntryRow
-                            key={entry.id}
-                            entry={entry}
-                            onEdit={() => onEdit(entry)}
-                            onDelete={() => onDelete(entry)}
-                        />
-                    ))
-                )}
-            </div>
+                    <button
+                        type="button"
+                        onClick={onAddConnection}
+                        className="min-h-9 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white"
+                    >
+                        + Add connection
+                    </button>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                    {draft.connections.length === 0 ? (
+                        <div className="rounded-md border border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500">
+                            No connections yet.
+                        </div>
+                    ) : (
+                        draft.connections.map((connection) => (
+                            <ConnectionRow
+                                key={connection.id}
+                                connection={connection}
+                                linkedPresetCount={draft.modelPresets.filter(
+                                    (preset) => preset.connectionId === connection.id,
+                                ).length}
+                                onEdit={() => onEditConnection(connection)}
+                                onDelete={() => onDeleteConnection(connection)}
+                            />
+                        ))
+                    )}
+                </div>
+            </section>
+
+            <section className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h4 className="text-sm font-semibold text-zinc-950">
+                            Model presets
+                        </h4>
+                        <p className="mt-1 text-sm text-zinc-500">
+                            These are the flat model choices shown in Summary and Chat.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onAddModelPreset}
+                        disabled={draft.connections.length === 0}
+                        className="min-h-9 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+                    >
+                        + Add model preset
+                    </button>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                    {draft.modelPresets.length === 0 ? (
+                        <div className="rounded-md border border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500">
+                            {draft.connections.length === 0
+                                ? "Create a connection before adding model presets."
+                                : "No model presets yet."}
+                        </div>
+                    ) : (
+                        draft.modelPresets.map((preset) => (
+                            <ModelPresetRow
+                                key={preset.id}
+                                preset={preset}
+                                connection={connectionMap.get(preset.connectionId)}
+                                onEdit={() => onEditModelPreset(preset)}
+                                onDelete={() => onDeleteModelPreset(preset)}
+                            />
+                        ))
+                    )}
+                </div>
+            </section>
 
             <label className="flex items-start gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
                 <input
@@ -424,25 +581,27 @@ function ApiProviderSettings({
     );
 }
 
-function ApiEntryRow({
-    entry,
+function ConnectionRow({
+    connection,
+    linkedPresetCount,
     onEdit,
     onDelete,
 }: {
-    entry: BYOKEntry;
+    connection: BYOKConnection;
+    linkedPresetCount: number;
     onEdit: () => void;
     onDelete: () => void;
 }) {
-    const isConfigured = isBYOKEntryConfigured(entry);
+    const isConfigured = isBYOKConnectionConfigured(connection);
 
     return (
         <div className="rounded-md border border-zinc-200 p-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="text-sm font-semibold text-zinc-950">
-                            {byokEntryLabel(entry)}
-                        </h4>
+                        <h5 className="text-sm font-semibold text-zinc-950">
+                            {byokConnectionLabel(connection)}
+                        </h5>
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                             isConfigured
                                 ? "bg-emerald-100 text-emerald-800"
@@ -453,13 +612,16 @@ function ApiEntryRow({
                         </span>
                     </div>
                     <p className="mt-1 text-xs text-zinc-500">
-                        {providerLabel(entry.provider)}
+                        {providerLabel(connection.provider)}
                     </p>
-                    {entry.provider === "custom" && (
+                    {connection.provider === "custom" && (
                         <p className="mt-1 break-all text-xs text-zinc-400">
-                            Base URL: {entry.baseUrl || "Missing"}
+                            Base URL: {connection.baseUrl || "Missing"}
                         </p>
                     )}
+                    <p className="mt-2 text-xs text-zinc-500">
+                        {linkedPresetCount} model preset{linkedPresetCount === 1 ? "" : "s"}
+                    </p>
                 </div>
                 <div className="flex gap-2">
                     <button
@@ -482,20 +644,84 @@ function ApiEntryRow({
     );
 }
 
-function ApiEntryFormModal({
-    entry,
+function ModelPresetRow({
+    preset,
+    connection,
+    onEdit,
+    onDelete,
+}: {
+    preset: BYOKModelPreset;
+    connection?: BYOKConnection;
+    onEdit: () => void;
+    onDelete: () => void;
+}) {
+    const isConfigured = connection
+        ? isBYOKConnectionConfigured(connection) && isBYOKModelPresetConfigured(preset)
+        : false;
+
+    const label = connection
+        ? byokResolvedModelPresetLabel({ ...preset, connection })
+        : preset.name.trim() || preset.model.trim() || "Model preset";
+
+    return (
+        <div className="rounded-md border border-zinc-200 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h5 className="text-sm font-semibold text-zinc-950">
+                            {label}
+                        </h5>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            isConfigured
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-amber-100 text-amber-800"
+                        }`}
+                        >
+                            {isConfigured ? "Ready" : "Incomplete"}
+                        </span>
+                    </div>
+                    <p className="mt-1 text-xs text-zinc-500">
+                        {connection ? byokConnectionLabel(connection) : "Missing connection"}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-400">
+                        Model: {preset.model || "Missing"}
+                    </p>
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={onEdit}
+                        className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                    >
+                        Edit
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onDelete}
+                        className="min-h-9 rounded-md border border-red-200 px-3 text-sm font-medium text-red-700 hover:border-red-300 hover:text-red-800"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ConnectionFormModal({
+    connection,
     onCancel,
     onSave,
 }: {
-    entry: BYOKEntry | null;
+    connection: BYOKConnection | null;
     onCancel: () => void;
-    onSave: (draft: BYOKEntryDraft, entryId?: string) => void;
+    onSave: (draft: BYOKConnectionDraft, connectionId?: string) => void;
 }) {
-    const [draft, setDraft] = useState<BYOKEntryDraft>(() => ({
-        provider: entry?.provider ?? "openai",
-        apiKey: entry?.apiKey ?? "",
-        model: entry?.model ?? providerDefaultModel(entry?.provider ?? "openai"),
-        baseUrl: entry?.baseUrl ?? "",
+    const [draft, setDraft] = useState<BYOKConnectionDraft>(() => ({
+        name: connection?.name ?? providerLabel(connection?.provider ?? "openai"),
+        provider: connection?.provider ?? "openai",
+        apiKey: connection?.apiKey ?? "",
+        baseUrl: connection?.baseUrl ?? "",
     }));
     const [error, setError] = useState("");
 
@@ -503,7 +729,7 @@ function ApiEntryFormModal({
         setDraft((current) => ({
             ...current,
             provider,
-            model: current.model.trim() ? current.model : providerDefaultModel(provider),
+            name: current.name.trim() ? current.name : providerLabel(provider),
             baseUrl: provider === "custom" ? current.baseUrl : "",
         }));
         setError("");
@@ -513,18 +739,18 @@ function ApiEntryFormModal({
         event.preventDefault();
 
         const nextDraft = {
+            name: draft.name.trim(),
             provider: draft.provider,
             apiKey: draft.apiKey.trim(),
-            model: draft.model.trim(),
             baseUrl: draft.baseUrl.trim(),
         };
 
-        if (!nextDraft.apiKey) {
-            setError("API key is required.");
+        if (!nextDraft.name) {
+            setError("Connection name is required.");
             return;
         }
-        if (!nextDraft.model) {
-            setError("Model name is required.");
+        if (!nextDraft.apiKey) {
+            setError("API key is required.");
             return;
         }
         if (nextDraft.provider === "custom" && !nextDraft.baseUrl) {
@@ -532,7 +758,7 @@ function ApiEntryFormModal({
             return;
         }
 
-        onSave(nextDraft, entry?.id);
+        onSave(nextDraft, connection?.id);
     };
 
     return (
@@ -543,14 +769,30 @@ function ApiEntryFormModal({
             >
                 <div className="border-b border-zinc-200 px-5 py-4">
                     <h3 className="text-base font-semibold text-zinc-950">
-                        {entry ? "Edit API preset" : "Add API preset"}
+                        {connection ? "Edit connection" : "Add connection"}
                     </h3>
                     <p className="mt-1 text-sm text-zinc-500">
-                        Configure an OpenAI-compatible provider preset.
+                        Configure reusable provider credentials.
                     </p>
                 </div>
 
                 <div className="flex flex-col gap-4 px-5 py-4">
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-zinc-500">
+                            Connection name
+                        </span>
+                        <input
+                            type="text"
+                            value={draft.name}
+                            onChange={(event) => {
+                                setDraft((current) => ({ ...current, name: event.target.value }));
+                                setError("");
+                            }}
+                            placeholder="Groq personal"
+                            className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
+                        />
+                    </label>
+
                     <label className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-zinc-500">
                             Provider
@@ -580,22 +822,6 @@ function ApiEntryFormModal({
                                 setError("");
                             }}
                             placeholder="sk-..."
-                            className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
-                        />
-                    </label>
-
-                    <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-zinc-500">
-                            Model name
-                        </span>
-                        <input
-                            type="text"
-                            value={draft.model}
-                            onChange={(event) => {
-                                setDraft((current) => ({ ...current, model: event.target.value }));
-                                setError("");
-                            }}
-                            placeholder="gpt-4o-mini"
                             className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
                         />
                     </label>
@@ -637,7 +863,7 @@ function ApiEntryFormModal({
                         type="submit"
                         className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white"
                     >
-                        {entry ? "Save preset" : "Add preset"}
+                        {connection ? "Save connection" : "Add connection"}
                     </button>
                 </div>
             </form>
@@ -645,12 +871,156 @@ function ApiEntryFormModal({
     );
 }
 
-function ConfirmApiEntryDeleteModal({
-    entry,
+function ModelPresetFormModal({
+    preset,
+    connections,
+    onCancel,
+    onSave,
+}: {
+    preset: BYOKModelPreset | null;
+    connections: BYOKConnection[];
+    onCancel: () => void;
+    onSave: (draft: BYOKModelPresetDraft, presetId?: string) => void;
+}) {
+    const initialConnection = connections.find((connection) => connection.id === preset?.connectionId) ?? connections[0];
+    const [draft, setDraft] = useState<BYOKModelPresetDraft>(() => ({
+        connectionId: preset?.connectionId ?? initialConnection?.id ?? "",
+        model: preset?.model ?? providerDefaultModel(initialConnection?.provider ?? "openai"),
+        name: preset?.name ?? "",
+    }));
+    const [error, setError] = useState("");
+
+    const updateConnectionId = (connectionId: string) => {
+        const connection = connections.find((item) => item.id === connectionId);
+        setDraft((current) => ({
+            ...current,
+            connectionId,
+            model: current.model.trim() ? current.model : providerDefaultModel(connection?.provider ?? "openai"),
+        }));
+        setError("");
+    };
+
+    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        const nextDraft = {
+            connectionId: draft.connectionId,
+            model: draft.model.trim(),
+            name: draft.name.trim(),
+        };
+
+        if (!nextDraft.connectionId) {
+            setError("Connection is required.");
+            return;
+        }
+        if (!nextDraft.model) {
+            setError("Model name is required.");
+            return;
+        }
+
+        onSave(nextDraft, preset?.id);
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+            <form
+                onSubmit={handleSubmit}
+                className="w-full max-w-lg rounded-lg bg-white shadow-xl"
+            >
+                <div className="border-b border-zinc-200 px-5 py-4">
+                    <h3 className="text-base font-semibold text-zinc-950">
+                        {preset ? "Edit model preset" : "Add model preset"}
+                    </h3>
+                    <p className="mt-1 text-sm text-zinc-500">
+                        Create a reusable model choice for Summary and Chat.
+                    </p>
+                </div>
+
+                <div className="flex flex-col gap-4 px-5 py-4">
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-zinc-500">
+                            Connection
+                        </span>
+                        <select
+                            value={draft.connectionId}
+                            onChange={(event) => updateConnectionId(event.target.value)}
+                            className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900"
+                        >
+                            {connections.map((connection) => (
+                                <option key={connection.id} value={connection.id}>
+                                    {byokConnectionLabel(connection)}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-zinc-500">
+                            Model name
+                        </span>
+                        <input
+                            type="text"
+                            value={draft.model}
+                            onChange={(event) => {
+                                setDraft((current) => ({ ...current, model: event.target.value }));
+                                setError("");
+                            }}
+                            placeholder="llama-3.1-8b-instant"
+                            className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
+                        />
+                    </label>
+
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-zinc-500">
+                            Display name (optional)
+                        </span>
+                        <input
+                            type="text"
+                            value={draft.name}
+                            onChange={(event) => {
+                                setDraft((current) => ({ ...current, name: event.target.value }));
+                                setError("");
+                            }}
+                            placeholder="Groq fast summary"
+                            className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900"
+                        />
+                    </label>
+
+                    {error && (
+                        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                            {error}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-zinc-200 px-5 py-4">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white"
+                    >
+                        {preset ? "Save preset" : "Add preset"}
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+}
+
+function ConfirmConnectionDeleteModal({
+    connection,
+    linkedPresetCount,
     onCancel,
     onConfirm,
 }: {
-    entry: BYOKEntry;
+    connection: BYOKConnection;
+    linkedPresetCount: number;
     onCancel: () => void;
     onConfirm: () => void;
 }) {
@@ -659,21 +1029,25 @@ function ConfirmApiEntryDeleteModal({
             <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
                 <div className="border-b border-zinc-200 px-5 py-4">
                     <h3 className="text-base font-semibold text-zinc-950">
-                        Delete API preset
+                        Delete connection
                     </h3>
                     <p className="mt-1 text-sm text-zinc-500">
-                        This removes the saved provider preset from this browser.
+                        This removes the saved connection from this browser.
                     </p>
                 </div>
 
-                <div className="px-5 py-4">
+                <div className="flex flex-col gap-3 px-5 py-4">
                     <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-3">
                         <p className="text-sm font-medium text-zinc-950">
-                            {byokEntryLabel(entry)}
+                            {byokConnectionLabel(connection)}
                         </p>
                         <p className="mt-1 text-xs text-zinc-500">
-                            {providerLabel(entry.provider)}
+                            {providerLabel(connection.provider)}
                         </p>
+                    </div>
+
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                        Deleting this connection will also delete {linkedPresetCount} linked model preset{linkedPresetCount === 1 ? "" : "s"}.
                     </div>
                 </div>
 
@@ -698,62 +1072,51 @@ function ConfirmApiEntryDeleteModal({
     );
 }
 
-function ModelSettings({
-    models,
-    jobs,
-    error,
-    isLoading,
-    onRefresh,
-    onAction,
+function ConfirmModelPresetDeleteModal({
+    label,
+    onCancel,
+    onConfirm,
 }: {
-    models: RuntimeModel[];
-    jobs: Record<string, ModelJob>;
-    error: string | null;
-    isLoading: boolean;
-    onRefresh: () => void;
-    onAction: (model: RuntimeModel, action: ModelJobAction) => void;
+    label: string;
+    onCancel: () => void;
+    onConfirm: () => void;
 }) {
     return (
-        <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between gap-3">
-                <div>
-                    <h3 className="text-sm font-semibold text-zinc-950">
-                        Speech models
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+            <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
+                <div className="border-b border-zinc-200 px-5 py-4">
+                    <h3 className="text-base font-semibold text-zinc-950">
+                        Delete model preset
                     </h3>
                     <p className="mt-1 text-sm text-zinc-500">
-                        Download ASR, alignment, and diarization models into the backend cache.
+                        This removes the saved model preset from this browser.
                     </p>
                 </div>
-                <button
-                    type="button"
-                    onClick={onRefresh}
-                    className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
-                >
-                    {isLoading ? "Refreshing..." : "Refresh"}
-                </button>
-            </div>
 
-            {error && (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                    {error}
-                </div>
-            )}
-
-            <div className="flex flex-col gap-3">
-                {models.length === 0 && !isLoading ? (
-                    <div className="rounded-md border border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500">
-                        No model information available.
+                <div className="px-5 py-4">
+                    <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-3">
+                        <p className="text-sm font-medium text-zinc-950">
+                            {label}
+                        </p>
                     </div>
-                ) : (
-                    models.map((model) => (
-                        <ModelRow
-                            key={model.id}
-                            model={model}
-                            job={model.active_job_id ? jobs[model.active_job_id] : undefined}
-                            onAction={onAction}
-                        />
-                    ))
-                )}
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-zinc-200 px-5 py-4">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        className="min-h-10 rounded-md bg-red-700 px-4 text-sm font-medium text-white hover:bg-red-800"
+                    >
+                        Delete
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -826,6 +1189,67 @@ function ConfirmModelActionModal({
                         {isRedownload ? "Re-download" : "Uninstall"}
                     </button>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+function ModelSettings({
+    models,
+    jobs,
+    error,
+    isLoading,
+    onRefresh,
+    onAction,
+}: {
+    models: RuntimeModel[];
+    jobs: Record<string, ModelJob>;
+    error: string | null;
+    isLoading: boolean;
+    onRefresh: () => void;
+    onAction: (model: RuntimeModel, action: ModelJobAction) => void;
+}) {
+    return (
+        <div className="flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-3">
+                <div>
+                    <h3 className="text-sm font-semibold text-zinc-950">
+                        Speech models
+                    </h3>
+                    <p className="mt-1 text-sm text-zinc-500">
+                        Download ASR, alignment, and diarization models into the backend cache.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={onRefresh}
+                    className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                >
+                    {isLoading ? "Refreshing..." : "Refresh"}
+                </button>
+            </div>
+
+            {error && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {error}
+                </div>
+            )}
+
+            <div className="flex flex-col gap-3">
+                {models.length === 0 && !isLoading ? (
+                    <div className="rounded-md border border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500">
+                        No model information available.
+                    </div>
+                ) : (
+                    models.map((model) => (
+                        <ModelRow
+                            key={model.id}
+                            model={model}
+                            job={model.active_job_id ? jobs[model.active_job_id] : undefined}
+                            onAction={onAction}
+                        />
+                    ))
+                )}
             </div>
         </div>
     );
@@ -939,12 +1363,21 @@ function ModelRow({
     );
 }
 
-function trimEntry(entry: BYOKEntry): BYOKEntry {
+function trimConnection(connection: BYOKConnection): BYOKConnection {
     return {
-        ...entry,
-        apiKey: entry.apiKey.trim(),
-        model: entry.model.trim(),
-        baseUrl: entry.provider === "custom" ? entry.baseUrl.trim() : "",
+        ...connection,
+        name: connection.name.trim(),
+        apiKey: connection.apiKey.trim(),
+        baseUrl: connection.provider === "custom" ? connection.baseUrl.trim() : "",
+    };
+}
+
+function trimModelPreset(preset: BYOKModelPreset): BYOKModelPreset {
+    return {
+        ...preset,
+        connectionId: preset.connectionId.trim(),
+        model: preset.model.trim(),
+        name: preset.name.trim(),
     };
 }
 

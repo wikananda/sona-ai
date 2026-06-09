@@ -10,7 +10,10 @@ import {
     SummaryMode,
     LocalLLMModel
 } from "@/src/api/sonaApi";
-import { BYOKEntry, byokEntryLabel } from "@/src/hooks/useBYOKSettings";
+import {
+    BYOKResolvedModelPreset,
+    byokResolvedModelPresetLabel,
+} from "@/src/hooks/useBYOKSettings";
 import { exportSummaryPdf } from "@/src/utils/pdfExport";
 import { remarkHtmlLineBreaks } from "@/src/utils/markdownPlugins";
 
@@ -29,9 +32,9 @@ interface Props {
     runtimeDevices: RuntimeDevices;
     selectedMode: SummaryMode;
     onModeChange: (mode: SummaryMode) => void;
-    byokEntries: BYOKEntry[];
-    selectedBYOKEntryId: string;
-    onBYOKEntryChange: (entryId: string) => void;
+    byokModelPresets: BYOKResolvedModelPreset[];
+    selectedBYOKPresetId: string;
+    onBYOKPresetChange: (presetId: string) => void;
     onOpenSettings: () => void;
     customInstruction: string;
     onCustomInstructionChange: (instruction: string) => void;
@@ -52,9 +55,9 @@ export default function SummaryPanel({
     runtimeDevices,
     selectedMode,
     onModeChange,
-    byokEntries,
-    selectedBYOKEntryId,
-    onBYOKEntryChange,
+    byokModelPresets,
+    selectedBYOKPresetId,
+    onBYOKPresetChange,
     onOpenSettings,
     customInstruction,
     onCustomInstructionChange,
@@ -70,7 +73,7 @@ export default function SummaryPanel({
     const [isExportingPdf, setIsExportingPdf] = useState(false);
     const [exportError, setExportError] = useState("");
     const isBusy = isLoading || isSavingSummary;
-    const hasBYOKEntries = byokEntries.length > 0;
+    const hasBYOKPresets = byokModelPresets.length > 0;
 
     const openSummaryEditor = () => {
         setSummaryDraft(summary);
@@ -209,15 +212,15 @@ export default function SummaryPanel({
                     {selectedMode === "byok" && (
                         <div className="flex flex-wrap items-center gap-3">
                             <select
-                                value={hasBYOKEntries ? selectedBYOKEntryId : ""}
-                                onChange={(event) => onBYOKEntryChange(event.target.value)}
-                                disabled={isBusy || !hasBYOKEntries}
+                                value={hasBYOKPresets ? selectedBYOKPresetId : ""}
+                                onChange={(event) => onBYOKPresetChange(event.target.value)}
+                                disabled={isBusy || !hasBYOKPresets}
                                 className="min-h-10 min-w-56 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                {hasBYOKEntries ? (
-                                    byokEntries.map((entry) => (
-                                        <option key={entry.id} value={entry.id}>
-                                            {byokEntryLabel(entry)}
+                                {hasBYOKPresets ? (
+                                    byokModelPresets.map((preset) => (
+                                        <option key={preset.id} value={preset.id}>
+                                            {byokResolvedModelPresetLabel(preset)}
                                         </option>
                                     ))
                                 ) : (
@@ -268,7 +271,7 @@ export default function SummaryPanel({
                 </div>
             </div>
 
-            {selectedMode === "byok" && !hasBYOKEntries && (
+            {selectedMode === "byok" && !hasBYOKPresets && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                     Add an API preset before running BYOK summary.
                 </div>

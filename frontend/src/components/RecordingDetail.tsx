@@ -16,9 +16,8 @@ import {
     TranscriptSegmentUpdateParams,
 } from "@/src/api/sonaApi";
 import {
-    BYOKEntry,
-    byokEntryToSettings,
-    isBYOKEntryConfigured,
+    BYOKResolvedModelPreset,
+    byokResolvedModelPresetToSettings,
 } from "@/src/hooks/useBYOKSettings";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import RecordingChatPanel from "@/src/components/RecordingChatPanel";
@@ -71,7 +70,7 @@ interface Props {
         recordingId: string,
         params: RecordingSummaryUpdateParams,
     ) => Promise<void>;
-    byokEntries: BYOKEntry[];
+    byokModelPresets: BYOKResolvedModelPreset[];
     onOpenSettings: () => void;
 }
 
@@ -93,7 +92,7 @@ export default function RecordingDetail({
     onSummarize,
     isUpdatingSummary = false,
     onUpdateSummary,
-    byokEntries,
+    byokModelPresets,
     onOpenSettings,
 }: Props) {
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -119,22 +118,21 @@ export default function RecordingDetail({
     const [localLLMModel, setLocalLLMModel] = useState<LocalLLMModel>("qwen");
     const [summaryDevice, setSummaryDevice] = useState<RuntimeDevice>(runtimeDevices.default);
     const [summaryMode, setSummaryMode] = useState<SummaryMode>("local");
-    const [summaryBYOKEntryId, setSummaryBYOKEntryId] = useState("");
-    const [chatBYOKEntryId, setChatBYOKEntryId] = useState("");
-    const validBYOKEntries = byokEntries.filter(isBYOKEntryConfigured);
-    const effectiveSummaryBYOKEntryId =
-        validBYOKEntries.find((entry) => entry.id === summaryBYOKEntryId)?.id ??
-        validBYOKEntries[0]?.id ??
+    const [summaryBYOKPresetId, setSummaryBYOKPresetId] = useState("");
+    const [chatBYOKPresetId, setChatBYOKPresetId] = useState("");
+    const effectiveSummaryBYOKPresetId =
+        byokModelPresets.find((preset) => preset.id === summaryBYOKPresetId)?.id ??
+        byokModelPresets[0]?.id ??
         "";
-    const effectiveChatBYOKEntryId =
-        validBYOKEntries.find((entry) => entry.id === chatBYOKEntryId)?.id ??
-        validBYOKEntries[0]?.id ??
+    const effectiveChatBYOKPresetId =
+        byokModelPresets.find((preset) => preset.id === chatBYOKPresetId)?.id ??
+        byokModelPresets[0]?.id ??
         "";
-    const selectedSummaryEntry = validBYOKEntries.find(
-        (entry) => entry.id === effectiveSummaryBYOKEntryId,
+    const selectedSummaryPreset = byokModelPresets.find(
+        (preset) => preset.id === effectiveSummaryBYOKPresetId,
     );
-    const selectedSummaryBYOKSettings = selectedSummaryEntry
-        ? byokEntryToSettings(selectedSummaryEntry)
+    const selectedSummaryBYOKSettings = selectedSummaryPreset
+        ? byokResolvedModelPresetToSettings(selectedSummaryPreset)
         : undefined;
     const selectedSummaryDevice = runtimeDevices.available.includes(summaryDevice)
         ? summaryDevice
@@ -499,9 +497,9 @@ export default function RecordingDetail({
                                 runtimeDevices={runtimeDevices}
                                 selectedMode={summaryMode}
                                 onModeChange={setSummaryMode}
-                                byokEntries={validBYOKEntries}
-                                selectedBYOKEntryId={effectiveSummaryBYOKEntryId}
-                                onBYOKEntryChange={setSummaryBYOKEntryId}
+                                byokModelPresets={byokModelPresets}
+                                selectedBYOKPresetId={effectiveSummaryBYOKPresetId}
+                                onBYOKPresetChange={setSummaryBYOKPresetId}
                                 onOpenSettings={onOpenSettings}
                                 customInstruction={summaryInstruction}
                                 onCustomInstructionChange={setSummaryInstruction}
@@ -520,9 +518,9 @@ export default function RecordingDetail({
                             <RecordingChatPanel
                                 recordingId={recording.id}
                                 canChat={segments.length > 0}
-                                byokEntries={validBYOKEntries}
-                                selectedBYOKEntryId={effectiveChatBYOKEntryId}
-                                onBYOKEntryChange={setChatBYOKEntryId}
+                                byokModelPresets={byokModelPresets}
+                                selectedBYOKPresetId={effectiveChatBYOKPresetId}
+                                onBYOKPresetChange={setChatBYOKPresetId}
                                 onOpenSettings={onOpenSettings}
                             />
                         )}

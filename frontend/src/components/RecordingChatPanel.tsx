@@ -8,39 +8,38 @@ import {
     RecordingChatMessage,
 } from "@/src/api/sonaApi";
 import {
-    BYOKEntry,
-    byokEntryLabel,
-    byokEntryToSettings,
-    isBYOKEntryConfigured,
+    BYOKResolvedModelPreset,
+    byokResolvedModelPresetLabel,
+    byokResolvedModelPresetToSettings,
 } from "@/src/hooks/useBYOKSettings";
 import { remarkHtmlLineBreaks } from "@/src/utils/markdownPlugins";
 
 interface Props {
     recordingId: string;
     canChat: boolean;
-    byokEntries: BYOKEntry[];
-    selectedBYOKEntryId: string;
-    onBYOKEntryChange: (entryId: string) => void;
+    byokModelPresets: BYOKResolvedModelPreset[];
+    selectedBYOKPresetId: string;
+    onBYOKPresetChange: (presetId: string) => void;
     onOpenSettings: () => void;
 }
 
 export default function RecordingChatPanel({
     recordingId,
     canChat,
-    byokEntries,
-    selectedBYOKEntryId,
-    onBYOKEntryChange,
+    byokModelPresets,
+    selectedBYOKPresetId,
+    onBYOKPresetChange,
     onOpenSettings,
 }: Props) {
     const [messages, setMessages] = useState<RecordingChatMessage[]>([]);
     const [question, setQuestion] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
-    const selectedEntry = byokEntries.find((entry) => entry.id === selectedBYOKEntryId);
-    const selectedSettings = selectedEntry && isBYOKEntryConfigured(selectedEntry)
-        ? byokEntryToSettings(selectedEntry)
+    const selectedPreset = byokModelPresets.find((preset) => preset.id === selectedBYOKPresetId);
+    const selectedSettings = selectedPreset
+        ? byokResolvedModelPresetToSettings(selectedPreset)
         : undefined;
-    const hasBYOKEntries = byokEntries.length > 0;
+    const hasBYOKPresets = byokModelPresets.length > 0;
 
     const canSend =
         canChat &&
@@ -96,15 +95,15 @@ export default function RecordingChatPanel({
 
             <div className="flex flex-wrap items-center gap-3">
                 <select
-                    value={hasBYOKEntries ? selectedBYOKEntryId : ""}
-                    onChange={(event) => onBYOKEntryChange(event.target.value)}
-                    disabled={isLoading || !hasBYOKEntries}
+                    value={hasBYOKPresets ? selectedBYOKPresetId : ""}
+                    onChange={(event) => onBYOKPresetChange(event.target.value)}
+                    disabled={isLoading || !hasBYOKPresets}
                     className="min-h-10 min-w-56 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                    {hasBYOKEntries ? (
-                        byokEntries.map((entry) => (
-                            <option key={entry.id} value={entry.id}>
-                                {byokEntryLabel(entry)}
+                    {hasBYOKPresets ? (
+                        byokModelPresets.map((preset) => (
+                            <option key={preset.id} value={preset.id}>
+                                {byokResolvedModelPresetLabel(preset)}
                             </option>
                         ))
                     ) : (
@@ -121,7 +120,7 @@ export default function RecordingChatPanel({
                 </button>
             </div>
 
-            {!hasBYOKEntries && (
+            {!hasBYOKPresets && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                     Add an API preset before chatting with this recording.
                 </div>
