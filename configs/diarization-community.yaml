@@ -7,6 +7,3 @@ diarization:
     conda_env: "sona-diarization"
     tool_path: "tools/diarization/diarize_community.py"
     timeout_seconds: 1800
-
-cp_dir:
-    hf_cache: "cp/hf_cache"

@@ -44,7 +44,7 @@ configs/                  Runtime model and pipeline config
 tools/                    Standalone helper scripts
 tests/                    Backend tests and smoke scripts
 data/projects/            Local project audio, transcripts, summaries, chat data
-cp/hf_cache/              Hugging Face/model cache target
+.models/                  Local model cache target
 ```
 
 Important backend modules:
@@ -106,9 +106,10 @@ Example `.env` values:
 
 ```bash
 HF_TOKEN=your_huggingface_token
-HF_HOME=cp/hf_cache
-HUGGINGFACE_HUB_CACHE=cp/hf_cache
-TRANSFORMERS_CACHE=cp/hf_cache
+SONA_HF_CACHE=.models
+HF_HOME=.models
+HUGGINGFACE_HUB_CACHE=.models/hub
+TRANSFORMERS_CACHE=.models/transformers
 ```
 
 Start the backend:
@@ -281,7 +282,7 @@ For wider deployment, use persistent storage for:
 
 - SQLite or another database.
 - `data/projects/`.
-- `cp/hf_cache/`.
+- `.models/`.
 
 ## Status
 

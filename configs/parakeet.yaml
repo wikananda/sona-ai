@@ -3,6 +3,3 @@ model:
     language: "en"
     supported_languages: ["en"]
     batch_size: 1
-
-cp_dir:
-    hf_cache: "cp/hf_cache"

@@ -4,11 +4,8 @@ model:
     task_type: "causal"
     language: "en"
     device: "mps"
-    cp_dir: "cp/llama-3.2-3B-Instruct-mediasum"
+    cp_dir: ".models/llama-3.2-3B-Instruct-mediasum"
 
 limits:
     max_input_length: 512
     max_output_tokens: 1024
-
-cp_dir:
-    hf_cache: "cp/hf_cache"

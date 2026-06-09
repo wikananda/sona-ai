@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 from dotenv import load_dotenv
 
-from sona_ai.core import PROJECT_ROOT, Timer, setup_logging
+from sona_ai.core import PROJECT_ROOT, Timer, model_cache_root, setup_logging
 from sona_ai.diarization.schemas import DiarizationResult, SpeakerTurn
 
 
@@ -76,8 +76,7 @@ class PyannoteDiarizer:
         )
 
     def _cache_dir(self) -> Path:
-        cache_dir = self.config.get("cp_dir", {}).get("hf_cache", "cp/hf_cache")
-        return PROJECT_ROOT / cache_dir / "pyannote"
+        return model_cache_root() / "pyannote"
 
     def _patch_huggingface_hub_auth_kwarg(self) -> None:
         from huggingface_hub import hf_hub_download

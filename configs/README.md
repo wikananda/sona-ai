@@ -13,7 +13,9 @@ name, for example `load_config("speech")` resolves to `configs/speech.yaml`.
 - `diarization-community.yaml`: external pyannote Community-1 diarization.
 
 Speech runtime device defaults live in `speech.yaml`. Component configs keep
-model names, model-specific options, external tool paths, and cache settings.
+model names, model-specific options, and external tool paths. Model downloads
+share the global cache root configured by `SONA_HF_CACHE`, defaulting to
+`.models/`.
 
 ## Summarization
 

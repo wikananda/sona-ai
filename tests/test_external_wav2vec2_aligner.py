@@ -13,7 +13,7 @@ class ExternalWav2Vec2AlignerTest(unittest.TestCase):
                     "device": "cpu",
                 },
                 "alignment": {},
-                "cp_dir": {"hf_cache": "cp/hf_cache"},
+                "cp_dir": {"hf_cache": ".models"},
             }
         )
         original = TranscriptionResult(
@@ -39,7 +39,7 @@ class ExternalWav2Vec2AlignerTest(unittest.TestCase):
                     "device": "cpu",
                 },
                 "alignment": {},
-                "cp_dir": {"hf_cache": "cp/hf_cache"},
+                "cp_dir": {"hf_cache": ".models"},
             }
         )
         original = TranscriptionResult(

@@ -14,6 +14,8 @@ from sona_ai.api.routes.transcribe import router as transcribe_router
 from sona_ai.api.routes.summarize import router as summarize_router
 from sona_ai.api.routes.chat import router as chat_router
 
+import os
+
 logger = setup_logging()
 app = FastAPI(title="Sona AI API")
 
@@ -40,7 +42,7 @@ async def startup_event():
     _mark_interrupted_recordings_failed()
 
     logger.info("Setting up environment...")
-    speech_config = load_config("speech")
+    speech_config = load_config(os.getenv("SONA_SPEECH_CONFIG", "speech"))
     
     logger.info("Loading models...")
     

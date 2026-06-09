@@ -1,7 +1,7 @@
 import gc
 from typing import Dict, Optional, Union
 
-from sona_ai.core import PROJECT_ROOT, load_config, resolve_device, write_json
+from sona_ai.core import PROJECT_ROOT, load_config, model_cache_root, resolve_device, write_json
 from sona_ai.summarization.prompts import build_prompt
 
 
@@ -24,7 +24,7 @@ class GGUFLLMSummarizer:
         self.model = self._load_model()
 
     def _cache_dir(self) -> str:
-        return str(PROJECT_ROOT / self.config["cp_dir"]["hf_cache"])
+        return str(model_cache_root())
 
     def _download_model(self) -> str:
         try:

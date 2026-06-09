@@ -19,7 +19,7 @@ def transcriber_config(device: str = "cpu") -> dict:
             "vad_filter": False,
             "word_timestamps": False,
         },
-        "cp_dir": {"hf_cache": "cp/hf_cache"},
+        "cp_dir": {"hf_cache": ".models"},
     }
 
 

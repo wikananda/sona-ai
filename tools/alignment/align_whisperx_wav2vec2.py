@@ -11,7 +11,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--language", required=True)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--model-name", required=True)
-    parser.add_argument("--cache-dir", default="cp/hf_cache/wav2vec2-align")
+    parser.add_argument("--cache-dir", default=".models/wav2vec2-align")
     return parser.parse_args()
 
 

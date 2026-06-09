@@ -1,11 +1,10 @@
 import gc
-import os
 from pathlib import Path
 from typing import Optional
 
 import torch
 
-from sona_ai.core import PROJECT_ROOT, Timer, setup_logging
+from sona_ai.core import Timer, model_cache_root, setup_logging, setup_model_cache_environment
 from sona_ai.transcription.schemas import TranscriptionResult
 
 
@@ -118,19 +117,10 @@ class ParakeetTranscriber:
         return device
 
     def _cache_dir(self) -> Path:
-        cache_dir = self.config.get("cp_dir", {}).get("hf_cache", "cp/hf_cache")
-        return PROJECT_ROOT / cache_dir
+        return model_cache_root(self.config)
 
     def _setup_cache_environment(self):
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        os.environ["HF_HOME"] = str(self.cache_dir)
-        os.environ["HF_HUB_CACHE"] = str(self.cache_dir / "hub")
-        os.environ["HUGGINGFACE_HUB_CACHE"] = str(self.cache_dir / "hub")
-        os.environ["TRANSFORMERS_CACHE"] = str(self.cache_dir / "transformers")
-        os.environ["TORCH_HOME"] = str(self.cache_dir / "torch")
-        os.environ["NEMO_HOME"] = str(self.cache_dir / "nemo")
-        os.environ["NEMO_CACHE_DIR"] = str(self.cache_dir / "nemo")
-        os.environ["XDG_CACHE_HOME"] = str(self.cache_dir / "xdg")
+        self.cache_dir = setup_model_cache_environment(self.config)
 
     def _patch_numpy_sctypes(self):
         import numpy as np

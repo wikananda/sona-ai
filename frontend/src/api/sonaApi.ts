@@ -22,6 +22,8 @@ export type BYOKProvider = "openai" | "groq" | "openrouter" | "custom";
 export type LocalLLMModel = "qwen" | "llama" | "gemma";
 export type RuntimeDevice = "auto" | "cpu" | "mps" | "cuda";
 export type RecordingChatRole = "user" | "assistant";
+export type RuntimeModelStatus = "missing" | "installed" | "running" | "failed";
+export type ModelDownloadJobStatus = "queued" | "running" | "installed" | "failed";
 export type RecordingProgressStage =
     | "queued"
     | "preparing"
@@ -41,6 +43,33 @@ export interface RuntimeDevices {
         cuda: boolean;
         mps: boolean;
     };
+}
+
+export interface RuntimeModel {
+    id: string;
+    label: string;
+    type: string;
+    model_names: string[];
+    config_name: string;
+    environment: string;
+    cache_subdir?: string | null;
+    cache_path: string;
+    requires_hf_token: boolean;
+    hf_token_available: boolean;
+    installed: boolean;
+    status: RuntimeModelStatus;
+    active_job_id?: string | null;
+    error?: string | null;
+}
+
+export interface ModelDownloadJob {
+    job_id: string;
+    model_id: string;
+    status: ModelDownloadJobStatus;
+    message: string;
+    started_at: string;
+    finished_at?: string | null;
+    error?: string | null;
 }
 
 export interface Project {
@@ -239,6 +268,20 @@ export async function deleteProject(projectId: string): Promise<void> {
 
 export async function getRuntimeDevices(): Promise<RuntimeDevices> {
     return requestJson("/runtime/devices");
+}
+
+export async function getRuntimeModels(): Promise<RuntimeModel[]> {
+    return requestJson("/runtime/models");
+}
+
+export async function startRuntimeModelDownload(modelId: string): Promise<ModelDownloadJob> {
+    return requestJson(`/runtime/models/${modelId}/download`, {
+        method: "POST",
+    });
+}
+
+export async function getRuntimeModelDownloadJob(jobId: string): Promise<ModelDownloadJob> {
+    return requestJson(`/runtime/model-downloads/${jobId}`);
 }
 
 export async function uploadProjectRecording(

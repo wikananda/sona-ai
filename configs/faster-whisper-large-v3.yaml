@@ -8,6 +8,3 @@ model:
     beam_size: 5
     vad_filter: false
     word_timestamps: false
-
-cp_dir:
-    hf_cache: "cp/hf_cache"

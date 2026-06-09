@@ -5,7 +5,7 @@ from typing import Optional
 from collections.abc import Callable
 
 from sona_ai.alignment.base import Aligner
-from sona_ai.core import PROJECT_ROOT, setup_logging, write_json
+from sona_ai.core import PROJECT_ROOT, setup_logging, setup_model_cache_environment, write_json
 from sona_ai.diarization.base import Diarizer
 from sona_ai.pipelines.speaker_assignment import SpeakerAssigner
 from sona_ai.transcription.base import Transcriber
@@ -227,19 +227,7 @@ class SpeechPipeline:
 
         os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
-        if config and "cp_dir" in config and "hf_cache" in config["cp_dir"]:
-            cache_dir = PROJECT_ROOT / config["cp_dir"]["hf_cache"]
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            os.environ["HF_HOME"] = str(cache_dir)
-            os.environ["HF_HUB_CACHE"] = str(cache_dir / "hub")
-            os.environ["HUGGINGFACE_HUB_CACHE"] = str(cache_dir / "hub")
-            os.environ["TRANSFORMERS_CACHE"] = str(cache_dir / "transformers")
-            os.environ["TORCH_HOME"] = str(cache_dir / "torch")
-            os.environ["PYANNOTE_CACHE"] = str(cache_dir / "pyannote")
-            os.environ["NEMO_HOME"] = str(cache_dir / "nemo")
-            os.environ["NEMO_CACHE_DIR"] = str(cache_dir / "nemo")
-            os.environ["XDG_CACHE_HOME"] = str(cache_dir / "xdg")
-            os.environ["MPLCONFIGDIR"] = str(cache_dir / "matplotlib")
+        setup_model_cache_environment(config)
 
     def close(self):
         self.cleanup_models()

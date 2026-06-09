@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from sona_ai.core import PROJECT_ROOT, setup_logging
+from sona_ai.core import PROJECT_ROOT, model_cache_root, setup_logging
 from sona_ai.diarization.schemas import DiarizationResult, SpeakerTurn
 
 logger = setup_logging()
@@ -21,8 +21,7 @@ class ExternalCommunityDiarizer:
             "tools/diarization/diarize_community.py",
         )
         self.device = config.get("model", {}).get("device", "cpu")
-        cache_root = PROJECT_ROOT / config.get("cp_dir", {}).get("hf_cache", "cp/hf_cache")
-        self.cache_dir = cache_root / "pyannote-community"
+        self.cache_dir = model_cache_root() / "pyannote-community"
         self.timeout_seconds = int(diarization_config.get("timeout_seconds", 1800))
 
     def load_models(self) -> None:

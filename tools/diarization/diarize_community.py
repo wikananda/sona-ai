@@ -19,7 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-speakers", type=int, default=None)
     parser.add_argument("--num-speakers", type=int, default=None)
     parser.add_argument("--device", default="cpu", choices=["cpu", "cuda", "mps"])
-    parser.add_argument("--cache-dir", default="cp/hf_cache/pyannote-community")
+    parser.add_argument("--cache-dir", default=".models/pyannote-community")
     parser.add_argument("--regular", action="store_true", help="Use regular diarization instead of exclusive diarization.")
     return parser.parse_args()
 

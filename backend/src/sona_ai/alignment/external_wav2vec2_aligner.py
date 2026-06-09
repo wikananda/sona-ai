@@ -6,7 +6,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from sona_ai.core import PROJECT_ROOT, resolve_device, setup_logging
+from sona_ai.core import PROJECT_ROOT, model_cache_root, resolve_device, setup_logging
 from sona_ai.transcription.schemas import TranscriptionResult
 
 
@@ -23,8 +23,7 @@ class ExternalWav2Vec2Aligner:
             "tools/alignment/align_whisperx_wav2vec2.py",
         )
         self.device = resolve_device(config.get("model", {}).get("device", "cpu"), no_mps=True)
-        cache_root = PROJECT_ROOT / config.get("cp_dir", {}).get("hf_cache", "cp/hf_cache")
-        self.cache_dir = cache_root / "wav2vec2-align"
+        self.cache_dir = model_cache_root() / "wav2vec2-align"
         self.timeout_seconds = int(alignment_config.get("timeout_seconds", 900))
 
     def load_models(self) -> None:
