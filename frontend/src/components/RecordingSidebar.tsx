@@ -174,7 +174,7 @@ export default function RecordingSidebar({
                                     event.stopPropagation();
                                     onDelete(recording.id);
                                 }}
-                                className="mt-2 inline-block text-xs font-medium text-zinc-500 hover:text-red-700"
+                                className="mt-2 inline-block text-xs font-medium text-zinc-500 hover:cursor-pointer hover:text-red-700"
                             >
                                 Delete
                             </button>
@@ -184,7 +184,7 @@ export default function RecordingSidebar({
                                     event.stopPropagation();
                                     startEditing(recording);
                                 }}
-                                className="mt-2 inline-block text-xs font-medium text-zinc-500 hover:text-zinc-900"
+                                className="mt-2 inline-block text-xs font-medium text-zinc-500 hover:cursor-pointer hover:text-zinc-900"
                             >
                                 Rename
                             </button>

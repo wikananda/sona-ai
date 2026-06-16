@@ -66,14 +66,14 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setIsSettingsOpen(true)}
-              className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+              className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950"
             >
               Settings
             </button>
             <button
               type="button"
               onClick={() => setIsCreateModalOpen(true)}
-              className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white"
+              className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white hover:cursor-pointer hover:bg-zinc-400"
             >
               New project
             </button>
@@ -119,7 +119,7 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => handleDelete(project.id)}
-                    className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:border-red-300 hover:text-red-700"
+                    className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:cursor-pointer hover:border-red-300 hover:text-red-700"
                   >
                     Delete
                   </button>
@@ -144,7 +144,7 @@ export default function Home() {
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
                 disabled={isCreating}
-                className="rounded-md px-2 py-1 text-xl leading-none text-zinc-500 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-md px-2 py-1 text-xl leading-none text-zinc-500 hover:text-zinc-950 hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Close new project form"
               >
                 ×

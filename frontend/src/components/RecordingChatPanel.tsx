@@ -98,7 +98,7 @@ export default function RecordingChatPanel({
                     value={hasBYOKPresets ? selectedBYOKPresetId : ""}
                     onChange={(event) => onBYOKPresetChange(event.target.value)}
                     disabled={isLoading || !hasBYOKPresets}
-                    className="min-h-10 min-w-56 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-10 min-w-56 rounded-md border border-zinc-300 bg-white px-3 text-sm hover:cursor-pointer outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {hasBYOKPresets ? (
                         byokModelPresets.map((preset) => (
@@ -114,7 +114,7 @@ export default function RecordingChatPanel({
                     type="button"
                     onClick={onOpenSettings}
                     disabled={isLoading}
-                    className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     Settings
                 </button>
@@ -180,7 +180,7 @@ export default function RecordingChatPanel({
                 <button
                     type="submit"
                     disabled={!canSend}
-                    className="min-h-11 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    className="min-h-11 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40 hover:cursor-pointer hover:bg-zinc-400"
                 >
                     Send
                 </button>

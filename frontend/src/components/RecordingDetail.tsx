@@ -358,7 +358,7 @@ export default function RecordingDetail({
                                         type="button"
                                         onClick={openRetranscribeEditor}
                                         disabled={isRetranscribing}
-                                        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
                                     </button>
@@ -377,7 +377,7 @@ export default function RecordingDetail({
                                         type="button"
                                         onClick={openRetranscribeEditor}
                                         disabled={isRetranscribing}
-                                        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
                                     </button>
@@ -387,143 +387,143 @@ export default function RecordingDetail({
                     )}
                     {(recording.status === "done" || hasTranscript) && (
                         <>
-                        {isProcessingRecording && (
-                            <RecordingProgressPanel
-                                recording={recording}
-                                helperText="You can keep reviewing the current transcript while processing finishes."
-                                isCanceling={isCanceling}
-                                onCancel={onCancel ? handleCancelProcessing : undefined}
-                            />
-                        )}
-                        {recording.status === "failed" && hasTranscript && (
-                            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-                                {recording.error ?? "Processing failed, but the transcript is still available."}
-                            </div>
-                        )}
-                        {recording.status === "canceled" && hasTranscript && (
-                            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
-                                Processing was canceled, but the previous transcript is still available.
-                            </div>
-                        )}
+                            {isProcessingRecording && (
+                                <RecordingProgressPanel
+                                    recording={recording}
+                                    helperText="You can keep reviewing the current transcript while processing finishes."
+                                    isCanceling={isCanceling}
+                                    onCancel={onCancel ? handleCancelProcessing : undefined}
+                                />
+                            )}
+                            {recording.status === "failed" && hasTranscript && (
+                                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                                    {recording.error ?? "Processing failed, but the transcript is still available."}
+                                </div>
+                            )}
+                            {recording.status === "canceled" && hasTranscript && (
+                                <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+                                    Processing was canceled, but the previous transcript is still available.
+                                </div>
+                            )}
 
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200">
-                            <div className="flex">
-                                <TabButton
-                                    label="Transcription"
-                                    isActive={activeTab === "transcript"}
-                                    onClick={() => setActiveTab("transcript")}
-                                />
-                                <TabButton
-                                    label="Summary"
-                                    isActive={activeTab === "summary"}
-                                    onClick={() => setActiveTab("summary")}
-                                />
-                                <TabButton
-                                    label="Chat"
-                                    isActive={activeTab === "chat"}
-                                    onClick={() => setActiveTab("chat")}
-                                />
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200">
+                                <div className="flex">
+                                    <TabButton
+                                        label="Transcription"
+                                        isActive={activeTab === "transcript"}
+                                        onClick={() => setActiveTab("transcript")}
+                                    />
+                                    <TabButton
+                                        label="Summary"
+                                        isActive={activeTab === "summary"}
+                                        onClick={() => setActiveTab("summary")}
+                                    />
+                                    <TabButton
+                                        label="Chat"
+                                        isActive={activeTab === "chat"}
+                                        onClick={() => setActiveTab("chat")}
+                                    />
+                                </div>
+                                {activeTab === "transcript" && (
+                                    canRenameSpeakers ||
+                                    canRetranscribe ||
+                                    canExtractSpeakers ||
+                                    isSpeakerExtractionRunning
+                                ) && (
+                                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                                            {canRenameSpeakers && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsSpeakerEditorOpen(true)}
+                                                    disabled={isRenamingSpeakers}
+                                                    className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
+                                                    {isRenamingSpeakers ? "Saving speakers..." : "Edit speakers"}
+                                                </button>
+                                            )}
+                                            {canExtractSpeakers && (
+                                                <button
+                                                    type="button"
+                                                    onClick={openSpeakerExtractionEditor}
+                                                    disabled={isExtractingSpeakers}
+                                                    className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
+                                                    {isExtractingSpeakers ? "Extracting speakers..." : "Extract speakers"}
+                                                </button>
+                                            )}
+                                            {isSpeakerExtractionRunning && (
+                                                <span className="text-sm text-amber-700">
+                                                    Extracting speakers...
+                                                </span>
+                                            )}
+                                            {canRetranscribe && (
+                                                <button
+                                                    type="button"
+                                                    onClick={openRetranscribeEditor}
+                                                    disabled={isRetranscribing}
+                                                    className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
+                                                    {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                             </div>
+
                             {activeTab === "transcript" && (
-                                canRenameSpeakers ||
-                                canRetranscribe ||
-                                canExtractSpeakers ||
-                                isSpeakerExtractionRunning
-                            ) && (
-                                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                                        {canRenameSpeakers && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsSpeakerEditorOpen(true)}
-                                                disabled={isRenamingSpeakers}
-                                                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
-                                            >
-                                                {isRenamingSpeakers ? "Saving speakers..." : "Edit speakers"}
-                                            </button>
-                                        )}
-                                        {canExtractSpeakers && (
-                                            <button
-                                                type="button"
-                                                onClick={openSpeakerExtractionEditor}
-                                                disabled={isExtractingSpeakers}
-                                                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
-                                            >
-                                                {isExtractingSpeakers ? "Extracting speakers..." : "Extract speakers"}
-                                            </button>
-                                        )}
-                                        {isSpeakerExtractionRunning && (
-                                            <span className="text-sm text-amber-700">
-                                                Extracting speakers...
-                                            </span>
-                                        )}
-                                        {canRetranscribe && (
-                                            <button
-                                                type="button"
-                                                onClick={openRetranscribeEditor}
-                                                disabled={isRetranscribing}
-                                                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
-                                            >
-                                                {isRetranscribing ? "Re-transcribing..." : "Re-transcribe"}
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-                        </div>
+                                <TranscriptPanel
+                                    recordingName={recording.original_name}
+                                    segments={segments}
+                                    isSavingSpeakers={isRenamingSpeakers}
+                                    onRenameSpeakers={handleRenameSpeakers}
+                                    isSavingSegment={isEditingTranscript}
+                                    onUpdateSegment={handleUpdateTranscriptSegment}
+                                    isSpeakerEditorOpen={isSpeakerEditorOpen}
+                                    onSpeakerEditorClose={() => setIsSpeakerEditorOpen(false)}
+                                    activeSegmentIndex={activeSegmentIndex}
+                                    onSeekToSegment={handleSeekToSegment}
+                                />
+                            )}
 
-                        {activeTab === "transcript" && (
-                            <TranscriptPanel
-                                recordingName={recording.original_name}
-                                segments={segments}
-                                isSavingSpeakers={isRenamingSpeakers}
-                                onRenameSpeakers={handleRenameSpeakers}
-                                isSavingSegment={isEditingTranscript}
-                                onUpdateSegment={handleUpdateTranscriptSegment}
-                                isSpeakerEditorOpen={isSpeakerEditorOpen}
-                                onSpeakerEditorClose={() => setIsSpeakerEditorOpen(false)}
-                                activeSegmentIndex={activeSegmentIndex}
-                                onSeekToSegment={handleSeekToSegment}
-                            />
-                        )}
-
-                        {activeTab === "summary" && (
-                            <SummaryPanel
-                                recordingName={recording.original_name}
-                                summary={summary}
-                                isLoading={isSummarizing}
-                                selectedModel={localLLMModel}
-                                onModelChange={setLocalLLMModel}
-                                selectedDevice={selectedSummaryDevice}
-                                onDeviceChange={setSummaryDevice}
-                                runtimeDevices={runtimeDevices}
-                                selectedMode={summaryMode}
-                                onModeChange={setSummaryMode}
-                                byokModelPresets={byokModelPresets}
-                                selectedBYOKPresetId={effectiveSummaryBYOKPresetId}
-                                onBYOKPresetChange={setSummaryBYOKPresetId}
-                                onOpenSettings={onOpenSettings}
-                                customInstruction={summaryInstruction}
-                                onCustomInstructionChange={setSummaryInstruction}
-                                onSummarize={handleSummarize}
-                                isSavingSummary={isUpdatingSummary}
-                                onUpdateSummary={handleUpdateSummary}
-                                canSummarize={
-                                    Boolean(onSummarize) &&
-                                    segments.length > 0 &&
-                                    !isProcessingRecording &&
-                                    (summaryMode === "local" || Boolean(selectedSummaryBYOKSettings))
-                                }
-                            />
-                        )}
-                        {activeTab === "chat" && (
-                            <RecordingChatPanel
-                                recordingId={recording.id}
-                                canChat={segments.length > 0}
-                                byokModelPresets={byokModelPresets}
-                                selectedBYOKPresetId={effectiveChatBYOKPresetId}
-                                onBYOKPresetChange={setChatBYOKPresetId}
-                                onOpenSettings={onOpenSettings}
-                            />
-                        )}
+                            {activeTab === "summary" && (
+                                <SummaryPanel
+                                    recordingName={recording.original_name}
+                                    summary={summary}
+                                    isLoading={isSummarizing}
+                                    selectedModel={localLLMModel}
+                                    onModelChange={setLocalLLMModel}
+                                    selectedDevice={selectedSummaryDevice}
+                                    onDeviceChange={setSummaryDevice}
+                                    runtimeDevices={runtimeDevices}
+                                    selectedMode={summaryMode}
+                                    onModeChange={setSummaryMode}
+                                    byokModelPresets={byokModelPresets}
+                                    selectedBYOKPresetId={effectiveSummaryBYOKPresetId}
+                                    onBYOKPresetChange={setSummaryBYOKPresetId}
+                                    onOpenSettings={onOpenSettings}
+                                    customInstruction={summaryInstruction}
+                                    onCustomInstructionChange={setSummaryInstruction}
+                                    onSummarize={handleSummarize}
+                                    isSavingSummary={isUpdatingSummary}
+                                    onUpdateSummary={handleUpdateSummary}
+                                    canSummarize={
+                                        Boolean(onSummarize) &&
+                                        segments.length > 0 &&
+                                        !isProcessingRecording &&
+                                        (summaryMode === "local" || Boolean(selectedSummaryBYOKSettings))
+                                    }
+                                />
+                            )}
+                            {activeTab === "chat" && (
+                                <RecordingChatPanel
+                                    recordingId={recording.id}
+                                    canChat={segments.length > 0}
+                                    byokModelPresets={byokModelPresets}
+                                    selectedBYOKPresetId={effectiveChatBYOKPresetId}
+                                    onBYOKPresetChange={setChatBYOKPresetId}
+                                    onOpenSettings={onOpenSettings}
+                                />
+                            )}
                         </>
                     )}
                 </div>
@@ -543,7 +543,7 @@ export default function RecordingDetail({
                                 type="button"
                                 onClick={closeRetranscribeEditor}
                                 disabled={isRetranscribing}
-                                className="text-sm font-medium text-zinc-500 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="text-sm font-medium text-zinc-500 hover:cursor-pointer hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Close
                             </button>
@@ -685,14 +685,14 @@ export default function RecordingDetail({
                                 type="button"
                                 onClick={closeRetranscribeEditor}
                                 disabled={isRetranscribing}
-                                className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={isRetranscribing}
-                                className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {isRetranscribing ? "Starting..." : "Start re-transcribe"}
                             </button>
@@ -811,7 +811,7 @@ function TabButton({
             onClick={onClick}
             className={`min-h-11 border-b-2 px-4 text-sm font-medium transition-colors ${isActive
                 ? "border-zinc-950 text-zinc-950"
-                : "border-transparent text-zinc-500 hover:text-zinc-950"
+                : "border-transparent text-zinc-500 hover:text-zinc-950 hover:cursor-pointer"
                 }`}
         >
             {label}
@@ -860,7 +860,7 @@ function RecordingProgressPanel({
                             disabled={isCanceling}
                             aria-label="Cancel processing"
                             title="Cancel processing"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-amber-300 text-lg leading-none text-amber-950 transition-colors hover:border-amber-500 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-amber-300 text-lg leading-none text-amber-950 transition-colors hover:cursor-pointer hover:border-amber-500 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             x
                         </button>

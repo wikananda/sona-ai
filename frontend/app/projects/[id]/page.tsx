@@ -298,12 +298,12 @@ export default function ProjectDetailPage() {
                 return {
                     ...current,
                     recordings: current.recordings.map((recording) =>
-                        recording.id === recordingId ? { ...recording, ...updated} : recording,
+                        recording.id === recordingId ? { ...recording, ...updated } : recording,
                     ),
                 };
             });
 
-            setSelectedRecording((current) => 
+            setSelectedRecording((current) =>
                 current?.id === recordingId ? { ...current, ...updated } : current,
             );
         } catch (err) {
@@ -497,7 +497,7 @@ export default function ProjectDetailPage() {
             <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-5 py-6">
                 <header className="flex flex-wrap items-start justify-between gap-4">
                     <div className="flex flex-col gap-3">
-                        <Link href="/" className="text-sm font-medium text-zinc-600 hover:text-zinc-950">
+                        <Link href="/" className="text-sm font-medium text-zinc-600 hover:text-zinc-950 cursor-pointer">
                             Back to projects
                         </Link>
                         <div>
@@ -510,7 +510,7 @@ export default function ProjectDetailPage() {
                     <button
                         type="button"
                         onClick={() => setIsSettingsOpen(true)}
-                        className="min-h-10 rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                        className="min-h-10 rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 hover:cursor-pointer"
                     >
                         Settings
                     </button>

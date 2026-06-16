@@ -302,7 +302,7 @@ export default function LiveTranscriptionPanel({
                             value={language}
                             onChange={(event) => setLanguage(event.target.value)}
                             disabled={state !== "idle"}
-                            className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="min-h-10 hover:cursor-pointer rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {TRANSCRIPTION_LANGUAGES.map((item) => (
                                 <option key={item.value} value={item.value}>
@@ -318,7 +318,7 @@ export default function LiveTranscriptionPanel({
                             value={model}
                             onChange={(event) => setModel(event.target.value as TranscriptionModel)}
                             disabled={state !== "idle"}
-                            className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="min-h-10 hover:cursor-pointer rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {TRANSCRIPTION_MODELS.map((item) => (
                                 <option
@@ -343,7 +343,7 @@ export default function LiveTranscriptionPanel({
                             value={selectedDevice}
                             onChange={(event) => setDevice(event.target.value as RuntimeDevice)}
                             disabled={state !== "idle"}
-                            className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="min-h-10 hover:cursor-pointer rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {runtimeDevices.available.map((item) => (
                                 <option key={item} value={item}>
@@ -357,7 +357,7 @@ export default function LiveTranscriptionPanel({
                         type="button"
                         onClick={startLiveTranscription}
                         disabled={isBusy}
-                        className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                        className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm hover:cursor-pointer font-medium text-white hover:bg-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                         {state === "requesting" ? "Requesting access" : "Start live"}
                     </button>
@@ -448,7 +448,7 @@ function SourceCheckbox({
     onChange: (event: ChangeEvent<HTMLInputElement>) => void;
 }) {
     return (
-        <label className="flex items-start gap-2 text-sm text-zinc-700">
+        <label className="flex items-start gap-2 text-sm text-zinc-700 hover:cursor-pointer">
             <input
                 type="checkbox"
                 checked={checked}

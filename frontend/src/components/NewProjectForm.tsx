@@ -47,14 +47,14 @@ export default function NewProjectForm({ onCreate, onCancel, isCreating }: Props
                     type="button"
                     onClick={onCancel}
                     disabled={isCreating}
-                    className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm hover:cursor-pointer hover:border-zinc-400 font-medium text-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                     Cancel
                 </button>
                 <button
                     type="submit"
                     disabled={isCreating || !name.trim()}
-                    className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white hover:cursor-pointer hover:bg-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                     {isCreating ? "Creating" : "Create"}
                 </button>

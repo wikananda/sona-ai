@@ -111,7 +111,7 @@ export default function AudioFileDropzone({
                     type="button"
                     onClick={() => inputRef.current?.click()}
                     disabled={disabled}
-                    className="mt-1 min-h-9 rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-1 min-h-9 rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-700 hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     Choose from computer
                 </button>

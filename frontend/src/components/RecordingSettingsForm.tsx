@@ -72,7 +72,7 @@ export default function RecordingSettingsForm({
                     value={language}
                     onChange={(event) => setLanguage(event.target.value)}
                     disabled={isUploading}
-                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none hover:cursor-pointer focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {TRANSCRIPTION_LANGUAGES.map((item) => (
                         <option key={item.value} value={item.value}>
@@ -88,7 +88,7 @@ export default function RecordingSettingsForm({
                     value={model}
                     onChange={(event) => setModel(event.target.value as TranscriptionModel)}
                     disabled={isUploading}
-                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none hover:cursor-pointer focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {TRANSCRIPTION_MODELS.map((item) => (
                         <option key={item.value} value={item.value}>
@@ -104,7 +104,7 @@ export default function RecordingSettingsForm({
                     value={selectedDevice}
                     onChange={(event) => setDevice(event.target.value as RuntimeDevice)}
                     disabled={isUploading}
-                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none hover:cursor-pointer focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {runtimeDevices.available.map((item) => (
                         <option key={item} value={item}>
@@ -114,7 +114,7 @@ export default function RecordingSettingsForm({
                 </select>
             </label>
 
-            <label className="flex items-start gap-2 text-sm text-zinc-600">
+            <label className="flex items-start gap-2 text-sm text-zinc-600 hover:cursor-pointer">
                 <input
                     type="checkbox"
                     checked={extractSpeakers}
@@ -161,7 +161,7 @@ export default function RecordingSettingsForm({
                 <button
                     type="submit"
                     disabled={isUploading}
-                    className="min-h-10 flex-1 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    className="min-h-10 flex-1 rounded-md bg-zinc-950 px-4 text-sm font-medium hover:cursor-pointer hover:bg-zinc-400 text-white disabled:cursor-not-allowed disabled:opacity-40"
                 >
                     {isUploading ? "Uploading" : uploadLabel}
                 </button>
@@ -172,7 +172,7 @@ export default function RecordingSettingsForm({
                         onClear();
                     }}
                     disabled={isUploading}
-                    className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:cursor-pointer hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     Clear
                 </button>

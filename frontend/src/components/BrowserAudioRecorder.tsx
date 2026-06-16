@@ -214,7 +214,7 @@ export default function BrowserAudioRecorder({
                             type="button"
                             onClick={startRecording}
                             disabled={isBusy}
-                            className="min-h-10 flex-1 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                            className="min-h-10 flex-1 rounded-md bg-zinc-950 px-4 text-sm font-medium hover:cursor-pointer hover:bg-zinc-400 text-white disabled:cursor-not-allowed disabled:opacity-40"
                         >
                             {recorderState === "requesting" ? "Requesting access" : "Start recording"}
                         </button>
@@ -283,7 +283,7 @@ function SourceCheckbox({
     onChange: (event: ChangeEvent<HTMLInputElement>) => void;
 }) {
     return (
-        <label className="flex items-start gap-2 text-sm text-zinc-700">
+        <label className="flex items-start gap-2 text-sm text-zinc-700 hover:cursor-pointer">
             <input
                 type="checkbox"
                 checked={checked}

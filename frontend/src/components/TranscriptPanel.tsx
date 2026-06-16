@@ -267,7 +267,7 @@ export default function TranscriptPanel({
                     type="button"
                     onClick={handleExportPdf}
                     disabled={isExportingPdf || segments.length === 0}
-                    className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {isExportingPdf ? "Exporting..." : "Export PDF"}
                 </button>
@@ -299,10 +299,10 @@ export default function TranscriptPanel({
                                     : "minmax(0, 1fr) auto",
                             }}
                             className={`group grid w-full items-start gap-3 border-b border-zinc-100 py-3 text-left transition-colors last:border-b-0 ${activeSegmentIndex === index && !isEditing
-                                    ? "bg-zinc-100"
-                                    : isSeekable
-                                        ? "hover:bg-zinc-50"
-                                        : ""
+                                ? "bg-zinc-100"
+                                : isSeekable
+                                    ? "hover:bg-zinc-50"
+                                    : ""
                                 } ${isSeekable ? "cursor-pointer" : "cursor-default"}`}
                         >
                             {speakers.length > 0 && (
@@ -386,14 +386,14 @@ export default function TranscriptPanel({
                         className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl"
                     >
                         <div className="flex items-start justify-between gap-4">
-                            <h3 className="text-base font-semibold text-zinc-950">
+                            <h3 className="text-base font-semibold text-zinc-950 cursor-pointer">
                                 Edit speakers
                             </h3>
                             <button
                                 type="button"
                                 onClick={closeSpeakerEditor}
                                 disabled={isSavingSpeakers}
-                                className="text-sm font-medium text-zinc-500 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="text-sm font-medium text-zinc-500 hover:text-zinc-950 hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Close
                             </button>
@@ -410,7 +410,7 @@ export default function TranscriptPanel({
                                         name={speaker}
                                         defaultValue={speaker}
                                         disabled={isSavingSpeakers}
-                                        className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm text-zinc-950 cursor-pointer outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                                     />
                                 </label>
                             ))}
@@ -425,14 +425,14 @@ export default function TranscriptPanel({
                                 type="button"
                                 onClick={closeSpeakerEditor}
                                 disabled={isSavingSpeakers}
-                                className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="min-h-10 rounded-md cursor-pointer border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={isSavingSpeakers}
-                                className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                className="min-h-10 rounded-md bg-zinc-950 cursor-pointer px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {isSavingSpeakers ? "Saving..." : "Save"}
                             </button>

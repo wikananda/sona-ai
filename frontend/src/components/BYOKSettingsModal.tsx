@@ -275,14 +275,14 @@ export default function BYOKSettingsModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-md px-2 py-1 text-xl leading-none text-zinc-500 hover:text-zinc-950"
+                        className="rounded-md px-2 py-1 text-xl leading-none text-zinc-500 hover:text-zinc-950 hover:cursor-pointer"
                         aria-label="Close settings"
                     >
                         x
                     </button>
                 </div>
 
-                <div className="border-b border-zinc-200 px-5 pt-4">
+                <div className="border-b border-zinc-200 px-5 pt-4 pb-4">
                     <div className="flex rounded-md bg-zinc-100 p-1">
                         <TabButton
                             active={activeTab === "api"}
@@ -342,7 +342,7 @@ export default function BYOKSettingsModal({
                                 <button
                                     type="button"
                                     onClick={handleClearSavedKeys}
-                                    className="min-h-10 rounded-md border border-red-200 px-4 text-sm font-medium text-red-700 hover:border-red-300 hover:text-red-800"
+                                    className="min-h-10 rounded-md border border-red-200 px-4 text-sm hover:cursor-pointer font-medium text-red-700 hover:border-red-300 hover:text-red-800"
                                 >
                                     Clear saved keys
                                 </button>
@@ -351,13 +351,13 @@ export default function BYOKSettingsModal({
                                 <button
                                     type="button"
                                     onClick={onClose}
-                                    className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                                    className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm hover:cursor-pointer font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white"
+                                    className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm hover:cursor-pointer hover:bg-zinc-400 font-medium text-white"
                                 >
                                     Save settings
                                 </button>
@@ -368,7 +368,7 @@ export default function BYOKSettingsModal({
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white"
+                                className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white hover:cursor-pointer hover:bg-zinc-400"
                             >
                                 Done
                             </button>
@@ -437,11 +437,10 @@ function TabButton({
         <button
             type="button"
             onClick={onClick}
-            className={`min-h-10 flex-1 rounded-md px-3 text-sm font-medium ${
-                active
-                    ? "bg-white text-zinc-950 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-950"
-            }`}
+            className={`min-h-10 flex-1 rounded-md px-3 text-sm font-medium ${active
+                ? "bg-white text-zinc-950 shadow-sm"
+                : "text-zinc-500 hover:text-zinc-950 hover:cursor-pointer"
+                }`}
         >
             {children}
         </button>
@@ -493,7 +492,7 @@ function ApiProviderSettings({
                     <button
                         type="button"
                         onClick={onAddConnection}
-                        className="min-h-9 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white"
+                        className="min-h-9 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white hover:cursor-pointer hover:bg-zinc-400"
                     >
                         + Add connection
                     </button>
@@ -534,7 +533,7 @@ function ApiProviderSettings({
                         type="button"
                         onClick={onAddModelPreset}
                         disabled={draft.connections.length === 0}
-                        className="min-h-9 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+                        className="min-h-9 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500 hover:cursor-pointer hover:bg-zinc-400"
                     >
                         + Add model preset
                     </button>
@@ -561,7 +560,7 @@ function ApiProviderSettings({
                 </div>
             </section>
 
-            <label className="flex items-start gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+            <label className="flex items-start gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 hover:cursor-pointer">
                 <input
                     type="checkbox"
                     checked={draft.rememberKeys}
@@ -602,11 +601,10 @@ function ConnectionRow({
                         <h5 className="text-sm font-semibold text-zinc-950">
                             {byokConnectionLabel(connection)}
                         </h5>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            isConfigured
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-amber-100 text-amber-800"
-                        }`}
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${isConfigured
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-amber-100 text-amber-800"
+                            }`}
                         >
                             {isConfigured ? "Ready" : "Incomplete"}
                         </span>
@@ -627,14 +625,14 @@ function ConnectionRow({
                     <button
                         type="button"
                         onClick={onEdit}
-                        className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                        className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm hover:cursor-pointer font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
                     >
                         Edit
                     </button>
                     <button
                         type="button"
                         onClick={onDelete}
-                        className="min-h-9 rounded-md border border-red-200 px-3 text-sm font-medium text-red-700 hover:border-red-300 hover:text-red-800"
+                        className="min-h-9 rounded-md border border-red-200 px-3 text-sm hover:cursor-pointer font-medium text-red-700 hover:border-red-300 hover:text-red-800"
                     >
                         Delete
                     </button>
@@ -671,11 +669,10 @@ function ModelPresetRow({
                         <h5 className="text-sm font-semibold text-zinc-950">
                             {label}
                         </h5>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            isConfigured
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-amber-100 text-amber-800"
-                        }`}
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${isConfigured
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-amber-100 text-amber-800"
+                            }`}
                         >
                             {isConfigured ? "Ready" : "Incomplete"}
                         </span>
@@ -691,14 +688,14 @@ function ModelPresetRow({
                     <button
                         type="button"
                         onClick={onEdit}
-                        className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                        className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm hover:cursor-pointer font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
                     >
                         Edit
                     </button>
                     <button
                         type="button"
                         onClick={onDelete}
-                        className="min-h-9 rounded-md border border-red-200 px-3 text-sm font-medium text-red-700 hover:border-red-300 hover:text-red-800"
+                        className="min-h-9 rounded-md border border-red-200 px-3 text-sm hover:cursor-pointer font-medium text-red-700 hover:border-red-300 hover:text-red-800"
                     >
                         Delete
                     </button>
@@ -800,7 +797,7 @@ function ConnectionFormModal({
                         <select
                             value={draft.provider}
                             onChange={(event) => updateProvider(event.target.value as BYOKProvider)}
-                            className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900"
+                            className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 hover:cursor-pointer"
                         >
                             {BYOK_PROVIDERS.map((provider) => (
                                 <option key={provider.value} value={provider.value}>
@@ -855,13 +852,13 @@ function ConnectionFormModal({
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm hover:cursor-pointer font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
                     >
                         Cancel
                     </button>
                     <button
                         type="submit"
-                        className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white"
+                        className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm hover:cursor-pointer hover:bg-zinc-400 font-medium text-white"
                     >
                         {connection ? "Save connection" : "Add connection"}
                     </button>
@@ -928,7 +925,7 @@ function ModelPresetFormModal({
                 className="w-full max-w-lg rounded-lg bg-white shadow-xl"
             >
                 <div className="border-b border-zinc-200 px-5 py-4">
-                    <h3 className="text-base font-semibold text-zinc-950">
+                    <h3 className="text-base font-semibold text-zinc-950 ">
                         {preset ? "Edit model preset" : "Add model preset"}
                     </h3>
                     <p className="mt-1 text-sm text-zinc-500">
@@ -944,7 +941,7 @@ function ModelPresetFormModal({
                         <select
                             value={draft.connectionId}
                             onChange={(event) => updateConnectionId(event.target.value)}
-                            className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900"
+                            className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none hover:cursor-pointer focus:border-zinc-900"
                         >
                             {connections.map((connection) => (
                                 <option key={connection.id} value={connection.id}>
@@ -997,13 +994,13 @@ function ModelPresetFormModal({
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium hover:cursor-pointer text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
                     >
                         Cancel
                     </button>
                     <button
                         type="submit"
-                        className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white"
+                        className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white hover:cursor-pointer hover:bg-zinc-400"
                     >
                         {preset ? "Save preset" : "Add preset"}
                     </button>
@@ -1055,14 +1052,14 @@ function ConfirmConnectionDeleteModal({
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium hover:cursor-pointer text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
                     >
                         Cancel
                     </button>
                     <button
                         type="button"
                         onClick={onConfirm}
-                        className="min-h-10 rounded-md bg-red-700 px-4 text-sm font-medium text-white hover:bg-red-800"
+                        className="min-h-10 rounded-md bg-red-700 px-4 text-sm font-medium hover:cursor-pointer text-white hover:bg-red-800"
                     >
                         Delete
                     </button>
@@ -1105,14 +1102,14 @@ function ConfirmModelPresetDeleteModal({
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm hover:cursor-pointer font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
                     >
                         Cancel
                     </button>
                     <button
                         type="button"
                         onClick={onConfirm}
-                        className="min-h-10 rounded-md bg-red-700 px-4 text-sm font-medium text-white hover:bg-red-800"
+                        className="min-h-10 rounded-md bg-red-700 px-4 text-sm hover:cursor-pointer font-medium text-white hover:bg-red-800"
                     >
                         Delete
                     </button>
@@ -1155,7 +1152,7 @@ function ConfirmModelActionModal({
                             {model.label}
                         </p>
                         <p className="mt-1 text-xs text-zinc-500">
-                            {model.type} / {model.environment}
+                            {modelTypeLabel(model.type)} model
                         </p>
                         <p className="mt-2 break-all text-xs text-zinc-500">
                             Cache: {model.cache_path}
@@ -1173,18 +1170,17 @@ function ConfirmModelActionModal({
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950"
                     >
                         Cancel
                     </button>
                     <button
                         type="button"
                         onClick={onConfirm}
-                        className={`min-h-10 rounded-md px-4 text-sm font-medium text-white ${
-                            isRedownload
-                                ? "bg-zinc-950"
-                                : "bg-red-700 hover:bg-red-800"
-                        }`}
+                        className={`min-h-10 rounded-md px-4 text-sm font-medium text-white hover:cursor-pointer ${isRedownload
+                            ? "bg-zinc-950 hover:bg-zinc-400"
+                            : "bg-red-700 hover:bg-red-800"
+                            }`}
                     >
                         {isRedownload ? "Re-download" : "Uninstall"}
                     </button>
@@ -1223,7 +1219,7 @@ function ModelSettings({
                 <button
                     type="button"
                     onClick={onRefresh}
-                    className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950"
+                    className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950"
                 >
                     {isLoading ? "Refreshing..." : "Refresh"}
                 </button>
@@ -1266,7 +1262,6 @@ function ModelRow({
 }) {
     const isRunning = model.status === "running" || Boolean(job && isActiveJob(job));
     const isBlocked = model.requires_hf_token && !model.hf_token_available;
-    const message = job?.message ?? model.error ?? model.management_note ?? modelStatusLabel(model.status);
     const progressLabel = job ? modelJobLabel(job) : null;
 
     return (
@@ -1282,24 +1277,24 @@ function ModelRow({
                         </span>
                     </div>
                     <p className="mt-1 text-xs text-zinc-500">
-                        {model.type} / {model.environment}
+                        {modelTypeLabel(model.type)} model
                     </p>
-                    <p className="mt-1 break-all text-xs text-zinc-500">
+                    {/* <p className="mt-1 break-all text-xs text-zinc-500">
                         {model.model_names.join(", ")}
-                    </p>
-                    <p className="mt-1 break-all text-xs text-zinc-400">
+                    </p> */}
+                    {/* <p className="mt-1 break-all text-xs text-zinc-400">
                         Cache: {model.cache_path}
-                    </p>
+                    </p> */}
                     {isBlocked && (
                         <p className="mt-2 text-xs font-medium text-amber-700">
                             Requires backend HF_TOKEN in .env.
                         </p>
                     )}
-                    {message && (
+                    {/* {message && (
                         <p className="mt-2 text-xs text-zinc-500">
                             {message}
                         </p>
-                    )}
+                    )} */}
                     {job && isActiveJob(job) && (
                         <div className="mt-3">
                             <div className="mb-1 flex items-center justify-between gap-3">
@@ -1337,7 +1332,7 @@ function ModelRow({
                             type="button"
                             onClick={() => onAction(model, "uninstall")}
                             disabled={isRunning}
-                            className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400"
+                            className="min-h-9 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400"
                         >
                             {isRunning && job?.action === "uninstall" ? "Uninstalling" : "Uninstall"}
                         </button>
@@ -1347,7 +1342,7 @@ function ModelRow({
                             type="button"
                             onClick={() => onAction(model, "redownload")}
                             disabled={isRunning || isBlocked}
-                            className="min-h-9 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+                            className="min-h-9 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed hover:cursor-pointer hover:bg-zinc-400 disabled:bg-zinc-200 disabled:text-zinc-500"
                         >
                             {isRunning && job?.action === "redownload" ? "Re-downloading" : "Re-download"}
                         </button>
@@ -1424,4 +1419,11 @@ async function startModelJob(modelId: string, action: ModelJobAction): Promise<M
         return redownloadRuntimeModel(modelId);
     }
     return startRuntimeModelDownload(modelId);
+}
+
+function modelTypeLabel(type: string): string {
+    if (type === "transcription") return "Transcription";
+    if (type === "alignment") return "Timestamp aligner";
+    if (type === "diarization") return "Speaker extraction";
+    return type.charAt(0).toUpperCase() + type.slice(1);
 }

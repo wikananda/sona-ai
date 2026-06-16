@@ -178,7 +178,7 @@ export default function SummaryPanel({
                                     value={selectedModel}
                                     onChange={(event) => onModelChange(event.target.value as LocalLLMModel)}
                                     disabled={isBusy}
-                                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none hover:cursor-pointer focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {LOCAL_LLM_MODELS.map((model) => (
                                         <option key={model.value} value={model.value}>
@@ -197,7 +197,7 @@ export default function SummaryPanel({
                                     value={selectedDevice}
                                     onChange={(event) => onDeviceChange(event.target.value as RuntimeDevice)}
                                     disabled={isBusy}
-                                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none hover:cursor-pointer focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {runtimeDevices.available.map((device) => (
                                         <option key={device} value={device}>
@@ -215,7 +215,7 @@ export default function SummaryPanel({
                                 value={hasBYOKPresets ? selectedBYOKPresetId : ""}
                                 onChange={(event) => onBYOKPresetChange(event.target.value)}
                                 disabled={isBusy || !hasBYOKPresets}
-                                className="min-h-10 min-w-56 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="min-h-10 min-w-56 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none hover:cursor-pointer focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {hasBYOKPresets ? (
                                     byokModelPresets.map((preset) => (
@@ -231,7 +231,7 @@ export default function SummaryPanel({
                                 type="button"
                                 onClick={onOpenSettings}
                                 disabled={isBusy}
-                                className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Settings
                             </button>
@@ -245,7 +245,7 @@ export default function SummaryPanel({
                             type="button"
                             onClick={handleExportPdf}
                             disabled={isExportingPdf || isBusy}
-                            className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {isExportingPdf ? "Exporting..." : "Export PDF"}
                         </button>
@@ -255,7 +255,7 @@ export default function SummaryPanel({
                             type="button"
                             onClick={openSummaryEditor}
                             disabled={isBusy}
-                            className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             Edit
                         </button>
@@ -264,7 +264,7 @@ export default function SummaryPanel({
                         type="button"
                         onClick={onSummarize}
                         disabled={isBusy || !canSummarize || isEditingSummary}
-                        className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white hover:cursor-pointer hover:bg-zinc-400 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {isLoading ? "Summarizing" : summary ? "Re-summarize" : "Summarize"}
                     </button>
@@ -345,7 +345,7 @@ export default function SummaryPanel({
                             type="button"
                             onClick={handleCancelSummaryEdit}
                             disabled={isSavingSummary}
-                            className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium hover:cursor-pointer text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             Cancel
                         </button>
@@ -353,7 +353,7 @@ export default function SummaryPanel({
                             type="button"
                             onClick={handleSaveSummaryEdit}
                             disabled={isSavingSummary}
-                            className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium hover:cursor-pointer text-white hover:bg-zinc-400 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {isSavingSummary ? "Saving..." : "Save"}
                         </button>

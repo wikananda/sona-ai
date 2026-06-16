@@ -69,7 +69,7 @@ export default function AddRecordingPanel({
                         type="button"
                         onClick={onCancel}
                         disabled={isUploading}
-                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:cursor-pointer hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         Cancel
                     </button>
@@ -86,7 +86,7 @@ export default function AddRecordingPanel({
                             disabled={isUploading}
                             className={`min-h-10 rounded-md text-sm font-medium transition-colors ${mode === item.value
                                 ? "bg-white text-zinc-950 shadow-sm"
-                                : "text-zinc-600 hover:text-zinc-950"
+                                : "text-zinc-600 hover:text-zinc-950 hover:cursor-pointer"
                                 } disabled:cursor-not-allowed disabled:opacity-50`}
                         >
                             {item.label}
