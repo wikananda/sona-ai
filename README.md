@@ -278,6 +278,62 @@ The frontend can be deployed to Vercel.
 
 The backend is model-heavy and should usually run on your laptop, a VM, or a GPU/CPU machine with enough memory. For a prototype, you can expose the local backend through a tunnel and set the deployed frontend's `NEXT_PUBLIC_API_BASE_URL` to that tunnel URL.
 
+### Hugging Face Backend Docker Space
+
+This repo includes a minimal backend-only Docker path for a Hugging Face Docker Space. It is meant for demo use, not durable production hosting.
+
+The Docker image:
+
+- Runs FastAPI on port `7860`.
+- Uses `configs/speech.hf.yaml`.
+- Runs Parakeet transcription on CPU.
+- Disables alignment and diarization to avoid extra external environments inside the demo container.
+- Expects BYOK for summary/chat; local LLM dependencies are omitted from the minimal image.
+- Stores uploaded recordings, SQLite data, and model cache inside the Space filesystem.
+
+Create a Hugging Face Space with SDK `Docker`, push this repo, and set these Space variables:
+
+```bash
+SONA_SPEECH_CONFIG=speech.hf
+SONA_HF_CACHE=.models
+HF_HOME=.models
+HUGGINGFACE_HUB_CACHE=.models/hub
+TRANSFORMERS_CACHE=.models/transformers
+```
+
+Set this as a Space secret only if needed:
+
+```bash
+HF_TOKEN=your_huggingface_token
+```
+
+Local Docker smoke test:
+
+```bash
+docker build -t sona-ai-backend-hf .
+docker run --rm -p 7860:7860 -e SONA_SPEECH_CONFIG=speech.hf sona-ai-backend-hf
+```
+
+Then open:
+
+```text
+http://localhost:7860/docs
+```
+
+For a deployed frontend, set:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=https://<space-owner>-<space-name>.hf.space
+```
+
+Without persistent Hugging Face storage, Space restarts can remove:
+
+- `backend/data/sona.db`
+- `data/projects/`
+- `.models/`
+
+That is acceptable for a short demo, but it means projects, recordings, and downloaded models may disappear or redownload after restart.
+
 For wider deployment, use persistent storage for:
 
 - SQLite or another database.
