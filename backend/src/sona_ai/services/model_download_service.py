@@ -192,7 +192,9 @@ class ModelDownloadService:
 
     def mark_profile_installed(self, profile: PipelineProfile) -> None:
         for model_id in self.required_model_ids_for_profile(profile):
-            self.mark_installed(model_id)
+            entry = self._entry(model_id)
+            if entry.environment == "sona-ai":
+                self.mark_installed(model_id)
 
     def _run_job(self, entry: ModelCatalogEntry, job_id: str) -> None:
         job = self.get_job(job_id)

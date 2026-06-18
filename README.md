@@ -210,6 +210,7 @@ Dedicated config files live beside it:
 - `configs/faster-whisper-turbo.yaml`
 - `configs/wav2vec2.yaml`
 - `configs/diarization-community.yaml`
+- `configs/speech.hf-full.yaml`
 - `configs/qwen.yaml`
 - `configs/llama.yaml`
 - `configs/gemma.yaml`
@@ -280,21 +281,21 @@ The backend is model-heavy and should usually run on your laptop, a VM, or a GPU
 
 ### Hugging Face Backend Docker Space
 
-This repo includes a minimal backend-only Docker path for a Hugging Face Docker Space. It is meant for demo use, not durable production hosting.
+This repo includes a backend-only Docker path for a Hugging Face Docker Space. It is meant for demo use, not durable production hosting.
 
 The Docker image:
 
 - Runs FastAPI on port `7860`.
-- Uses `configs/speech.hf.yaml`.
-- Runs Parakeet transcription on CPU.
-- Disables alignment and diarization to avoid extra external environments inside the demo container.
-- Expects BYOK for summary/chat; local LLM dependencies are omitted from the minimal image.
+- Uses `configs/speech.hf-full.yaml`.
+- Creates `sona-ai`, `sona-aligner`, and `sona-diarization` conda environments inside the container.
+- Supports Parakeet, Faster-Whisper, Wav2Vec2 alignment, and pyannote Community-1 diarization on CPU.
+- Expects BYOK for summary/chat; local LLM dependencies are omitted from the image.
 - Stores uploaded recordings, SQLite data, and model cache inside the Space filesystem.
 
 Create a Hugging Face Space with SDK `Docker`, push this repo, and set these Space variables:
 
 ```bash
-SONA_SPEECH_CONFIG=speech.hf
+SONA_SPEECH_CONFIG=speech.hf-full
 SONA_HF_CACHE=.models
 HF_HOME=.models
 HUGGINGFACE_HUB_CACHE=.models/hub
@@ -311,7 +312,7 @@ Local Docker smoke test:
 
 ```bash
 docker build -t sona-ai-backend-hf .
-docker run --rm -p 7860:7860 -e SONA_SPEECH_CONFIG=speech.hf sona-ai-backend-hf
+docker run --rm -p 7860:7860 -e SONA_SPEECH_CONFIG=speech.hf-full sona-ai-backend-hf
 ```
 
 Then open:

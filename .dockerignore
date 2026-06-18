@@ -18,6 +18,8 @@ backend/data/*
 backend/**/*.pyc
 backend/**/__pycache__
 backend/.pytest_cache
+tools/**/*.pyc
+tools/**/__pycache__
 
 frontend
 node_modules

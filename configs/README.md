@@ -6,6 +6,7 @@ name, for example `load_config("speech")` resolves to `configs/speech.yaml`.
 ## Pipeline
 
 - `speech.yaml`: top-level speech pipeline selection.
+- `speech.hf-full.yaml`: Hugging Face Docker Space profile with CPU ASR, alignment, and diarization enabled.
 - `parakeet.yaml`: NVIDIA Parakeet ASR.
 - `faster-whisper-large-v3.yaml`: Faster-Whisper Large-v3 ASR.
 - `faster-whisper-turbo.yaml`: Faster-Whisper Turbo ASR.
