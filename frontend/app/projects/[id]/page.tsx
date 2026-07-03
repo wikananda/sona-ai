@@ -134,7 +134,7 @@ export default function ProjectDetailPage() {
         refreshSelectedRecording().catch((err) => setError(err.message));
     }, 3000, hasActiveRecordings);
 
-    const handleStartDraft = () => {
+    const handleStartDraft = useCallback(() => {
         setDraftMode((current) => current ?? "upload");
         setPreviousRecordingId((current) => {
             if (draftMode) return current;
@@ -144,16 +144,16 @@ export default function ProjectDetailPage() {
         });
         setSelectedRecording(null);
         setSelectedRecordingId(DRAFT_RECORDING_ID);
-    };
+    }, [draftMode, selectedRecordingId]);
 
-    const handleSelectDraft = () => {
+    const handleSelectDraft = useCallback(() => {
         if (!draftMode) return;
 
         setSelectedRecording(null);
         setSelectedRecordingId(DRAFT_RECORDING_ID);
-    };
+    }, [draftMode]);
 
-    const handleCancelDraft = () => {
+    const handleCancelDraft = useCallback(() => {
         const fallbackRecordingId = previousRecordingId &&
             recordings.some((recording) => recording.id === previousRecordingId)
             ? previousRecordingId
@@ -165,13 +165,13 @@ export default function ProjectDetailPage() {
         if (!recordings.length) {
             setSelectedRecording(null);
         }
-    };
+    }, [previousRecordingId, recordings]);
 
-    const handleSelectRecording = (recordingId: string) => {
+    const handleSelectRecording = useCallback((recordingId: string) => {
         setDraftMode(null);
         setPreviousRecordingId(undefined);
         setSelectedRecordingId(recordingId);
-    };
+    }, []);
 
     const ensureSpeechModelsReady = useCallback(async (params: {
         model: TranscriptionModel;
@@ -203,7 +203,7 @@ export default function ProjectDetailPage() {
         });
     }, []);
 
-    const handleUpload = async (params: {
+    const handleUpload = useCallback(async (params: {
         files: File[];
         language?: string;
         model: TranscriptionModel;
@@ -258,17 +258,17 @@ export default function ProjectDetailPage() {
         } finally {
             setIsUploading(false);
         }
-    };
+    }, [ensureSpeechModelsReady, projectId, refreshProject]);
 
-    const handleLiveRecordingSaved = async (recording: Recording) => {
+    const handleLiveRecordingSaved = useCallback(async (recording: Recording) => {
         setDraftMode(null);
         setPreviousRecordingId(undefined);
         setSelectedRecordingId(recording.id);
         setSelectedRecording(recording);
         await refreshProject();
-    };
+    }, [refreshProject]);
 
-    const handleDeleteRecording = async (recordingId: string) => {
+    const handleDeleteRecording = useCallback(async (recordingId: string) => {
         if (!window.confirm("Delete this recording and transcript?")) return;
 
         setError("");
@@ -282,9 +282,9 @@ export default function ProjectDetailPage() {
         } catch (err) {
             setError(getErrorMessage(err, "Failed to delete recording"));
         }
-    };
+    }, [selectedRecordingId, refreshProject]);
 
-    const handleRenameRecording = async (recordingId: string, name: string) => {
+    const handleRenameRecording = useCallback(async (recordingId: string, name: string) => {
         setError("");
         setRenamingRecordingId(recordingId);
         try {
@@ -308,9 +308,9 @@ export default function ProjectDetailPage() {
         } finally {
             setRenamingRecordingId(undefined);
         }
-    };
+    }, []);
 
-    const handleRetranscribeRecording = async (
+    const handleRetranscribeRecording = useCallback(async (
         recordingId: string,
         settings: RetranscribeParams,
     ): Promise<boolean> => {
@@ -343,9 +343,9 @@ export default function ProjectDetailPage() {
         } finally {
             setRetranscribingId(undefined);
         }
-    };
+    }, [ensureSpeechModelsReady, refreshProject]);
 
-    const handleLiveStartRequest = async (params: {
+    const handleLiveStartRequest = useCallback(async (params: {
         model: TranscriptionModel;
         device: RuntimeDevice;
         language?: string;
@@ -362,9 +362,9 @@ export default function ProjectDetailPage() {
             setError(getErrorMessage(err, "Failed to check model availability"));
             throw err;
         }
-    };
+    }, [ensureSpeechModelsReady]);
 
-    const handleCancelRecording = async (recordingId: string) => {
+    const handleCancelRecording = useCallback(async (recordingId: string) => {
         setError("");
         setCancelingRecordingId(recordingId);
         try {
@@ -379,9 +379,9 @@ export default function ProjectDetailPage() {
         } finally {
             setCancelingRecordingId(undefined);
         }
-    };
+    }, [refreshProject]);
 
-    const handleRenameTranscriptSpeakers = async (
+    const handleRenameTranscriptSpeakers = useCallback(async (
         recordingId: string,
         speakers: Record<string, string>,
     ) => {
@@ -396,9 +396,9 @@ export default function ProjectDetailPage() {
         } finally {
             setRenamingSpeakerId(undefined);
         }
-    };
+    }, []);
 
-    const handleUpdateTranscriptSegment = async (
+    const handleUpdateTranscriptSegment = useCallback(async (
         recordingId: string,
         segmentIndex: number,
         params: TranscriptSegmentUpdateParams,
@@ -414,9 +414,9 @@ export default function ProjectDetailPage() {
         } finally {
             setEditingTranscriptId(undefined);
         }
-    };
+    }, []);
 
-    const handleExtractSpeakers = async (
+    const handleExtractSpeakers = useCallback(async (
         recordingId: string,
         params: SpeakerExtractionParams,
     ) => {
@@ -432,9 +432,9 @@ export default function ProjectDetailPage() {
         } finally {
             setExtractingSpeakerId(undefined);
         }
-    };
+    }, [refreshProject]);
 
-    const handleSummarizeRecording = async (
+    const handleSummarizeRecording = useCallback(async (
         recordingId: string,
         params: RecordingSummaryParams,
     ) => {
@@ -451,9 +451,9 @@ export default function ProjectDetailPage() {
         } finally {
             setSummarizingId(undefined);
         }
-    };
+    }, []);
 
-    const handleUpdateRecordingSummary = async (
+    const handleUpdateRecordingSummary = useCallback(async (
         recordingId: string,
         params: RecordingSummaryUpdateParams,
     ) => {
@@ -470,7 +470,11 @@ export default function ProjectDetailPage() {
         } finally {
             setUpdatingSummaryId(undefined);
         }
-    };
+    }, []);
+
+    const handleOpenSettings = useCallback(() => {
+        setIsSettingsOpen(true);
+    }, []);
 
     if (isLoadingProject) {
         return (
@@ -566,7 +570,7 @@ export default function ProjectDetailPage() {
                             isUpdatingSummary={updatingSummaryId === selectedRecording?.id}
                             onUpdateSummary={handleUpdateRecordingSummary}
                             byokModelPresets={byokSettings.validModelPresets}
-                            onOpenSettings={() => setIsSettingsOpen(true)}
+                            onOpenSettings={handleOpenSettings}
                         />
                     )}
                 </div>

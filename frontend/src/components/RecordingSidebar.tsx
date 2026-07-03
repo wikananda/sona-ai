@@ -5,7 +5,7 @@ import {
 } from "@/src/api/sonaApi";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import { formatDateTime } from "@/src/utils/formatters";
-import { useState } from "react";
+import { memo, useState } from "react";
 
 interface Props {
     recordings: Recording[];
@@ -21,7 +21,7 @@ interface Props {
     isUploading: boolean;
 }
 
-export default function RecordingSidebar({
+function RecordingSidebar({
     recordings,
     selectedId,
     isDraftSelected = false,
@@ -196,3 +196,5 @@ export default function RecordingSidebar({
         </aside>
     );
 }
+
+export default memo(RecordingSidebar);

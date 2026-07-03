@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import {
     recordingAudioUrl,
     Recording,
@@ -11,7 +11,6 @@ import {
     RuntimeDevice,
     RuntimeDevices,
     LocalLLMModel,
-    TranscriptionModel,
     SummaryMode,
     TranscriptSegmentUpdateParams,
 } from "@/src/api/sonaApi";
@@ -21,14 +20,10 @@ import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import RecordingChatPanel from "@/src/components/RecordingChatPanel";
 import SummaryPanel from "@/src/components/SummaryPanel";
 import TranscriptPanel from "@/src/components/TranscriptPanel";
-import Modal from "@/src/components/ui/Modal";
-import {
-    deviceLabel,
-    isTranscriptionModel,
-    numberOrEmpty,
-    TRANSCRIPTION_LANGUAGES,
-    TRANSCRIPTION_MODELS,
-} from "@/src/utils/transcriptionSettings";
+import RetranscribeEditorModal from "@/src/components/recording-detail/RetranscribeEditorModal";
+import SpeakerExtractionEditorModal from "@/src/components/recording-detail/SpeakerExtractionEditorModal";
+import TabButton from "@/src/components/recording-detail/TabButton";
+import RecordingProgressPanel from "@/src/components/recording-detail/RecordingProgressPanel";
 
 type DetailTab = "transcript" | "summary" | "chat";
 
@@ -73,7 +68,7 @@ interface Props {
     onOpenSettings: () => void;
 }
 
-export default function RecordingDetail({
+function RecordingDetail({
     recording,
     isLoading,
     runtimeDevices,
@@ -100,20 +95,6 @@ export default function RecordingDetail({
     const [isSpeakerEditorOpen, setIsSpeakerEditorOpen] = useState(false);
     const [isRetranscribeEditorOpen, setIsRetranscribeEditorOpen] = useState(false);
     const [isSpeakerExtractionEditorOpen, setIsSpeakerExtractionEditorOpen] = useState(false);
-    const [retranscribeLanguage, setRetranscribeLanguage] = useState("auto");
-    const [retranscribeModel, setRetranscribeModel] =
-        useState<TranscriptionModel>("parakeet");
-    const [retranscribeDevice, setRetranscribeDevice] =
-        useState<RuntimeDevice>(runtimeDevices.default);
-    const [retranscribeMinSpeakers, setRetranscribeMinSpeakers] =
-        useState<number | "">("");
-    const [retranscribeMaxSpeakers, setRetranscribeMaxSpeakers] =
-        useState<number | "">("");
-    const [retranscribeExtractSpeakers, setRetranscribeExtractSpeakers] = useState(true);
-    const [extractMinSpeakers, setExtractMinSpeakers] = useState<number | "">("");
-    const [extractMaxSpeakers, setExtractMaxSpeakers] = useState<number | "">("");
-    const [retranscribeError, setRetranscribeError] = useState("");
-    const [speakerExtractionError, setSpeakerExtractionError] = useState("");
     const [localLLMModel, setLocalLLMModel] = useState<LocalLLMModel>("qwen");
     const [summaryDevice, setSummaryDevice] = useState<RuntimeDevice>(runtimeDevices.default);
     const [summaryMode, setSummaryMode] = useState<SummaryMode>("local");
@@ -208,85 +189,18 @@ export default function RecordingDetail({
         await audio.play().catch(() => undefined);
     };
 
-    const openRetranscribeEditor = () => {
-        const recordingDevice = runtimeDevices.available.includes(recording.device)
-            ? recording.device
-            : runtimeDevices.default;
+    const handleRetranscribe = async (
+        settings: RetranscribeParams,
+    ): Promise<boolean> => {
+        if (!onRetranscribe) return false;
 
-        setRetranscribeLanguage(recording.language_hint ?? "auto");
-        setRetranscribeModel(
-            isTranscriptionModel(recording.model) ? recording.model : "parakeet",
-        );
-        setRetranscribeDevice(recordingDevice);
-        setRetranscribeMinSpeakers(recording.min_speakers ?? "");
-        setRetranscribeMaxSpeakers(recording.max_speakers ?? "");
-        setRetranscribeExtractSpeakers(true);
-        setRetranscribeError("");
-        setIsRetranscribeEditorOpen(true);
+        return onRetranscribe(recording.id, settings);
     };
 
-    const closeRetranscribeEditor = () => {
-        if (isRetranscribing) return;
-        setRetranscribeError("");
-        setIsRetranscribeEditorOpen(false);
-    };
-
-    const openSpeakerExtractionEditor = () => {
-        setExtractMinSpeakers(recording.min_speakers ?? "");
-        setExtractMaxSpeakers(recording.max_speakers ?? "");
-        setSpeakerExtractionError("");
-        setIsSpeakerExtractionEditorOpen(true);
-    };
-
-    const closeSpeakerExtractionEditor = () => {
-        if (isExtractingSpeakers) return;
-        setSpeakerExtractionError("");
-        setIsSpeakerExtractionEditorOpen(false);
-    };
-
-    const handleRetranscribeSubmit = async (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        if (!onRetranscribe) return;
-
-        const selectedDevice = runtimeDevices.available.includes(retranscribeDevice)
-            ? retranscribeDevice
-            : runtimeDevices.default;
-        if (
-            retranscribeExtractSpeakers &&
-            (retranscribeMinSpeakers === "" || retranscribeMaxSpeakers === "")
-        ) {
-            setRetranscribeError("Min and max speakers are required when extracting speakers.");
-            return;
-        }
-
-        setRetranscribeError("");
-        const started = await onRetranscribe(recording.id, {
-            language: retranscribeLanguage,
-            model: retranscribeModel,
-            device: selectedDevice,
-            minSpeakers: retranscribeExtractSpeakers ? retranscribeMinSpeakers : "",
-            maxSpeakers: retranscribeExtractSpeakers ? retranscribeMaxSpeakers : "",
-            extractSpeakers: retranscribeExtractSpeakers,
-        });
-        if (started) {
-            setIsRetranscribeEditorOpen(false);
-        }
-    };
-
-    const handleSpeakerExtractionSubmit = async (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
+    const handleExtractSpeakers = async (settings: SpeakerExtractionParams) => {
         if (!onExtractSpeakers) return;
-        if (extractMinSpeakers === "" || extractMaxSpeakers === "") {
-            setSpeakerExtractionError("Min and max speakers are required.");
-            return;
-        }
 
-        setSpeakerExtractionError("");
-        await onExtractSpeakers(recording.id, {
-            minSpeakers: extractMinSpeakers,
-            maxSpeakers: extractMaxSpeakers,
-        });
-        setIsSpeakerExtractionEditorOpen(false);
+        await onExtractSpeakers(recording.id, settings);
     };
 
     const handleCancelProcessing = async () => {
@@ -347,7 +261,7 @@ export default function RecordingDetail({
                                 <div>
                                     <button
                                         type="button"
-                                        onClick={openRetranscribeEditor}
+                                        onClick={() => setIsRetranscribeEditorOpen(true)}
                                         disabled={isRetranscribing}
                                         className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
@@ -366,7 +280,7 @@ export default function RecordingDetail({
                                 <div>
                                     <button
                                         type="button"
-                                        onClick={openRetranscribeEditor}
+                                        onClick={() => setIsRetranscribeEditorOpen(true)}
                                         disabled={isRetranscribing}
                                         className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
@@ -435,7 +349,7 @@ export default function RecordingDetail({
                                             {canExtractSpeakers && (
                                                 <button
                                                     type="button"
-                                                    onClick={openSpeakerExtractionEditor}
+                                                    onClick={() => setIsSpeakerExtractionEditorOpen(true)}
                                                     disabled={isExtractingSpeakers}
                                                     className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
@@ -450,7 +364,7 @@ export default function RecordingDetail({
                                             {canRetranscribe && (
                                                 <button
                                                     type="button"
-                                                    onClick={openRetranscribeEditor}
+                                                    onClick={() => setIsRetranscribeEditorOpen(true)}
                                                     disabled={isRetranscribing}
                                                     className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
@@ -521,352 +435,25 @@ export default function RecordingDetail({
             </div>
 
             {isRetranscribeEditorOpen && (
-                <Modal backdropClassName="bg-black/35">
-                    <form
-                        onSubmit={handleRetranscribeSubmit}
-                        className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-xl"
-                    >
-                        <div className="flex items-start justify-between gap-4">
-                            <h3 className="text-base font-semibold text-zinc-950">
-                                Re-transcribe settings
-                            </h3>
-                            <button
-                                type="button"
-                                onClick={closeRetranscribeEditor}
-                                disabled={isRetranscribing}
-                                className="text-sm font-medium text-zinc-500 hover:cursor-pointer hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                Close
-                            </button>
-                        </div>
-
-                        <div className="mt-5 grid gap-4 md:grid-cols-2">
-                            <label className="flex flex-col gap-1">
-                                <span className="text-xs font-medium text-zinc-500">
-                                    Language
-                                </span>
-                                <select
-                                    value={retranscribeLanguage}
-                                    onChange={(event) => setRetranscribeLanguage(event.target.value)}
-                                    disabled={isRetranscribing}
-                                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    {TRANSCRIPTION_LANGUAGES.map((item) => (
-                                        <option key={item.value} value={item.value}>
-                                            {item.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-
-                            <label className="flex flex-col gap-1">
-                                <span className="text-xs font-medium text-zinc-500">
-                                    Model
-                                </span>
-                                <select
-                                    value={retranscribeModel}
-                                    onChange={(event) => setRetranscribeModel(
-                                        event.target.value as TranscriptionModel,
-                                    )}
-                                    disabled={isRetranscribing}
-                                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    {TRANSCRIPTION_MODELS.map((item) => (
-                                        <option key={item.value} value={item.value}>
-                                            {item.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-
-                            <label className="flex flex-col gap-1">
-                                <span className="text-xs font-medium text-zinc-500">
-                                    Device
-                                </span>
-                                <select
-                                    value={
-                                        runtimeDevices.available.includes(retranscribeDevice)
-                                            ? retranscribeDevice
-                                            : runtimeDevices.default
-                                    }
-                                    onChange={(event) => setRetranscribeDevice(
-                                        event.target.value as RuntimeDevice,
-                                    )}
-                                    disabled={isRetranscribing}
-                                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    {runtimeDevices.available.map((device) => (
-                                        <option key={device} value={device}>
-                                            {deviceLabel(device)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-
-                            <label className="flex items-start gap-2 md:col-span-2">
-                                <input
-                                    type="checkbox"
-                                    checked={retranscribeExtractSpeakers}
-                                    onChange={(event) => {
-                                        setRetranscribeExtractSpeakers(event.target.checked);
-                                        setRetranscribeError("");
-                                    }}
-                                    disabled={isRetranscribing}
-                                    className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-950 focus:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
-                                />
-                                <span className="text-sm text-zinc-600">
-                                    Extract speakers during re-transcribe
-                                    <span className="block text-xs text-zinc-500">
-                                        Uncheck this to re-run ASR now and extract speakers later.
-                                    </span>
-                                </span>
-                            </label>
-
-                            {retranscribeExtractSpeakers && (
-                                <div className="grid gap-4 sm:grid-cols-2 md:col-span-2">
-                                    <label className="flex flex-col gap-1">
-                                        <span className="text-xs font-medium text-zinc-500">
-                                            Min speakers
-                                        </span>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            value={retranscribeMinSpeakers}
-                                            onChange={(event) => {
-                                                setRetranscribeMinSpeakers(
-                                                    numberOrEmpty(event.target.value),
-                                                );
-                                                setRetranscribeError("");
-                                            }}
-                                            disabled={isRetranscribing}
-                                            placeholder="Required"
-                                            className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                    </label>
-
-                                    <label className="flex flex-col gap-1">
-                                        <span className="text-xs font-medium text-zinc-500">
-                                            Max speakers
-                                        </span>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            value={retranscribeMaxSpeakers}
-                                            onChange={(event) => {
-                                                setRetranscribeMaxSpeakers(
-                                                    numberOrEmpty(event.target.value),
-                                                );
-                                                setRetranscribeError("");
-                                            }}
-                                            disabled={isRetranscribing}
-                                            placeholder="Required"
-                                            className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                    </label>
-                                </div>
-                            )}
-                        </div>
-
-                        {retranscribeError && (
-                            <p className="mt-4 text-sm text-red-700">{retranscribeError}</p>
-                        )}
-
-                        <div className="mt-6 flex justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={closeRetranscribeEditor}
-                                disabled={isRetranscribing}
-                                className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:cursor-pointer hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={isRetranscribing}
-                                className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                {isRetranscribing ? "Starting..." : "Start re-transcribe"}
-                            </button>
-                        </div>
-                    </form>
-                </Modal>
+                <RetranscribeEditorModal
+                    recording={recording}
+                    runtimeDevices={runtimeDevices}
+                    isRetranscribing={isRetranscribing}
+                    onClose={() => setIsRetranscribeEditorOpen(false)}
+                    onSubmit={handleRetranscribe}
+                />
             )}
 
             {isSpeakerExtractionEditorOpen && (
-                <Modal backdropClassName="bg-black/35">
-                    <form
-                        onSubmit={handleSpeakerExtractionSubmit}
-                        className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl"
-                    >
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <h3 className="text-base font-semibold text-zinc-950">
-                                    Extract speaker settings
-                                </h3>
-                                <p className="mt-1 text-sm text-zinc-500">
-                                    Set speaker bounds for diarization.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={closeSpeakerExtractionEditor}
-                                disabled={isExtractingSpeakers}
-                                className="text-sm font-medium text-zinc-500 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                Close
-                            </button>
-                        </div>
-
-                        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                            <label className="flex flex-col gap-1">
-                                <span className="text-xs font-medium text-zinc-500">
-                                    Min speakers
-                                </span>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    value={extractMinSpeakers}
-                                    onChange={(event) => {
-                                        setExtractMinSpeakers(
-                                            numberOrEmpty(event.target.value),
-                                        );
-                                        setSpeakerExtractionError("");
-                                    }}
-                                    disabled={isExtractingSpeakers}
-                                    placeholder="Required"
-                                    className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                />
-                            </label>
-
-                            <label className="flex flex-col gap-1">
-                                <span className="text-xs font-medium text-zinc-500">
-                                    Max speakers
-                                </span>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    value={extractMaxSpeakers}
-                                    onChange={(event) => {
-                                        setExtractMaxSpeakers(
-                                            numberOrEmpty(event.target.value),
-                                        );
-                                        setSpeakerExtractionError("");
-                                    }}
-                                    disabled={isExtractingSpeakers}
-                                    placeholder="Required"
-                                    className="min-h-10 rounded-md border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                />
-                            </label>
-                        </div>
-
-                        {speakerExtractionError && (
-                            <p className="mt-4 text-sm text-red-700">{speakerExtractionError}</p>
-                        )}
-
-                        <div className="mt-6 flex justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={closeSpeakerExtractionEditor}
-                                disabled={isExtractingSpeakers}
-                                className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={isExtractingSpeakers}
-                                className="min-h-10 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                {isExtractingSpeakers ? "Starting..." : "Start extraction"}
-                            </button>
-                        </div>
-                    </form>
-                </Modal>
+                <SpeakerExtractionEditorModal
+                    recording={recording}
+                    isExtractingSpeakers={isExtractingSpeakers}
+                    onClose={() => setIsSpeakerExtractionEditorOpen(false)}
+                    onSubmit={handleExtractSpeakers}
+                />
             )}
         </section>
     );
 }
 
-function TabButton({
-    label,
-    isActive,
-    onClick,
-}: {
-    label: string;
-    isActive: boolean;
-    onClick: () => void;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={`min-h-11 border-b-2 px-4 text-sm font-medium transition-colors ${isActive
-                ? "border-zinc-950 text-zinc-950"
-                : "border-transparent text-zinc-500 hover:text-zinc-950 hover:cursor-pointer"
-                }`}
-        >
-            {label}
-        </button>
-    );
-}
-
-function RecordingProgressPanel({
-    recording,
-    helperText,
-    isCanceling = false,
-    onCancel,
-}: {
-    recording: Recording;
-    helperText?: string;
-    isCanceling?: boolean;
-    onCancel?: () => Promise<void>;
-}) {
-    const progress = recording.progress;
-    const percent = Math.max(0, Math.min(100, Math.round(progress?.percent ?? 0)));
-    const totalSteps = progress?.total_steps ?? 0;
-    const completedSteps = progress?.completed_steps ?? 0;
-    const detail = totalSteps > 0
-        ? `Completed ${completedSteps} of ${totalSteps} stages`
-        : "Preparing progress details";
-
-    return (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
-            <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                    <p className="text-sm font-medium text-amber-950">
-                        {progress?.label ?? "Processing"}...
-                    </p>
-                    <p className="mt-1 text-xs text-amber-800">
-                        {helperText ?? detail}
-                    </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                    <span className="text-sm font-semibold tabular-nums text-amber-950">
-                        {percent}%
-                    </span>
-                    {onCancel && (
-                        <button
-                            type="button"
-                            onClick={onCancel}
-                            disabled={isCanceling}
-                            aria-label="Cancel processing"
-                            title="Cancel processing"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-amber-300 text-lg leading-none text-amber-950 transition-colors hover:cursor-pointer hover:border-amber-500 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            x
-                        </button>
-                    )}
-                </div>
-            </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-amber-100">
-                <div
-                    className="h-full rounded-full bg-amber-600 transition-[width] duration-300"
-                    style={{ width: `${percent}%` }}
-                />
-            </div>
-            {helperText && (
-                <p className="mt-2 text-xs text-amber-800">{detail}</p>
-            )}
-        </div>
-    );
-}
+export default memo(RecordingDetail);

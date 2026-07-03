@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
     Recording,
     RuntimeDevice,
@@ -42,7 +43,7 @@ const ADD_MODES: Array<{ value: AddRecordingMode; label: string }> = [
     { value: "live", label: "Live transcription" },
 ];
 
-export default function AddRecordingPanel({
+function AddRecordingPanel({
     projectId,
     mode,
     onModeChange,
@@ -118,3 +119,5 @@ export default function AddRecordingPanel({
         </section>
     );
 }
+
+export default memo(AddRecordingPanel);

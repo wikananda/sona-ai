@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { RecordingStatus } from "@/src/api/sonaApi";
 
 const LABELS: Record<RecordingStatus, string> = {
@@ -20,10 +21,12 @@ interface Props {
     status: RecordingStatus;
 }
 
-export default function RecordingStatusBadge({ status }: Props) {
+function RecordingStatusBadge({ status }: Props) {
     return (
         <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${STYLES[status]}`}>
             {LABELS[status]}
         </span>
     );
 }
+
+export default memo(RecordingStatusBadge);
