@@ -9,6 +9,8 @@ import {
     type PointerEvent,
 } from "react";
 import { SpeakerSegment, TranscriptSegmentUpdateParams } from "@/src/api/sonaApi";
+import Modal from "@/src/components/ui/Modal";
+import { getErrorMessage } from "@/src/utils/errorHandling";
 import { exportTranscriptPdf } from "@/src/utils/pdfExport";
 
 const EDIT_HOLD_MS = 600;
@@ -137,9 +139,7 @@ export default function TranscriptPanel({
             });
             cancelSegmentEdit();
         } catch (err) {
-            setSegmentError(
-                err instanceof Error ? err.message : "Failed to save transcript segment.",
-            );
+            setSegmentError(getErrorMessage(err, "Failed to save transcript segment."));
         }
     };
 
@@ -234,7 +234,7 @@ export default function TranscriptPanel({
             await onRenameSpeakers?.(nextSpeakerNames);
             onSpeakerEditorClose?.();
         } catch (err) {
-            setSpeakerError(err instanceof Error ? err.message : "Failed to save speaker names.");
+            setSpeakerError(getErrorMessage(err, "Failed to save speaker names."));
         }
     };
 
@@ -246,9 +246,7 @@ export default function TranscriptPanel({
         try {
             await exportTranscriptPdf({ recordingName, segments });
         } catch (err) {
-            setExportError(
-                err instanceof Error ? err.message : "Failed to export transcript PDF.",
-            );
+            setExportError(getErrorMessage(err, "Failed to export transcript PDF."));
         } finally {
             setIsExportingPdf(false);
         }
@@ -380,7 +378,7 @@ export default function TranscriptPanel({
             </div>
 
             {isSpeakerEditorOpen && speakers.length > 0 && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+                <Modal backdropClassName="bg-black/35">
                     <form
                         onSubmit={handleSpeakerSave}
                         className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl"
@@ -438,7 +436,7 @@ export default function TranscriptPanel({
                             </button>
                         </div>
                     </form>
-                </div>
+                </Modal>
             )}
         </div>
     );

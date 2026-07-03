@@ -4,6 +4,7 @@ from typing import Optional
 
 from sona_ai.core import load_config, validate_device_available, setup_logging
 from sona_ai.pipelines import SpeechPipeline, build_speech_pipeline
+from sona_ai.transcription.live_timestamps import segment_live_timestamps
 from sona_ai.transcription.schemas import TranscriptionResult
 from sona_ai.services.pipeline_profile import (
     PipelineProfile,
@@ -106,7 +107,39 @@ class TranscriptionService:
         logger.info("Waiting for transcription lock...")
         with self._transcription_lock:
             logger.info("Transcription lock acquired for live chunk.")
-            return pipeline.transcriber.transcribe(audio_path, language=language)
+            transcription = pipeline.transcriber.transcribe(audio_path, language=language)
+        return segment_live_timestamps(transcription, audio_path)
+
+    def align_live_segments(
+        self,
+        audio_path: str,
+        language: Optional[str],
+        segments: list[dict],
+        model: Optional[str] = None,
+        device: Optional[str] = None,
+    ) -> tuple[list[dict], bool]:
+        """Align rough live-transcription segments against the saved audio.
+
+        Returns the aligned segment dicts and whether alignment produced a new
+        transcript (as opposed to passing the rough transcript through).
+        """
+        rough_transcription = TranscriptionResult.from_aligned_result(
+            {
+                "language": language,
+                "segments": segments,
+            }
+        )
+        aligned_transcription = self.align_transcript(
+            audio_path,
+            rough_transcription,
+            model=model,
+            device=device,
+        )
+        aligned_transcription = segment_live_timestamps(aligned_transcription, audio_path)
+        return (
+            aligned_transcription.to_segment_dicts(),
+            aligned_transcription is not rough_transcription,
+        )
 
     def align_transcript(
         self,

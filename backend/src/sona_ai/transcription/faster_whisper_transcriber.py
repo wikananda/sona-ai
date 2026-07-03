@@ -1,10 +1,15 @@
-import gc
 from pathlib import Path
 from typing import Optional
 
 import torch
 
-from sona_ai.core import Timer, model_cache_root, setup_logging, setup_model_cache_environment
+from sona_ai.core import (
+    Timer,
+    cleanup_model_attrs,
+    model_cache_root,
+    setup_logging,
+    setup_model_cache_environment,
+)
 from sona_ai.transcription.schemas import TranscriptionResult
 
 
@@ -103,12 +108,4 @@ class FasterWhisperTranscriber:
         self.cache_dir = setup_model_cache_environment(self.config)
 
     def cleanup_models(self):
-        if self.model is not None:
-            del self.model
-            self.model = None
-
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        elif torch.backends.mps.is_available():
-            torch.mps.empty_cache()
+        cleanup_model_attrs(self, "model")

@@ -1,13 +1,12 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request
+from fastapi import APIRouter, UploadFile, File, Request
 from fastapi.concurrency import run_in_threadpool
 from typing import Optional
 import shutil
 import uuid
 import os
 
-from sona_ai.core import setup_logging
+from sona_ai.api.routes._errors import route_error_handler
 
-logger = setup_logging()
 router = APIRouter()
 
 @router.post("/transcribe")
@@ -31,22 +30,18 @@ async def transcribe(
         shutil.copyfileobj(file.file, buffer)
 
     try:
-        result = await run_in_threadpool(
-            request.app.state.transcription_service.transcribe,
-            temp_filename,
-            language=language,
-            model=model,
-            device=device,
-            min_speakers=min_speakers,
-            max_speakers=max_speakers,
-            extract_speakers=extract_speakers,
-        )
-        return result
-    except Exception as e:
-        if isinstance(e, ValueError):
-            raise HTTPException(status_code=400, detail=str(e))
-        logger.error(f"Error transcribing file: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        with route_error_handler("Error transcribing file: %s", log_traceback=False):
+            result = await run_in_threadpool(
+                request.app.state.transcription_service.transcribe,
+                temp_filename,
+                language=language,
+                model=model,
+                device=device,
+                min_speakers=min_speakers,
+                max_speakers=max_speakers,
+                extract_speakers=extract_speakers,
+            )
+            return result
     finally:
         if os.path.exists(temp_filename):
             os.remove(temp_filename)

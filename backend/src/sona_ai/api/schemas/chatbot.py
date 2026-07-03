@@ -1,17 +1,13 @@
-from typing import Literal, Optional
+from typing import Literal
 from pydantic import BaseModel
+
+from sona_ai.api.schemas.byok import BYOKSettings
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str
 
-class ChatBYOKSettings(BaseModel):
-    provider: Literal["openai", "groq", "openrouter", "custom"]
-    api_key: str
-    model: str
-    base_url: Optional[str] = None
-
 class RecordingChatRequest(BaseModel):
     question: str
     history: list[ChatMessage] = []
-    byok_settings: ChatBYOKSettings
+    byok_settings: BYOKSettings

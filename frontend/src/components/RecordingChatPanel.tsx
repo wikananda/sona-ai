@@ -10,8 +10,9 @@ import {
 import {
     BYOKResolvedModelPreset,
     byokResolvedModelPresetLabel,
-    byokResolvedModelPresetToSettings,
 } from "@/src/hooks/useBYOKSettings";
+import { selectBYOKPreset } from "@/src/hooks/useBYOKPreset";
+import { getErrorMessage } from "@/src/utils/errorHandling";
 import { remarkHtmlLineBreaks } from "@/src/utils/markdownPlugins";
 
 interface Props {
@@ -35,10 +36,7 @@ export default function RecordingChatPanel({
     const [question, setQuestion] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
-    const selectedPreset = byokModelPresets.find((preset) => preset.id === selectedBYOKPresetId);
-    const selectedSettings = selectedPreset
-        ? byokResolvedModelPresetToSettings(selectedPreset)
-        : undefined;
+    const { selectedSettings } = selectBYOKPreset(byokModelPresets, selectedBYOKPresetId);
     const hasBYOKPresets = byokModelPresets.length > 0;
 
     const canSend =
@@ -78,7 +76,7 @@ export default function RecordingChatPanel({
                 },
             ]);
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to chat with recording");
+            setError(getErrorMessage(err, "Failed to chat with recording"));
         } finally {
             setIsLoading(false);
         }

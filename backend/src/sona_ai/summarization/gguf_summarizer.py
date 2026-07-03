@@ -1,7 +1,13 @@
-import gc
 from typing import Dict, Optional, Union
 
-from sona_ai.core import PROJECT_ROOT, load_config, model_cache_root, resolve_device, write_json
+from sona_ai.core import (
+    PROJECT_ROOT,
+    cleanup_model_attrs,
+    load_config,
+    model_cache_root,
+    resolve_device,
+    write_json,
+)
 from sona_ai.summarization.prompts import build_prompt
 
 
@@ -103,7 +109,5 @@ class GGUFLLMSummarizer:
         return summary
 
     def cleanup_models(self):
-        if getattr(self, "model", None) is not None:
-            del self.model
-            self.model = None
-        gc.collect()
+        # llama-cpp models hold no torch device memory, so skip cache emptying.
+        cleanup_model_attrs(self, "model", empty_torch_caches=False)

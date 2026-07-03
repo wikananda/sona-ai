@@ -1,4 +1,4 @@
-__all__ = ["ExternalWav2Vec2Aligner", "NoOpAligner", "Wav2Vec2Aligner"]
+__all__ = ["ExternalWav2Vec2Aligner", "NoOpAligner"]
 
 
 def __getattr__(name):
@@ -12,9 +12,4 @@ def __getattr__(name):
 
         return ExternalWav2Vec2Aligner
 
-    if name == "Wav2Vec2Aligner":
-        from .wav2vec2_aligner import Wav2Vec2Aligner
-
-        return Wav2Vec2Aligner
-        
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -15,14 +15,13 @@ import {
     SummaryMode,
     TranscriptSegmentUpdateParams,
 } from "@/src/api/sonaApi";
-import {
-    BYOKResolvedModelPreset,
-    byokResolvedModelPresetToSettings,
-} from "@/src/hooks/useBYOKSettings";
+import { BYOKResolvedModelPreset } from "@/src/hooks/useBYOKSettings";
+import { selectBYOKPreset } from "@/src/hooks/useBYOKPreset";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import RecordingChatPanel from "@/src/components/RecordingChatPanel";
 import SummaryPanel from "@/src/components/SummaryPanel";
 import TranscriptPanel from "@/src/components/TranscriptPanel";
+import Modal from "@/src/components/ui/Modal";
 import {
     deviceLabel,
     isTranscriptionModel,
@@ -120,20 +119,12 @@ export default function RecordingDetail({
     const [summaryMode, setSummaryMode] = useState<SummaryMode>("local");
     const [summaryBYOKPresetId, setSummaryBYOKPresetId] = useState("");
     const [chatBYOKPresetId, setChatBYOKPresetId] = useState("");
-    const effectiveSummaryBYOKPresetId =
-        byokModelPresets.find((preset) => preset.id === summaryBYOKPresetId)?.id ??
-        byokModelPresets[0]?.id ??
-        "";
-    const effectiveChatBYOKPresetId =
-        byokModelPresets.find((preset) => preset.id === chatBYOKPresetId)?.id ??
-        byokModelPresets[0]?.id ??
-        "";
-    const selectedSummaryPreset = byokModelPresets.find(
-        (preset) => preset.id === effectiveSummaryBYOKPresetId,
-    );
-    const selectedSummaryBYOKSettings = selectedSummaryPreset
-        ? byokResolvedModelPresetToSettings(selectedSummaryPreset)
-        : undefined;
+    const {
+        effectivePresetId: effectiveSummaryBYOKPresetId,
+        selectedSettings: selectedSummaryBYOKSettings,
+    } = selectBYOKPreset(byokModelPresets, summaryBYOKPresetId);
+    const { effectivePresetId: effectiveChatBYOKPresetId } =
+        selectBYOKPreset(byokModelPresets, chatBYOKPresetId);
     const selectedSummaryDevice = runtimeDevices.available.includes(summaryDevice)
         ? summaryDevice
         : runtimeDevices.default;
@@ -530,7 +521,7 @@ export default function RecordingDetail({
             </div>
 
             {isRetranscribeEditorOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+                <Modal backdropClassName="bg-black/35">
                     <form
                         onSubmit={handleRetranscribeSubmit}
                         className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-xl"
@@ -698,11 +689,11 @@ export default function RecordingDetail({
                             </button>
                         </div>
                     </form>
-                </div>
+                </Modal>
             )}
 
             {isSpeakerExtractionEditorOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+                <Modal backdropClassName="bg-black/35">
                     <form
                         onSubmit={handleSpeakerExtractionSubmit}
                         className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl"
@@ -790,7 +781,7 @@ export default function RecordingDetail({
                             </button>
                         </div>
                     </form>
-                </div>
+                </Modal>
             )}
         </section>
     );

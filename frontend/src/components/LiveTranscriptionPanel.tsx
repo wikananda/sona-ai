@@ -10,6 +10,8 @@ import {
     saveLiveRecording,
     transcribeLiveChunk,
 } from "@/src/api/sonaApi";
+import { getErrorMessage } from "@/src/utils/errorHandling";
+import { formatClockTime } from "@/src/utils/formatters";
 import {
     deviceLabel,
     TRANSCRIPTION_LANGUAGES,
@@ -219,9 +221,7 @@ export default function LiveTranscriptionPanel({
                 setSegments(segmentsRef.current);
             })
             .catch((err) => {
-                const message = err instanceof Error
-                    ? err.message
-                    : "Failed to transcribe live chunk";
+                const message = getErrorMessage(err, "Failed to transcribe live chunk");
                 chunkErrorRef.current = message;
                 setError(message);
             });
@@ -259,7 +259,7 @@ export default function LiveTranscriptionPanel({
             resetLiveTranscription();
         } catch (err) {
             setState("idle");
-            setError(err instanceof Error ? err.message : "Failed to save live recording");
+            setError(getErrorMessage(err, "Failed to save live recording"));
         }
     };
 
@@ -381,7 +381,7 @@ export default function LiveTranscriptionPanel({
                         </p>
                     </div>
                     <span className="rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-700">
-                        {formatDuration(elapsedSeconds)}
+                        {formatClockTime(elapsedSeconds)}
                     </span>
                 </div>
             </div>
@@ -412,7 +412,7 @@ export default function LiveTranscriptionPanel({
                             {segments.map((segment, index) => (
                                 <div key={`${segment.start}-${index}`} className="text-sm">
                                     <span className="mr-3 font-mono text-xs text-zinc-500">
-                                        {formatTime(segment.start)}
+                                        {formatClockTime(segment.start)}
                                     </span>
                                     <span className="text-zinc-900">{segment.text}</span>
                                 </div>
@@ -556,18 +556,6 @@ function timestampForFilename(): string {
         .slice(0, 19);
 }
 
-function formatDuration(seconds: number): string {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
-}
-
-function formatTime(seconds: number): string {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
-}
-
 function errorMessage(err: unknown, hasMicrophone: boolean): string {
     if (err instanceof Error && err.message === "NO_SCREEN_AUDIO") {
         return "No audio track was shared. Choose a tab/window with audio enabled, or use microphone mode.";
@@ -580,5 +568,5 @@ function errorMessage(err: unknown, hasMicrophone: boolean): string {
             ? "No microphone was found."
             : "No screen or audio source was selected.";
     }
-    return err instanceof Error ? err.message : "Failed to start live transcription.";
+    return getErrorMessage(err, "Failed to start live transcription.");
 }

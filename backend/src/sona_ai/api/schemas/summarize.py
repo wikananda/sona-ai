@@ -1,11 +1,7 @@
 from pydantic import BaseModel
 from typing import Literal, Optional
 
-class BYOKSummarizeSettings(BaseModel):
-    provider: Literal["openai", "groq", "openrouter", "custom"]
-    api_key: str
-    model: str
-    base_url: Optional[str] = None
+from sona_ai.api.schemas.byok import BYOKSettings
 
 class SummarizeRequest(BaseModel):
     text: str
@@ -14,7 +10,7 @@ class SummarizeRequest(BaseModel):
     model: Optional[str] = "qwen"
     device: Optional[str] = "auto"
     mode: Literal["local", "byok"] = "local"
-    byok: Optional[BYOKSummarizeSettings] = None
+    byok: Optional[BYOKSettings] = None
 
 
 class RecordingSummaryRequest(BaseModel):
@@ -23,4 +19,4 @@ class RecordingSummaryRequest(BaseModel):
     model: Optional[str] = "qwen"
     device: Optional[str] = "auto"
     mode: Literal["local", "byok"] = "local"
-    byok: Optional[BYOKSummarizeSettings] = None
+    byok: Optional[BYOKSettings] = None

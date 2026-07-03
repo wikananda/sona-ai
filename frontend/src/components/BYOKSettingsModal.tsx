@@ -12,7 +12,10 @@ import {
     startRuntimeModelDownload,
     uninstallRuntimeModel,
 } from "@/src/api/sonaApi";
+import Modal from "@/src/components/ui/Modal";
 import { BYOK_PROVIDERS } from "@/src/utils/constants";
+import { getErrorMessage } from "@/src/utils/errorHandling";
+import { usePolling } from "@/src/hooks/usePolling";
 import {
     BYOKConnection,
     BYOKConnectionDraft,
@@ -93,7 +96,7 @@ export default function BYOKSettingsModal({
         try {
             setModels(await getRuntimeModels());
         } catch (error) {
-            setModelError(error instanceof Error ? error.message : "Failed to load models.");
+            setModelError(getErrorMessage(error, "Failed to load models."));
         } finally {
             setIsLoadingModels(false);
         }
@@ -105,27 +108,21 @@ export default function BYOKSettingsModal({
         }
     }, [activeTab, loadModels]);
 
-    useEffect(() => {
-        if (activeTab !== "models" || activeDownloadJobs.length === 0) return;
-
-        const interval = window.setInterval(async () => {
-            const updates = await Promise.allSettled(
-                activeDownloadJobs.map((job) => getRuntimeModelJob(job.job_id)),
-            );
-            setJobs((current) => {
-                const next = { ...current };
-                for (const update of updates) {
-                    if (update.status === "fulfilled") {
-                        next[update.value.job_id] = update.value;
-                    }
+    usePolling(async () => {
+        const updates = await Promise.allSettled(
+            activeDownloadJobs.map((job) => getRuntimeModelJob(job.job_id)),
+        );
+        setJobs((current) => {
+            const next = { ...current };
+            for (const update of updates) {
+                if (update.status === "fulfilled") {
+                    next[update.value.job_id] = update.value;
                 }
-                return next;
-            });
-            void loadModels();
-        }, 1500);
-
-        return () => window.clearInterval(interval);
-    }, [activeDownloadJobs, activeTab, loadModels]);
+            }
+            return next;
+        });
+        void loadModels();
+    }, 1500, activeTab === "models" && activeDownloadJobs.length > 0);
 
     const updateRememberKeys = (rememberKeys: boolean) => {
         setDraft((current) => ({
@@ -167,7 +164,7 @@ export default function BYOKSettingsModal({
             }));
             void loadModels();
         } catch (error) {
-            setModelError(error instanceof Error ? error.message : `Failed to start ${action}.`);
+            setModelError(getErrorMessage(error, `Failed to start ${action}.`));
         }
     };
 
@@ -258,7 +255,7 @@ export default function BYOKSettingsModal({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <Modal>
             <form
                 onSubmit={handleSubmit}
                 className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl"
@@ -420,7 +417,7 @@ export default function BYOKSettingsModal({
                     onConfirm={handleConfirmDeleteModelPreset}
                 />
             )}
-        </div>
+        </Modal>
     );
 }
 
@@ -759,7 +756,7 @@ function ConnectionFormModal({
     };
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+        <Modal zClassName="z-[60]">
             <form
                 onSubmit={handleSubmit}
                 className="w-full max-w-lg rounded-lg bg-white shadow-xl"
@@ -864,7 +861,7 @@ function ConnectionFormModal({
                     </button>
                 </div>
             </form>
-        </div>
+        </Modal>
     );
 }
 
@@ -919,7 +916,7 @@ function ModelPresetFormModal({
     };
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+        <Modal zClassName="z-[60]">
             <form
                 onSubmit={handleSubmit}
                 className="w-full max-w-lg rounded-lg bg-white shadow-xl"
@@ -1006,7 +1003,7 @@ function ModelPresetFormModal({
                     </button>
                 </div>
             </form>
-        </div>
+        </Modal>
     );
 }
 
@@ -1022,7 +1019,7 @@ function ConfirmConnectionDeleteModal({
     onConfirm: () => void;
 }) {
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+        <Modal zClassName="z-[60]">
             <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
                 <div className="border-b border-zinc-200 px-5 py-4">
                     <h3 className="text-base font-semibold text-zinc-950">
@@ -1065,7 +1062,7 @@ function ConfirmConnectionDeleteModal({
                     </button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }
 
@@ -1079,7 +1076,7 @@ function ConfirmModelPresetDeleteModal({
     onConfirm: () => void;
 }) {
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+        <Modal zClassName="z-[60]">
             <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
                 <div className="border-b border-zinc-200 px-5 py-4">
                     <h3 className="text-base font-semibold text-zinc-950">
@@ -1115,7 +1112,7 @@ function ConfirmModelPresetDeleteModal({
                     </button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }
 
@@ -1133,7 +1130,7 @@ function ConfirmModelActionModal({
     const isRedownload = action === "redownload";
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+        <Modal zClassName="z-[60]">
             <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
                 <div className="border-b border-zinc-200 px-5 py-4">
                     <h3 className="text-base font-semibold text-zinc-950">
@@ -1186,7 +1183,7 @@ function ConfirmModelActionModal({
                     </button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }
 

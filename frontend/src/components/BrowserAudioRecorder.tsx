@@ -3,6 +3,8 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { RuntimeDevice, RuntimeDevices, TranscriptionModel } from "@/src/api/sonaApi";
 import RecordingSettingsForm from "@/src/components/RecordingSettingsForm";
+import { getErrorMessage } from "@/src/utils/errorHandling";
+import { formatClockTime } from "@/src/utils/formatters";
 
 type RecorderState = "idle" | "requesting" | "recording" | "stopping" | "preview";
 
@@ -178,7 +180,7 @@ export default function BrowserAudioRecorder({
                         </p>
                     </div>
                     <span className="rounded-full bg-white px-3 py-1 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200">
-                        {formatDuration(elapsedSeconds)}
+                        {formatClockTime(elapsedSeconds)}
                     </span>
                 </div>
 
@@ -405,12 +407,6 @@ function extensionForMimeType(mimeType: string): string {
     return "webm";
 }
 
-function formatDuration(seconds: number): string {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
-}
-
 function errorMessage(err: unknown, hasMicrophone: boolean): string {
     if (err instanceof Error && err.message === "NO_SCREEN_AUDIO") {
         return "No audio track was shared. Choose a tab/window with audio enabled, or use microphone mode.";
@@ -423,5 +419,5 @@ function errorMessage(err: unknown, hasMicrophone: boolean): string {
             ? "No microphone was found."
             : "No screen or audio source was selected.";
     }
-    return err instanceof Error ? err.message : "Failed to start recording.";
+    return getErrorMessage(err, "Failed to start recording.");
 }

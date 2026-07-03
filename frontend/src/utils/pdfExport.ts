@@ -1,4 +1,5 @@
 import type { SpeakerSegment } from "@/src/api/sonaApi";
+import { formatClockTime } from "@/src/utils/formatters";
 
 interface ExportTranscriptPdfParams {
     recordingName: string;
@@ -30,7 +31,7 @@ export async function exportTranscriptPdf({
     segments.forEach((segment) => {
         const labelParts = [
             segment.speaker?.trim(),
-            `${formatTimestamp(segment.start)} - ${formatTimestamp(segment.end)}`,
+            `${formatClockTime(segment.start)} - ${formatClockTime(segment.end)}`,
         ].filter(Boolean);
 
         writer.addText(labelParts.join("  |  "), {
@@ -448,14 +449,6 @@ function cleanMarkdownInline(text: string): string {
         .replace(/`([^`]+)`/g, "$1")
         .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
         .trim();
-}
-
-function formatTimestamp(seconds: number): string {
-    const totalSeconds = Math.max(0, Math.floor(seconds));
-    const minutes = Math.floor(totalSeconds / 60);
-    const remainingSeconds = totalSeconds % 60;
-
-    return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 function buildFilename(recordingName: string, type: "summary" | "transcript"): string {

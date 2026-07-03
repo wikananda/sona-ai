@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.concurrency import run_in_threadpool
 import json
 
-from sona_ai.core import setup_logging
+from sona_ai.api.routes._errors import route_error_handler
 from sona_ai.api.schemas.chatbot import RecordingChatRequest
 from sona_ai.db.models import Recording
 from sona_ai.db.session import get_db
@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import select
 from sona_ai.chatbot.openai_compatible_chat import OpenAICompatibleChat, _chat_context_from_segments
 
-logger = setup_logging()
 router = APIRouter()
 
 @router.post("/recordings/{recording_id}/chat")
@@ -43,7 +42,7 @@ async def chat(
     
     byok = body.byok_settings
     
-    try:
+    with route_error_handler("chat error with recording: %s"):
         chat = OpenAICompatibleChat()
         answer = await run_in_threadpool(
             chat.answer,
@@ -55,10 +54,5 @@ async def chat(
             byok.provider,
             byok.base_url,
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        logger.exception("chat error with recording: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
-    
+
     return {"answer": answer}

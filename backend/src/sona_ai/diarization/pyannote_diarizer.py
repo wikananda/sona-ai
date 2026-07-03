@@ -1,4 +1,3 @@
-import gc
 import os
 import sys
 from pathlib import Path
@@ -8,7 +7,7 @@ import pandas as pd
 import torch
 from dotenv import load_dotenv
 
-from sona_ai.core import PROJECT_ROOT, Timer, model_cache_root, setup_logging
+from sona_ai.core import PROJECT_ROOT, Timer, cleanup_model_attrs, model_cache_root, setup_logging
 from sona_ai.diarization.schemas import DiarizationResult, SpeakerTurn
 
 
@@ -163,12 +162,4 @@ class PyannoteDiarizer:
         return turns
 
     def cleanup_models(self):
-        if self.model is not None:
-            del self.model
-            self.model = None
-
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        elif torch.backends.mps.is_available():
-            torch.mps.empty_cache()
+        cleanup_model_attrs(self, "model")

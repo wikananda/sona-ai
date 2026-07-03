@@ -4,8 +4,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import BYOKSettingsModal from "@/src/components/BYOKSettingsModal";
 import NewProjectForm from "@/src/components/NewProjectForm";
+import Modal from "@/src/components/ui/Modal";
 import { createProject, deleteProject, listProjects, Project } from "@/src/api/sonaApi";
 import { useBYOKSettings } from "@/src/hooks/useBYOKSettings";
+import { getErrorMessage } from "@/src/utils/errorHandling";
+import { formatDate } from "@/src/utils/formatters";
 
 export default function Home() {
   const byokSettings = useBYOKSettings();
@@ -36,7 +39,7 @@ export default function Home() {
       setProjects((current) => [project, ...current]);
       setIsCreateModalOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create project");
+      setError(getErrorMessage(err, "Failed to create project"));
     } finally {
       setIsCreating(false);
     }
@@ -50,7 +53,7 @@ export default function Home() {
       await deleteProject(projectId);
       setProjects((current) => current.filter((project) => project.id !== projectId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete project");
+      setError(getErrorMessage(err, "Failed to delete project"));
     }
   };
 
@@ -131,7 +134,7 @@ export default function Home() {
       </div>
 
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <Modal>
           <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
               <div>
@@ -158,7 +161,7 @@ export default function Home() {
               />
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {isSettingsOpen && (
@@ -174,12 +177,4 @@ export default function Home() {
       )}
     </main>
   );
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
 }

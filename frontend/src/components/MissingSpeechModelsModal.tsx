@@ -7,6 +7,8 @@ import {
     getRuntimeModelJob,
     startRuntimeModelDownload,
 } from "@/src/api/sonaApi";
+import Modal from "@/src/components/ui/Modal";
+import { getErrorMessage } from "@/src/utils/errorHandling";
 
 interface Props {
     models: RuntimeModel[];
@@ -51,11 +53,7 @@ export default function MissingSpeechModelsModal({
             }
             onInstalled();
         } catch (downloadError) {
-            setError(
-                downloadError instanceof Error
-                    ? downloadError.message
-                    : "Failed to download required models.",
-            );
+            setError(getErrorMessage(downloadError, "Failed to download required models."));
             setStatuses((current) => {
                 const next = { ...current };
                 for (const model of models) {
@@ -71,7 +69,7 @@ export default function MissingSpeechModelsModal({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <Modal>
             <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
                 <div className="border-b border-zinc-200 px-5 py-4">
                     <h2 className="text-base font-semibold text-zinc-950">
@@ -153,7 +151,7 @@ export default function MissingSpeechModelsModal({
                     </button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }
 

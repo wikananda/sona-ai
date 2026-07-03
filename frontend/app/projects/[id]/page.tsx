@@ -36,6 +36,8 @@ import MissingSpeechModelsModal from "@/src/components/MissingSpeechModelsModal"
 import RecordingDetail from "@/src/components/RecordingDetail";
 import RecordingSidebar from "@/src/components/RecordingSidebar";
 import { useBYOKSettings } from "@/src/hooks/useBYOKSettings";
+import { usePolling } from "@/src/hooks/usePolling";
+import { getErrorMessage } from "@/src/utils/errorHandling";
 
 const DRAFT_RECORDING_ID = "draft-recording";
 
@@ -127,16 +129,10 @@ export default function ProjectDetailPage() {
         refreshSelectedRecording().catch((err) => setError(err.message));
     }, [refreshSelectedRecording]);
 
-    useEffect(() => {
-        if (!hasActiveRecordings) return;
-
-        const intervalId = window.setInterval(() => {
-            refreshProject().catch((err) => setError(err.message));
-            refreshSelectedRecording().catch((err) => setError(err.message));
-        }, 3000);
-
-        return () => window.clearInterval(intervalId);
-    }, [hasActiveRecordings, refreshProject, refreshSelectedRecording]);
+    usePolling(() => {
+        refreshProject().catch((err) => setError(err.message));
+        refreshSelectedRecording().catch((err) => setError(err.message));
+    }, 3000, hasActiveRecordings);
 
     const handleStartDraft = () => {
         setDraftMode((current) => current ?? "upload");
@@ -225,7 +221,7 @@ export default function ProjectDetailPage() {
                 extractSpeakers: params.extractSpeakers,
             });
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to check model availability");
+            setError(getErrorMessage(err, "Failed to check model availability"));
             throw err;
         }
         if (!modelsReady) {
@@ -257,7 +253,7 @@ export default function ProjectDetailPage() {
             }
             return true;
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to upload recording");
+            setError(getErrorMessage(err, "Failed to upload recording"));
             throw err;
         } finally {
             setIsUploading(false);
@@ -284,7 +280,7 @@ export default function ProjectDetailPage() {
             }
             await refreshProject();
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to delete recording");
+            setError(getErrorMessage(err, "Failed to delete recording"));
         }
     };
 
@@ -307,7 +303,7 @@ export default function ProjectDetailPage() {
                 current?.id === recordingId ? { ...current, ...updated } : current,
             );
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to rename recording");
+            setError(getErrorMessage(err, "Failed to rename recording"));
             throw err;
         } finally {
             setRenamingRecordingId(undefined);
@@ -327,7 +323,7 @@ export default function ProjectDetailPage() {
                 extractSpeakers: settings.extractSpeakers,
             });
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to check model availability");
+            setError(getErrorMessage(err, "Failed to check model availability"));
             throw err;
         }
         if (!modelsReady) {
@@ -342,7 +338,7 @@ export default function ProjectDetailPage() {
             await refreshProject();
             return true;
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to re-transcribe recording");
+            setError(getErrorMessage(err, "Failed to re-transcribe recording"));
             throw err;
         } finally {
             setRetranscribingId(undefined);
@@ -363,7 +359,7 @@ export default function ProjectDetailPage() {
                 alignmentEnabled: false,
             });
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to check model availability");
+            setError(getErrorMessage(err, "Failed to check model availability"));
             throw err;
         }
     };
@@ -378,7 +374,7 @@ export default function ProjectDetailPage() {
             );
             await refreshProject();
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to cancel recording");
+            setError(getErrorMessage(err, "Failed to cancel recording"));
             throw err;
         } finally {
             setCancelingRecordingId(undefined);
@@ -395,7 +391,7 @@ export default function ProjectDetailPage() {
             const recording = await renameTranscriptSpeakers(recordingId, speakers);
             setSelectedRecording(recording);
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to rename speakers");
+            setError(getErrorMessage(err, "Failed to rename speakers"));
             throw err;
         } finally {
             setRenamingSpeakerId(undefined);
@@ -413,7 +409,7 @@ export default function ProjectDetailPage() {
             const recording = await updateTranscriptSegment(recordingId, segmentIndex, params);
             setSelectedRecording(recording);
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to update transcript");
+            setError(getErrorMessage(err, "Failed to update transcript"));
             throw err;
         } finally {
             setEditingTranscriptId(undefined);
@@ -431,7 +427,7 @@ export default function ProjectDetailPage() {
             setSelectedRecording(recording);
             await refreshProject();
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to extract speakers");
+            setError(getErrorMessage(err, "Failed to extract speakers"));
             throw err;
         } finally {
             setExtractingSpeakerId(undefined);
@@ -450,7 +446,7 @@ export default function ProjectDetailPage() {
                 current?.id === recordingId ? recording : current,
             );
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to summarize recording");
+            setError(getErrorMessage(err, "Failed to summarize recording"));
             throw err;
         } finally {
             setSummarizingId(undefined);
@@ -469,7 +465,7 @@ export default function ProjectDetailPage() {
                 current?.id === recordingId ? recording : current,
             );
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to update summary");
+            setError(getErrorMessage(err, "Failed to update summary"));
             throw err;
         } finally {
             setUpdatingSummaryId(undefined);

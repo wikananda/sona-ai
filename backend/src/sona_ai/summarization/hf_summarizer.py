@@ -1,11 +1,10 @@
-import gc
 from typing import Dict, Optional, Union
 
 import torch
 from peft import PeftModel
 from transformers import AutoConfig, AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer
 
-from sona_ai.core import PROJECT_ROOT, load_config, model_cache_root, write_json
+from sona_ai.core import PROJECT_ROOT, cleanup_model_attrs, load_config, model_cache_root, resolve_device, write_json
 from sona_ai.summarization.prompts import build_prompt
 
 
@@ -30,7 +29,7 @@ class LocalLLMSummarizer:
         write_outputs: bool = False,
     ):
         self.config = load_config(config)
-        self.device = self._resolve_device(device or self.config["model"]["device"])
+        self.device = resolve_device(device or self.config["model"]["device"])
         self.task_type = self._detect_task_type()
         self.max_new_tokens = max_new_tokens
         self.num_beams = num_beams
@@ -40,15 +39,6 @@ class LocalLLMSummarizer:
         self.model = self._load_model(use_pretrained=use_pretrained)
         self.model.to(self.device)
         self.model.eval()
-
-    def _resolve_device(self, device: str) -> str:
-        if device == "auto":
-            if torch.cuda.is_available():
-                return "cuda"
-            if torch.backends.mps.is_available():
-                return "mps"
-            return "cpu"
-        return device
 
     def _cache_dir(self) -> str:
         return str(model_cache_root())
@@ -142,12 +132,4 @@ class LocalLLMSummarizer:
         return summary
 
     def cleanup_models(self):
-        if getattr(self, "model", None) is not None:
-            del self.model
-            self.model = None
-
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        elif torch.backends.mps.is_available():
-            torch.mps.empty_cache()
+        cleanup_model_attrs(self, "model")

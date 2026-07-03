@@ -4,6 +4,7 @@ import {
     Recording,
 } from "@/src/api/sonaApi";
 import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
+import { formatDateTime } from "@/src/utils/formatters";
 import { useState } from "react";
 
 interface Props {
@@ -156,7 +157,7 @@ export default function RecordingSidebar({
                                         </p>
                                     )}
                                     <p className="mt-1 text-xs text-zinc-500">
-                                        {formatDate(recording.created_at)}
+                                        {formatDateTime(recording.created_at)}
                                     </p>
                                 </div>
                                 <RecordingStatusBadge status={recording.status} />
@@ -194,13 +195,4 @@ export default function RecordingSidebar({
             </div>
         </aside>
     );
-}
-
-function formatDate(value: string): string {
-    return new Intl.DateTimeFormat(undefined, {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-    }).format(new Date(value));
 }

@@ -14,6 +14,7 @@ import {
     BYOKResolvedModelPreset,
     byokResolvedModelPresetLabel,
 } from "@/src/hooks/useBYOKSettings";
+import { getErrorMessage } from "@/src/utils/errorHandling";
 import { exportSummaryPdf } from "@/src/utils/pdfExport";
 import { remarkHtmlLineBreaks } from "@/src/utils/markdownPlugins";
 
@@ -115,9 +116,7 @@ export default function SummaryPanel({
             await onUpdateSummary(nextSummary);
             setIsEditingSummary(false);
         } catch (err) {
-            setSummaryEditError(
-                err instanceof Error ? err.message : "Failed to save summary.",
-            );
+            setSummaryEditError(getErrorMessage(err, "Failed to save summary."));
         }
     };
 
@@ -129,9 +128,7 @@ export default function SummaryPanel({
         try {
             await exportSummaryPdf({ recordingName, summary });
         } catch (err) {
-            setExportError(
-                err instanceof Error ? err.message : "Failed to export summary PDF.",
-            );
+            setExportError(getErrorMessage(err, "Failed to export summary PDF."));
         } finally {
             setIsExportingPdf(false);
         }

@@ -1,10 +1,9 @@
-import gc
 from typing import Dict, Optional, Union
 
 import torch
 from packaging.version import Version
 
-from sona_ai.core import PROJECT_ROOT, load_config, model_cache_root, write_json
+from sona_ai.core import PROJECT_ROOT, cleanup_model_attrs, load_config, model_cache_root, write_json
 from sona_ai.summarization.prompts import build_prompt
 
 
@@ -129,6 +128,8 @@ class Gemma4Summarizer:
         return response.strip()
 
     def _resolve_device(self, device: str) -> str:
+        # Intentionally not core.devices.resolve_device: when CUDA is available
+        # this keeps "auto" so the model loads with device_map="auto".
         if device != "auto":
             return device
         if torch.cuda.is_available():
@@ -148,12 +149,4 @@ class Gemma4Summarizer:
         return self.model.device
 
     def cleanup_models(self):
-        if self.model is not None:
-            del self.model
-            self.model = None
-        self.processor = None
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        elif torch.backends.mps.is_available():
-            torch.mps.empty_cache()
+        cleanup_model_attrs(self, "model", "processor")
