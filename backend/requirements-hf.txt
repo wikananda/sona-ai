@@ -9,6 +9,7 @@ sqlalchemy>=2.0
 pydantic
 pyyaml
 httpx
+websockets>=12,<16
 huggingface_hub
 
 torch==2.8.0
