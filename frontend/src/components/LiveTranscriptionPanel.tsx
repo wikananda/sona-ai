@@ -83,6 +83,7 @@ export default function LiveTranscriptionPanel({
     const finalMimeTypeRef = useRef("audio/webm");
     const segmentsRef = useRef<SpeakerSegment[]>([]);
     const provisionalRef = useRef<SpeakerSegment | null>(null);
+    const previewFailedRef = useRef(false);
 
     const [includeMicrophone, setIncludeMicrophone] = useState(true);
     const [includeSystemAudio, setIncludeSystemAudio] = useState(true);
@@ -239,6 +240,7 @@ export default function LiveTranscriptionPanel({
     const activateLegacyFallback = (message: string) => {
         if (transportRef.current !== "whisper-stream") return;
         transportRef.current = "legacy";
+        previewFailedRef.current = true;
         setNotice(`${message} The original recording is still safe.`);
         liveSocketRef.current?.abort();
         liveSocketRef.current = null;
@@ -268,12 +270,14 @@ export default function LiveTranscriptionPanel({
                     provisionalRef.current = null;
                     setSegments(final.segments);
                     setProvisional(null);
+                    previewFailedRef.current = false;
                 }
             }).catch((err) => {
                 const message = err instanceof Error
                     ? err.message
                     : "Realtime transcript finalization failed.";
                 setNotice(`${message} Saving the captured recording anyway.`);
+                previewFailedRef.current = true;
             });
         }
         recorder.stop();
@@ -306,12 +310,14 @@ export default function LiveTranscriptionPanel({
                 provisionalRef.current = null;
                 setSegments(result.segments);
                 setProvisional(null);
+                previewFailedRef.current = false;
             })
             .catch((err) => {
                 const message = err instanceof Error
                     ? err.message
                     : "Compatibility transcription failed.";
                 setNotice(`${message} The original recording will still be saved.`);
+                previewFailedRef.current = true;
             });
     };
 
@@ -334,7 +340,7 @@ export default function LiveTranscriptionPanel({
             }
 
             const finalSegments = segmentsRef.current;
-            const recording = finalSegments.length > 0
+            const recording = finalSegments.length > 0 && !previewFailedRef.current
                 ? await saveLiveRecording({
                     projectId,
                     file: finalFile,
@@ -342,6 +348,9 @@ export default function LiveTranscriptionPanel({
                     language,
                     model,
                     device: selectedDevice,
+                    liveEngine: transportRef.current === "whisper-stream"
+                        ? "whisper-live"
+                        : "compatibility",
                 })
                 : await uploadProjectRecording({
                     projectId,
@@ -352,8 +361,8 @@ export default function LiveTranscriptionPanel({
                     extractSpeakers: false,
                 });
             await cleanupRealtime();
-            onSaved(recording);
             resetLiveTranscription();
+            onSaved(recording);
         } catch (err) {
             await cleanupRealtime();
             setState("save-error");
@@ -549,6 +558,7 @@ export default function LiveTranscriptionPanel({
         segmentsRef.current = [];
         provisionalRef.current = null;
         transportRef.current = "legacy";
+        previewFailedRef.current = false;
         setSegments([]);
         setProvisional(null);
         setNotice("");

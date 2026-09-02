@@ -125,6 +125,31 @@ The API will run at:
 http://localhost:8000
 ```
 
+## Realtime Whisper with WhisperLive
+
+Whisper live transcription uses an isolated WhisperLive sidecar. Keeping it outside the main Python environment avoids its speech dependency pins conflicting with Sona's batch transcription stack. The browser connects only to Sona; Sona validates the session and proxies small PCM frames to WhisperLive.
+
+Start the pinned CPU sidecar before the Sona backend:
+
+```bash
+docker compose -f compose.whisper-live.yml up --build -d
+```
+
+The compose file builds WhisperLive from the reviewed commit `c06c33982d2640b7aa6323acad45d5d8e63ad953`, binds it only to localhost, allows one client, and raises the meeting limit to six hours. The first session downloads and warms the selected Whisper model, so it can take longer to become ready.
+
+The backend defaults to this sidecar URL:
+
+```bash
+SONA_WHISPER_LIVE_URL=ws://127.0.0.1:9090
+SONA_WHISPER_LIVE_MAX_SESSIONS=1
+```
+
+If the backend runs in another container, set `SONA_WHISPER_LIVE_URL` to the sidecar's reachable service URL instead. For NVIDIA deployment, change the compose Dockerfile to `docker/Dockerfile.gpu` and configure Docker GPU access.
+
+Whisper uses low-latency WebSocket streaming when the sidecar is available. If it is not available or disconnects, the browser keeps the original MediaRecorder audio and falls back to compatibility transcription. If the preview is incomplete, Sona submits that same original file through the normal whole-file background transcription flow. Parakeet continues to use the existing chunked live-preview path.
+
+Whole-file uploads do not use WhisperLive and are unchanged: they are saved first, then processed by Sona's normal transcription worker.
+
 ## Optional Aligner Environment
 
 Use this when `configs/speech.yaml` enables `wav2vec2_external`.
@@ -269,8 +294,10 @@ Frontend checks:
 
 ```bash
 cd frontend
+npm test
 npx tsc --noEmit
 npm run lint
+npm run build
 ```
 
 ## Deployment Notes

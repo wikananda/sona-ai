@@ -1,5 +1,6 @@
 import json
 import httpx
+import math
 import tempfile
 import uuid
 from pathlib import Path
@@ -39,12 +40,10 @@ from sona_ai.services.transcription_service import SUPPORTED_TRANSCRIPTION_MODEL
 from sona_ai.storage import (
     delete_project_dir,
     delete_recording_file,
-    ensure_transcription_audio,
     save_upload,
     save_upload_as_wav,
 )
 from sona_ai.transcription.live_timestamps import segment_live_timestamps
-from sona_ai.transcription.schemas import TranscriptionResult
 
 
 logger = setup_logging()
@@ -246,6 +245,7 @@ def save_live_recording(
     language: Optional[str] = Form(default=None),
     model: str = Form(default="parakeet"),
     device: str = Form(default="auto"),
+    live_engine: str = Form(default="compatibility"),
     db: Session = Depends(get_db),
 ):
     if db.get(Project, project_id) is None:
@@ -254,11 +254,13 @@ def save_live_recording(
     model = _normalize_model(model)
     device = _normalize_device(device)
     language = _normalize_language(language)
+    if live_engine not in {"whisper-live", "compatibility"}:
+        raise HTTPException(status_code=400, detail="Unsupported live transcription engine")
     segments = _parse_live_segments(segments_json)
     profile = request.app.state.transcription_service.resolve_profile(
         model=model,
         device=device,
-        alignment_enabled=True,
+        alignment_enabled=False,
         extract_speakers=False,
     )
 
@@ -283,50 +285,18 @@ def save_live_recording(
             progress_total_steps=1,
             error=None,
         )
-        alignment_used = False
-        alignment_error = None
-        transcription_audio = ensure_transcription_audio(saved_audio.stored_path)
-        rough_transcription = TranscriptionResult.from_aligned_result(
-            {
-                "language": language,
-                "segments": segments,
-            }
-        )
-        final_segments = segments
-        try:
-            aligned_transcription = request.app.state.transcription_service.align_transcript(
-                str(PROJECT_ROOT / transcription_audio.stored_path),
-                rough_transcription,
-                model=model,
-                device=device,
-            )
-            aligned_transcription = segment_live_timestamps(
-                aligned_transcription,
-                str(PROJECT_ROOT / transcription_audio.stored_path),
-            )
-            final_segments = aligned_transcription.to_segment_dicts()
-            alignment_used = (
-                aligned_transcription is not rough_transcription
-                and _has_usable_segment_timestamps(final_segments)
-            )
-        except Exception as exc:
-            alignment_error = str(exc)
-            logger.warning(
-                "Failed to align live recording %s; saving rough live timestamps: %s",
-                recording_id,
-                exc,
-            )
-
         transcript_metadata = profile.to_metadata()
         transcript_metadata["runtime"]["language"] = language
         transcript_metadata["runtime"]["live_transcription"] = True
-        transcript_metadata["runtime"]["live_alignment_used"] = alignment_used
-        if alignment_error:
-            transcript_metadata["runtime"]["live_alignment_error"] = alignment_error
+        transcript_metadata["runtime"]["live_engine"] = live_engine
+        transcript_metadata["runtime"]["live_alignment_used"] = False
+        transcript_metadata["runtime"]["word_timestamps"] = any(
+            segment.get("words") for segment in segments
+        )
         transcript = Transcript(
             id=str(uuid.uuid4()),
             recording_id=recording_id,
-            segments_json=json.dumps(sanitize_for_json(final_segments)),
+            segments_json=json.dumps(sanitize_for_json(segments)),
             language=language,
             transcription_engine=profile.transcription_engine,
             diarization_engine=None,
@@ -963,14 +933,6 @@ def _offset_segments(segments: list[dict], offset_seconds: float) -> list[dict]:
     return sanitize_for_json(offset_segments)
 
 
-def _has_usable_segment_timestamps(segments: list[dict]) -> bool:
-    return any(
-        float(segment.get("end") or 0.0) > float(segment.get("start") or 0.0)
-        for segment in segments
-        if isinstance(segment, dict)
-    )
-
-
 def _parse_live_segments(segments_json: str) -> list[dict]:
     try:
         segments = json.loads(segments_json)
@@ -987,20 +949,58 @@ def _parse_live_segments(segments_json: str) -> list[dict]:
         text = str(segment.get("text") or "").strip()
         if not text:
             continue
-        start = float(segment.get("start") or 0.0)
-        end = float(segment.get("end") or start)
-        parsed_segments.append(
-            {
-                "text": text,
-                "start": start,
-                "end": max(end, start),
-            }
-        )
+        start = _finite_live_number(segment.get("start"), default=0.0)
+        end = max(_finite_live_number(segment.get("end"), default=start), start)
+        parsed_segment = {"text": text, "start": start, "end": end}
+        speaker = str(segment.get("speaker") or "").strip()
+        if speaker:
+            parsed_segment["speaker"] = speaker
 
-    if not parsed_segments:
-        raise HTTPException(status_code=400, detail="Live transcript has no text segments")
+        words = []
+        for word in segment.get("words") or []:
+            if not isinstance(word, dict):
+                continue
+            word_text = str(word.get("word") or "")
+            if not word_text.strip():
+                continue
+            word_start = min(max(
+                _finite_live_number(word.get("start"), default=start),
+                start,
+            ), end)
+            word_end = min(max(
+                _finite_live_number(word.get("end"), default=word_start),
+                word_start,
+            ), end)
+            parsed_word = {
+                "word": word_text,
+                "start": word_start,
+                "end": word_end,
+            }
+            score = _optional_finite_live_number(word.get("score"))
+            if score is not None:
+                parsed_word["score"] = min(max(score, 0.0), 1.0)
+            word_speaker = str(word.get("speaker") or "").strip()
+            if word_speaker:
+                parsed_word["speaker"] = word_speaker
+            words.append(parsed_word)
+        if words:
+            parsed_segment["words"] = words
+        parsed_segments.append(parsed_segment)
 
     return sanitize_for_json(parsed_segments)
+
+
+def _finite_live_number(value, default: float) -> float:
+    number = _optional_finite_live_number(value)
+    return max(number if number is not None else default, 0.0)
+
+
+def _optional_finite_live_number(value) -> Optional[float]:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
 
 
 def _normalize_model(model: str) -> str:

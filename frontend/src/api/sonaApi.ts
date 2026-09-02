@@ -216,6 +216,7 @@ export interface SaveLiveRecordingParams {
     language?: string;
     model: TranscriptionModel;
     device: RuntimeDevice;
+    liveEngine?: "whisper-live" | "compatibility";
 }
 
 export interface RetranscribeParams {
@@ -388,6 +389,7 @@ export async function saveLiveRecording(
     appendFormValue(formData, "language", params.language);
     appendFormValue(formData, "model", params.model);
     appendFormValue(formData, "device", params.device);
+    appendFormValue(formData, "live_engine", params.liveEngine ?? "compatibility");
 
     return requestJson(`/projects/${params.projectId}/live-transcription/recordings`, {
         method: "POST",

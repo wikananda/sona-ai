@@ -1,0 +1,26 @@
+services:
+  whisper-live:
+    build:
+      context: "https://github.com/collabora/WhisperLive.git#c06c33982d2640b7aa6323acad45d5d8e63ad953"
+      dockerfile: docker/Dockerfile.cpu
+    command:
+      - python
+      - run_server.py
+      - --port
+      - "9090"
+      - --backend
+      - faster_whisper
+      - --max_clients
+      - "1"
+      - --max_connection_time
+      - "21600"
+      - --omp_num_threads
+      - "4"
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - whisper-live-cache:/root/.cache/huggingface
+    restart: unless-stopped
+
+volumes:
+  whisper-live-cache:
