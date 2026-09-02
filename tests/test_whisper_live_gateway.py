@@ -5,9 +5,11 @@ import unittest
 import numpy as np
 
 from sona_ai.services.whisper_live_gateway import (
+    WhisperLiveCapacityError,
     WhisperLiveConfig,
     WhisperLiveGateway,
     WhisperLiveInputError,
+    WhisperLiveUnavailableError,
     _pcm16_to_float32,
     _upstream_options,
 )
@@ -17,7 +19,9 @@ class FakeUpstream:
     def __init__(self, messages):
         self.messages = asyncio.Queue()
         for message in messages:
-            self.messages.put_nowait(json.dumps(message))
+            self.messages.put_nowait(
+                message if message is StopAsyncIteration else json.dumps(message)
+            )
         self.sent = []
 
     async def send(self, data):
@@ -121,6 +125,33 @@ class WhisperLiveGatewayTest(unittest.IsolatedAsyncioTestCase):
             await self.make_gateway(upstream).relay(
                 browser,
                 model="faster-whisper-large-v3",
+                language=None,
+            )
+
+    async def test_reports_upstream_capacity_during_handshake(self):
+        upstream = FakeUpstream([
+            {"status": "WAIT", "message": 1.2},
+        ])
+        browser = FakeBrowser([])
+
+        with self.assertRaises(WhisperLiveCapacityError):
+            await self.make_gateway(upstream).relay(
+                browser,
+                model="faster-whisper-turbo",
+                language=None,
+            )
+
+    async def test_reports_upstream_disconnect_before_browser_stop(self):
+        upstream = FakeUpstream([
+            {"message": "SERVER_READY", "backend": "faster_whisper"},
+            StopAsyncIteration,
+        ])
+        browser = FakeBrowser([])
+
+        with self.assertRaises(WhisperLiveUnavailableError):
+            await self.make_gateway(upstream).relay(
+                browser,
+                model="faster-whisper-turbo",
                 language=None,
             )
 

@@ -44,7 +44,7 @@ class WhisperLiveInputError(WhisperLiveError):
 @dataclass(frozen=True)
 class WhisperLiveConfig:
     url: str = "ws://127.0.0.1:9090"
-    max_sessions: int = 2
+    max_sessions: int = 1
     connect_timeout_seconds: float = 10.0
     ready_timeout_seconds: float = 120.0
     stop_timeout_seconds: float = 20.0
@@ -214,7 +214,9 @@ class WhisperLiveGateway:
             else:
                 await upstream_task
                 browser_task.cancel()
-                return
+                raise WhisperLiveUnavailableError(
+                    "WhisperLive disconnected before the recording stopped."
+                )
 
             if browser_result == "stop":
                 try:
