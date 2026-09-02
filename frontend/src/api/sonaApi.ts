@@ -269,6 +269,12 @@ export interface RecordingSummaryUpdateParams {
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+export function apiWebSocketUrl(path: string): string {
+    const url = new URL(path, `${BASE_URL.replace(/\/$/, "")}/`);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    return url.toString();
+}
+
 export function recordingAudioUrl(recordingId: string): string {
     return `${BASE_URL}/recordings/${recordingId}/audio`;
 }

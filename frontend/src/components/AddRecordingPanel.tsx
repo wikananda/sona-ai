@@ -9,6 +9,7 @@ import {
 import BrowserAudioRecorder from "@/src/components/BrowserAudioRecorder";
 import LiveTranscriptionPanel from "@/src/components/LiveTranscriptionPanel";
 import RecordingUploader from "@/src/components/RecordingUploader";
+import { useCallback, useState } from "react";
 
 export type AddRecordingMode = "upload" | "record" | "live";
 
@@ -32,6 +33,7 @@ interface Props {
         language?: string;
     }) => Promise<boolean>;
     onLiveSaved: (recording: Recording) => Promise<void>;
+    onLiveActiveChange: (active: boolean) => void;
     isUploading: boolean;
     runtimeDevices: RuntimeDevices;
 }
@@ -50,9 +52,17 @@ export default function AddRecordingPanel({
     onUpload,
     onBeforeLiveStart,
     onLiveSaved,
+    onLiveActiveChange,
     isUploading,
     runtimeDevices,
 }: Props) {
+    const [isLiveActive, setIsLiveActive] = useState(false);
+    const controlsDisabled = isUploading || isLiveActive;
+    const handleLiveActiveChange = useCallback((active: boolean) => {
+        setIsLiveActive(active);
+        onLiveActiveChange(active);
+    }, [onLiveActiveChange]);
+
     return (
         <section className="min-h-[520px] bg-white">
             <div className="border-b border-zinc-200 px-6 py-5">
@@ -68,7 +78,7 @@ export default function AddRecordingPanel({
                     <button
                         type="button"
                         onClick={onCancel}
-                        disabled={isUploading}
+                        disabled={controlsDisabled}
                         className="min-h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:cursor-pointer hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         Cancel
@@ -83,7 +93,7 @@ export default function AddRecordingPanel({
                             key={item.value}
                             type="button"
                             onClick={() => onModeChange(item.value)}
-                            disabled={isUploading}
+                            disabled={controlsDisabled}
                             className={`min-h-10 rounded-md text-sm font-medium transition-colors ${mode === item.value
                                 ? "bg-white text-zinc-950 shadow-sm"
                                 : "text-zinc-600 hover:text-zinc-950 hover:cursor-pointer"
@@ -112,6 +122,7 @@ export default function AddRecordingPanel({
                         runtimeDevices={runtimeDevices}
                         onBeforeStart={onBeforeLiveStart}
                         onSaved={onLiveSaved}
+                        onActiveChange={handleLiveActiveChange}
                     />
                 )}
             </div>

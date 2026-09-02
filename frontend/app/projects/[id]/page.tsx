@@ -57,6 +57,7 @@ export default function ProjectDetailPage() {
     const [isLoadingProject, setIsLoadingProject] = useState(true);
     const [isLoadingRecording, setIsLoadingRecording] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [isLiveCaptureActive, setIsLiveCaptureActive] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [renamingRecordingId, setRenamingRecordingId] = useState<string>();
     const [retranscribingId, setRetranscribingId] = useState<string>();
@@ -158,6 +159,7 @@ export default function ProjectDetailPage() {
     };
 
     const handleCancelDraft = () => {
+        if (isLiveCaptureActive) return;
         const fallbackRecordingId = previousRecordingId &&
             recordings.some((recording) => recording.id === previousRecordingId)
             ? previousRecordingId
@@ -172,6 +174,7 @@ export default function ProjectDetailPage() {
     };
 
     const handleSelectRecording = (recordingId: string) => {
+        if (isLiveCaptureActive) return;
         setDraftMode(null);
         setPreviousRecordingId(undefined);
         setSelectedRecordingId(recordingId);
@@ -265,6 +268,7 @@ export default function ProjectDetailPage() {
     };
 
     const handleLiveRecordingSaved = async (recording: Recording) => {
+        setIsLiveCaptureActive(false);
         setDraftMode(null);
         setPreviousRecordingId(undefined);
         setSelectedRecordingId(recording.id);
@@ -534,7 +538,7 @@ export default function ProjectDetailPage() {
                         onDelete={handleDeleteRecording}
                         onRename={handleRenameRecording}
                         renamingId={renamingRecordingId}
-                        isUploading={isUploading}
+                        isUploading={isUploading || isLiveCaptureActive}
                     />
                     {isDraftSelected && draftMode ? (
                         <AddRecordingPanel
@@ -546,6 +550,7 @@ export default function ProjectDetailPage() {
                             onUpload={handleUpload}
                             onBeforeLiveStart={handleLiveStartRequest}
                             onLiveSaved={handleLiveRecordingSaved}
+                            onLiveActiveChange={setIsLiveCaptureActive}
                             isUploading={isUploading}
                             runtimeDevices={runtimeDevices}
                         />

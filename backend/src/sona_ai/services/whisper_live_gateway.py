@@ -48,6 +48,8 @@ class WhisperLiveConfig:
     connect_timeout_seconds: float = 10.0
     ready_timeout_seconds: float = 120.0
     stop_timeout_seconds: float = 20.0
+    finalization_grace_seconds: float = 1.0
+    finalization_silence_seconds: float = 0.8
     max_session_seconds: float = 6 * 60 * 60
     max_frame_bytes: int = 256 * 1024
 
@@ -64,6 +66,12 @@ class WhisperLiveConfig:
             ),
             stop_timeout_seconds=_positive_float(
                 "SONA_WHISPER_LIVE_STOP_TIMEOUT", cls.stop_timeout_seconds
+            ),
+            finalization_grace_seconds=_positive_float(
+                "SONA_WHISPER_LIVE_FINALIZATION_GRACE", cls.finalization_grace_seconds
+            ),
+            finalization_silence_seconds=_positive_float(
+                "SONA_WHISPER_LIVE_FINALIZATION_SILENCE", cls.finalization_silence_seconds
             ),
             max_session_seconds=_positive_float(
                 "SONA_WHISPER_LIVE_MAX_SESSION_SECONDS", cls.max_session_seconds
@@ -267,6 +275,12 @@ class WhisperLiveGateway:
             except json.JSONDecodeError as exc:
                 raise WhisperLiveInputError("Live transcription command must be valid JSON.") from exc
             if isinstance(command, dict) and command.get("type") == "stop":
+                silence_samples = int(
+                    self.config.finalization_silence_seconds * 16000
+                )
+                if silence_samples:
+                    await upstream.send(np.zeros(silence_samples, dtype=np.float32).tobytes())
+                await asyncio.sleep(self.config.finalization_grace_seconds)
                 await upstream.send(b"END_OF_AUDIO")
                 return "stop"
             raise WhisperLiveInputError("Unsupported live transcription command.")

@@ -75,6 +75,8 @@ class WhisperLiveGatewayTest(unittest.IsolatedAsyncioTestCase):
         config = WhisperLiveConfig(
             ready_timeout_seconds=0.5,
             stop_timeout_seconds=0.5,
+            finalization_grace_seconds=0.001,
+            finalization_silence_seconds=0.01,
         )
         return WhisperLiveGateway(
             config=config,
@@ -112,6 +114,9 @@ class WhisperLiveGatewayTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(upstream.sent[-1], b"END_OF_AUDIO")
         relayed_samples = np.frombuffer(upstream.sent[1], dtype=np.float32)
         self.assertAlmostEqual(float(relayed_samples[1]), 32767 / 32768)
+        silence = np.frombuffer(upstream.sent[-2], dtype=np.float32)
+        self.assertEqual(len(silence), 160)
+        self.assertFalse(silence.any())
 
     async def test_rejects_odd_sized_pcm_frames(self):
         upstream = FakeUpstream([
