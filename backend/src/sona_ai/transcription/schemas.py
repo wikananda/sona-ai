@@ -142,9 +142,18 @@ def _hypothesis_text(hypothesis: Any) -> str:
 
 def _hypothesis_timestamps(hypothesis: Any) -> dict[str, Any]:
     if isinstance(hypothesis, dict):
-        timestamps = hypothesis.get("timestamp") or hypothesis.get("timestamps") or {}
+        timestamps = (
+            hypothesis.get("timestamp")
+            or hypothesis.get("timestamps")
+            or hypothesis.get("timestep")
+            or {}
+        )
     else:
-        timestamps = getattr(hypothesis, "timestamp", None) or {}
+        timestamps = (
+            getattr(hypothesis, "timestamp", None)
+            or getattr(hypothesis, "timestep", None)
+            or {}
+        )
 
     return timestamps if isinstance(timestamps, dict) else {}
 

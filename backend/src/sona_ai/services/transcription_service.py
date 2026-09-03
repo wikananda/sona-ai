@@ -2,7 +2,12 @@ import threading
 from collections.abc import Callable
 from typing import Optional
 
-from sona_ai.core import load_config, validate_device_available, setup_logging
+from sona_ai.core import (
+    load_config,
+    resolve_device,
+    setup_logging,
+    validate_device_available,
+)
 from sona_ai.pipelines import SpeechPipeline, build_speech_pipeline
 from sona_ai.transcription.schemas import TranscriptionResult
 from sona_ai.services.pipeline_profile import (
@@ -39,6 +44,12 @@ class TranscriptionService:
         )
         self._pipelines = {
             default_profile.cache_key(): pipeline
+        }
+        self._transcribers = {
+            self._transcriber_key(
+                default_profile,
+                actual_device=getattr(pipeline.transcriber, "device", None),
+            ): pipeline.transcriber,
         }
         model_download_service.mark_profile_installed(default_profile)
 
@@ -108,6 +119,32 @@ class TranscriptionService:
             logger.info("Transcription lock acquired for live chunk.")
             return pipeline.transcriber.transcribe(audio_path, language=language)
 
+    def prepare_live_transcription(
+        self,
+        *,
+        model: str,
+        device: str,
+    ) -> None:
+        self._get_live_transcriber(model=model, device=device)
+
+    def transcribe_live_samples(
+        self,
+        samples,
+        *,
+        language: Optional[str],
+        model: str,
+        device: str,
+    ) -> TranscriptionResult:
+        transcriber = self._get_live_transcriber(model=model, device=device)
+        transcribe_samples = getattr(transcriber, "transcribe_samples", None)
+        if transcribe_samples is None:
+            raise ValueError(f"{model} does not support direct live PCM transcription.")
+
+        logger.info("Waiting for transcription lock for live PCM...")
+        with self._transcription_lock:
+            logger.info("Transcription lock acquired for live PCM.")
+            return transcribe_samples(samples, language=language)
+
     def align_transcript(
         self,
         audio_path: str,
@@ -130,8 +167,42 @@ class TranscriptionService:
             return pipeline.aligner.align(transcription, audio_path)
 
     def close(self):
-        for pipeline in self._pipelines.values():
-            pipeline.cleanup_models()
+        with self._transcription_lock:
+            for pipeline in self._pipelines.values():
+                pipeline.cleanup_models()
+
+    def _get_live_transcriber(self, *, model: str, device: str):
+        profile = self.resolve_profile(
+            model,
+            device,
+            alignment_enabled=False,
+            extract_speakers=False,
+        )
+        key = self._transcriber_key(profile)
+        transcriber = self._transcribers.get(key)
+        if transcriber is not None:
+            return transcriber
+
+        pipeline = self._get_pipeline(
+            model,
+            device,
+            alignment_enabled=False,
+            extract_speakers=False,
+        )
+        with self._pipeline_lock:
+            return self._transcribers.setdefault(key, pipeline.transcriber)
+
+    @staticmethod
+    def _transcriber_key(
+        profile: PipelineProfile,
+        *,
+        actual_device: Optional[str] = None,
+    ) -> tuple[str, str, str]:
+        return (
+            profile.transcription_engine,
+            profile.transcription_config,
+            resolve_device(actual_device or profile.device),
+        )
 
     def _get_pipeline(
         self,
@@ -177,6 +248,13 @@ class TranscriptionService:
             pipeline.load_models()
             model_download_service.mark_profile_installed(profile)
             self._pipelines[key] = pipeline
+            self._transcribers.setdefault(
+                self._transcriber_key(
+                    profile,
+                    actual_device=getattr(pipeline.transcriber, "device", None),
+                ),
+                pipeline.transcriber,
+            )
             return pipeline
 
     def _normalize_model(self, model: str) -> str:

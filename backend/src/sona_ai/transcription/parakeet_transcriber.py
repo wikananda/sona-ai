@@ -2,6 +2,7 @@ import gc
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 import torch
 
 from sona_ai.core import Timer, model_cache_root, setup_logging, setup_model_cache_environment
@@ -74,16 +75,54 @@ class ParakeetTranscriber:
             language=resolved_language,
         )
 
-    def _transcribe_with_timestamps(self, audio_path: str):
-        kwargs = {"timestamps": True}
+    def transcribe_samples(
+        self,
+        samples: np.ndarray,
+        language: Optional[str] = None,
+    ) -> TranscriptionResult:
+        """Transcribe mono 16 kHz float32 samples without container conversion."""
+        if self.model is None:
+            raise ReferenceError("Parakeet transcription model is not initialized.")
+
+        audio = np.asarray(samples, dtype=np.float32)
+        if audio.ndim != 1:
+            raise ValueError("Parakeet live audio must be a one-dimensional mono signal.")
+        if not np.isfinite(audio).all():
+            raise ValueError("Parakeet live audio contains non-finite samples.")
+        if audio.size == 0:
+            return TranscriptionResult(segments=[], language=language or self.language)
+
+        self._patch_numpy_sctypes()
+        resolved_language = language or self.language
+        self._validate_language(resolved_language)
+        hypotheses = self._transcribe_with_timestamps(audio, is_sample_array=True)
+        return TranscriptionResult.from_parakeet_hypothesis(
+            self._first_hypothesis(hypotheses),
+            language=resolved_language,
+        )
+
+    def _transcribe_with_timestamps(
+        self,
+        audio,
+        *,
+        is_sample_array: bool = False,
+    ):
+        kwargs = {"timestamps": True, "verbose": False}
         if self.batch_size is not None:
             kwargs["batch_size"] = self.batch_size
 
+        transcription_input = audio if is_sample_array else [audio]
+
         try:
-            return self.model.transcribe([audio_path], **kwargs)
+            return self.model.transcribe(transcription_input, **kwargs)
         except TypeError:
-            kwargs.pop("batch_size", None)
-            return self.model.transcribe([audio_path], **kwargs)
+            # Older NeMo releases don't accept every convenience keyword.
+            kwargs.pop("verbose", None)
+            try:
+                return self.model.transcribe(transcription_input, **kwargs)
+            except TypeError:
+                kwargs.pop("batch_size", None)
+                return self.model.transcribe(transcription_input, **kwargs)
 
     def _first_hypothesis(self, hypotheses):
         if hasattr(hypotheses, "text") or isinstance(hypotheses, (str, dict)):

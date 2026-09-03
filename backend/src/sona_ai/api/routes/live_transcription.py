@@ -20,6 +20,7 @@ logger = setup_logging()
 router = APIRouter()
 START_TIMEOUT_SECONDS = 15.0
 MAX_START_MESSAGE_BYTES = 16 * 1024
+STREAMING_MODELS = {*WHISPER_LIVE_MODELS, "parakeet"}
 
 
 @router.websocket("/projects/{project_id}/live-transcription/ws")
@@ -29,14 +30,25 @@ async def live_transcription_socket(websocket: WebSocket, project_id: str) -> No
     try:
         start = await _receive_start(websocket)
         _require_project(project_id)
-        gateway = getattr(websocket.app.state, "whisper_live_gateway", None)
-        if gateway is None:
-            raise WhisperLiveUnavailableError("Realtime Whisper is not configured.")
-        await gateway.relay(
-            websocket,
-            model=start["model"],
-            language=start["language"],
-        )
+        if start["model"] == "parakeet":
+            gateway = getattr(websocket.app.state, "parakeet_live_gateway", None)
+            if gateway is None:
+                raise WhisperLiveUnavailableError("Realtime Parakeet is not configured.")
+            await gateway.relay(
+                websocket,
+                model=start["model"],
+                device=start["device"],
+                language=start["language"],
+            )
+        else:
+            gateway = getattr(websocket.app.state, "whisper_live_gateway", None)
+            if gateway is None:
+                raise WhisperLiveUnavailableError("Realtime Whisper is not configured.")
+            await gateway.relay(
+                websocket,
+                model=start["model"],
+                language=start["language"],
+            )
     except WebSocketDisconnect:
         return
     except WhisperLiveInputError as exc:
@@ -96,8 +108,8 @@ def _validate_start(body: Any) -> dict[str, Any]:
         raise WhisperLiveInputError("Unsupported live transcription protocol version.")
 
     model = str(body.get("model") or "").lower().strip()
-    if model not in WHISPER_LIVE_MODELS:
-        raise WhisperLiveInputError("Realtime streaming is available only for Whisper models.")
+    if model not in STREAMING_MODELS:
+        raise WhisperLiveInputError("This model does not support realtime streaming.")
 
     device = str(body.get("device") or "auto").lower().strip()
     try:

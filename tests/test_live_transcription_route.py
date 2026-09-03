@@ -28,7 +28,7 @@ class FakeGateway:
 
 
 class FakeWebSocket:
-    def __init__(self, start, gateway):
+    def __init__(self, start, whisper_gateway, parakeet_gateway=None):
         self.messages = [{
             "type": "websocket.receive",
             "text": json.dumps(start),
@@ -37,7 +37,10 @@ class FakeWebSocket:
         self.accepted = False
         self.closed_with = None
         self.app = SimpleNamespace(
-            state=SimpleNamespace(whisper_live_gateway=gateway),
+            state=SimpleNamespace(
+                whisper_live_gateway=whisper_gateway,
+                parakeet_live_gateway=parakeet_gateway,
+            ),
         )
 
     async def accept(self):
@@ -87,9 +90,30 @@ class LiveTranscriptionRouteTest(unittest.IsolatedAsyncioTestCase):
             "language": None,
         }])
 
-    async def test_rejects_non_whisper_model_before_gateway(self):
+    async def test_dispatches_parakeet_with_device_and_language(self):
+        whisper_gateway = FakeGateway()
+        parakeet_gateway = FakeGateway()
+        websocket = FakeWebSocket(
+            valid_start(model="parakeet", device="cpu", language="en"),
+            whisper_gateway,
+            parakeet_gateway,
+        )
+        session = FakeSession()
+
+        with patch.object(live_route, "SessionLocal", return_value=session):
+            await live_route.live_transcription_socket(websocket, "project-1")
+
+        self.assertEqual(whisper_gateway.calls, [])
+        self.assertEqual(parakeet_gateway.calls, [{
+            "model": "parakeet",
+            "device": "cpu",
+            "language": "en",
+        }])
+        self.assertEqual(websocket.closed_with, 1000)
+
+    async def test_rejects_unknown_model_before_gateway(self):
         gateway = FakeGateway()
-        websocket = FakeWebSocket(valid_start(model="parakeet"), gateway)
+        websocket = FakeWebSocket(valid_start(model="unknown"), gateway)
 
         await live_route.live_transcription_socket(websocket, "project-1")
 

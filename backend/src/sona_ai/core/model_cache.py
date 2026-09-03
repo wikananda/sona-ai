@@ -49,6 +49,7 @@ def setup_model_cache_environment(
     os.environ["PYANNOTE_CACHE"] = str(cache_dir / "pyannote")
     os.environ["NEMO_HOME"] = str(cache_dir / "nemo")
     os.environ["NEMO_CACHE_DIR"] = str(cache_dir / "nemo")
+    os.environ["NUMBA_CACHE_DIR"] = str(cache_dir / "numba")
     os.environ["XDG_CACHE_HOME"] = str(cache_dir / "xdg")
     os.environ["MPLCONFIGDIR"] = str(cache_dir / "matplotlib")
     return cache_dir

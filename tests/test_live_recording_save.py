@@ -106,6 +106,36 @@ class LiveRecordingSaveTest(unittest.TestCase):
     def test_empty_live_transcript_is_valid_for_silent_recording(self):
         self.assertEqual(projects._parse_live_segments("[]"), [])
 
+    def test_accepts_parakeet_live_engine_metadata(self):
+        service = FakeTranscriptionService()
+        db = FakeSession()
+        upload = SimpleNamespace(
+            filename="meeting.webm",
+            content_type="audio/webm",
+            file=io.BytesIO(b"original audio"),
+        )
+        saved = SimpleNamespace(
+            stored_path="data/projects/p/r.webm",
+            mime_type="audio/webm",
+            file_size_bytes=14,
+        )
+
+        with patch.object(projects, "save_upload", return_value=saved):
+            result = projects.save_live_recording(
+                "project-1",
+                self.make_request(service),
+                file=upload,
+                segments_json="[]",
+                language="en",
+                model="parakeet",
+                device="cpu",
+                live_engine="parakeet-live",
+                db=db,
+            )
+
+        runtime = result["transcript"]["model_config"]["runtime"]
+        self.assertEqual(runtime["live_engine"], "parakeet-live")
+
     def test_parser_clamps_invalid_word_values(self):
         segments = projects._parse_live_segments(json.dumps([{
             "text": "Safe",

@@ -7,6 +7,7 @@ from sona_ai.db.engine import SessionLocal
 from sona_ai.db.models import Recording, RecordingStatus
 from sona_ai.pipelines import build_speech_pipeline
 from sona_ai.services import SummarizationService, TranscriptionService
+from sona_ai.services.parakeet_live_gateway import ParakeetLiveGateway
 from sona_ai.services.whisper_live_gateway import WhisperLiveGateway
 
 from sona_ai.api.routes.projects import router as projects_router
@@ -55,8 +56,12 @@ async def startup_event():
         speech_pipeline,
         speech_config=speech_config,
         default_model=speech_config.get("transcription", {}).get("engine", "parakeet"),
+        default_device=speech_config.get("transcription", {}).get("device", "auto"),
     )
     app.state.whisper_live_gateway = WhisperLiveGateway()
+    app.state.parakeet_live_gateway = ParakeetLiveGateway(
+        app.state.transcription_service,
+    )
     
     app.state.summarization_service = SummarizationService(
         config=speech_config.get("summarization", {}).get("config", "llama"),
@@ -70,8 +75,9 @@ async def startup_event():
 async def shutdown_event():
     logger.info("Shutting down...")
     logger.info("Cleaning up models...")
-    app.state.transcription_service.close()
     await app.state.whisper_live_gateway.close()
+    await app.state.parakeet_live_gateway.close()
+    app.state.transcription_service.close()
     app.state.summarization_service.close()
     logger.info("Cleanup complete!")
 
