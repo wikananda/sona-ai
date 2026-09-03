@@ -146,9 +146,28 @@ SONA_WHISPER_LIVE_MAX_SESSIONS=1
 
 If the backend runs in another container, set `SONA_WHISPER_LIVE_URL` to the sidecar's reachable service URL instead. For NVIDIA deployment, change the compose Dockerfile to `docker/Dockerfile.gpu` and configure Docker GPU access.
 
-Whisper uses low-latency WebSocket streaming when the sidecar is available. If it is not available or disconnects, the browser keeps the original MediaRecorder audio and falls back to compatibility transcription. If the preview is incomplete, Sona submits that same original file through the normal whole-file background transcription flow. Parakeet continues to use the existing chunked live-preview path.
+Whisper uses low-latency WebSocket streaming when the sidecar is available. If it is not available or disconnects, the browser keeps the original MediaRecorder audio and falls back to compatibility transcription. If the preview is incomplete, Sona submits that same original file through the normal whole-file background transcription flow.
 
 Whole-file uploads do not use WhisperLive and are unchanged: they are saved first, then processed by Sona's normal transcription worker.
+
+## Realtime Parakeet
+
+Parakeet live transcription is built into the Sona backend and does not need a sidecar. The browser sends the same mono 16 kHz PCM stream used by WhisperLive, and the backend sends samples directly to the already-loaded NeMo model without creating temporary audio files or running ffmpeg.
+
+Parakeet TDT 0.6B v3 is a full-context model rather than a cache-aware streaming checkpoint. Sona therefore uses bounded buffered inference based on NeMo's chunked-transcription layout: 10 seconds of left context, a 2-second decoding chunk, and 2 seconds of right context. The first preview normally appears after about 4 seconds of captured audio, followed by revisions every 2 seconds. Words appear provisionally right away and are committed after agreeing in two consecutive stable windows, which prevents a context-sensitive guess from becoming immutable too early.
+
+The defaults can be tuned in `.env`:
+
+```bash
+SONA_PARAKEET_LIVE_MAX_SESSIONS=1
+SONA_PARAKEET_LIVE_CHUNK_SECONDS=2
+SONA_PARAKEET_LIVE_LEFT_CONTEXT_SECONDS=10
+SONA_PARAKEET_LIVE_RIGHT_CONTEXT_SECONDS=2
+```
+
+Keep the session limit at one unless the host has enough compute for concurrent NeMo inference. If realtime decoding is unavailable or cannot keep up, the UI preserves the original MediaRecorder recording and offers the existing compatibility transcription path. Normal whole-file Parakeet uploads are unchanged.
+
+Sona currently enables English for Parakeet. Choose a Whisper model for Indonesian recordings.
 
 ## Optional Aligner Environment
 

@@ -30,6 +30,7 @@ class ParakeetLiveTranscriptAccumulator:
         self._committed_words: list[dict[str, Any]] = []
         self._commit_horizon = 0.0
         self._provisional: Optional[dict[str, Any]] = None
+        self._pending_stable_words: list[dict[str, Any]] = []
 
     @property
     def committed(self) -> list[dict[str, Any]]:
@@ -46,6 +47,7 @@ class ParakeetLiveTranscriptAccumulator:
         window_start: float,
         stable_cutoff: float,
         audio_end: float,
+        final: bool = False,
     ) -> Optional[dict[str, Any]]:
         if not isinstance(raw_segments, list):
             raise ParakeetLiveProtocolError("Parakeet segments must be a list")
@@ -59,37 +61,49 @@ class ParakeetLiveTranscriptAccumulator:
             window_start=window_start,
             audio_end=audio_end,
         )
-        newly_committed: list[dict[str, Any]] = []
-
-        stable_words = [
+        candidates = [
             word
             for word in words
-            if word["end"] <= stable_cutoff + 0.02
-            and word["end"] > self._commit_horizon - _TIMESTAMP_JITTER_SECONDS
+            if word["end"] > self._commit_horizon - _TIMESTAMP_JITTER_SECONDS
         ]
-        stable_words = _drop_committed_overlap(self._committed_words, stable_words)
-        stable_words = _deduplicate_adjacent(stable_words)
-        if stable_words:
-            committed_segment = _segment_from_words(stable_words)
+        candidates = _drop_committed_overlap(self._committed_words, candidates)
+        candidates = _deduplicate_adjacent(candidates)
+        stable_words = [
+            word for word in candidates if word["end"] <= stable_cutoff + 0.02
+        ]
+
+        # A full-context model can revise even an apparently old token as more
+        # speech arrives. Commit only the stable prefix that agreed while stable
+        # in the preceding snapshot. The final decode is authoritative.
+        confirmed_count = (
+            len(stable_words)
+            if final
+            else _matching_prefix_length(self._pending_stable_words, stable_words)
+        )
+        confirmed_words = stable_words[:confirmed_count]
+        pending_stable_words = stable_words[confirmed_count:]
+        newly_committed: list[dict[str, Any]] = []
+        if confirmed_words:
+            committed_segment = _segment_from_words(confirmed_words)
             self._committed.append(committed_segment)
-            self._committed_words.extend(deepcopy(stable_words))
+            self._committed_words.extend(deepcopy(confirmed_words))
             newly_committed.append(deepcopy(committed_segment))
 
-        # Advancing through silence is important: an old rolling-window word
-        # must not reappear simply because no newer word was committed.
-        self._commit_horizon = max(self._commit_horizon, stable_cutoff)
-
-        provisional_words = [
-            word
-            for word in words
-            if word["end"] > stable_cutoff + 0.02
-            and word["end"] > self._commit_horizon - _TIMESTAMP_JITTER_SECONDS
-        ]
-        provisional_words = _drop_committed_overlap(
-            self._committed_words,
-            provisional_words,
+        # Do not age out a stable token until it has had another snapshot in
+        # which to prove itself. With no pending token, advancing through
+        # silence prevents an old rolling-window word from reappearing.
+        safe_horizon = (
+            min(word["start"] for word in pending_stable_words)
+            if pending_stable_words
+            else stable_cutoff
         )
-        provisional_words = _deduplicate_adjacent(provisional_words)
+        self._commit_horizon = max(
+            self._commit_horizon,
+            min(stable_cutoff, safe_horizon),
+        )
+        self._pending_stable_words = deepcopy(pending_stable_words)
+
+        provisional_words = candidates[confirmed_count:]
         next_provisional = (
             _segment_from_words(provisional_words)
             if provisional_words
@@ -221,6 +235,30 @@ def _deduplicate_adjacent(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 continue
         deduplicated.append(word)
     return deduplicated
+
+
+def _matching_prefix_length(
+    previous: list[dict[str, Any]],
+    current: list[dict[str, Any]],
+) -> int:
+    matched = 0
+    for previous_word, current_word in zip(previous, current):
+        same_token = (
+            _normalized_token(previous_word["word"])
+            == _normalized_token(current_word["word"])
+        )
+        same_start = (
+            abs(previous_word["start"] - current_word["start"])
+            <= _TIMESTAMP_JITTER_SECONDS
+        )
+        same_end = (
+            abs(previous_word["end"] - current_word["end"])
+            <= _TIMESTAMP_JITTER_SECONDS
+        )
+        if not (same_token and same_start and same_end):
+            break
+        matched += 1
+    return matched
 
 
 def _segment_from_words(words: list[dict[str, Any]]) -> dict[str, Any]:

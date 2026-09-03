@@ -167,9 +167,16 @@ class TranscriptionService:
             return pipeline.aligner.align(transcription, audio_path)
 
     def close(self):
-        with self._transcription_lock:
-            for pipeline in self._pipelines.values():
-                pipeline.cleanup_models()
+        # Loading happens under the pipeline lock and inference happens under
+        # the transcription lock. Taking both in that order makes shutdown wait
+        # for either operation before models are cleared.
+        with self._pipeline_lock:
+            with self._transcription_lock:
+                pipelines = list(self._pipelines.values())
+                self._pipelines.clear()
+                self._transcribers.clear()
+                for pipeline in pipelines:
+                    pipeline.cleanup_models()
 
     def _get_live_transcriber(self, *, model: str, device: str):
         profile = self.resolve_profile(

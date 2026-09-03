@@ -1,5 +1,7 @@
 import asyncio
 import json
+import threading
+import time
 import unittest
 
 from sona_ai.services.parakeet_live_gateway import (
@@ -43,6 +45,25 @@ class FakeService:
             )] if words else [],
             language=settings.get("language"),
         )
+
+
+class SlowService(FakeService):
+    def __init__(self):
+        super().__init__()
+        self.active_calls = 0
+        self.max_active_calls = 0
+        self._call_lock = threading.Lock()
+
+    def transcribe_live_samples(self, samples, **settings):
+        with self._call_lock:
+            self.active_calls += 1
+            self.max_active_calls = max(self.max_active_calls, self.active_calls)
+        try:
+            time.sleep(0.04)
+            return super().transcribe_live_samples(samples, **settings)
+        finally:
+            with self._call_lock:
+                self.active_calls -= 1
 
 
 class FakeBrowser:
@@ -129,6 +150,30 @@ class ParakeetLiveGatewayTest(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(service.sample_lengths, [round(0.03 * 16000)])
+        self.assertEqual(browser.sent[-1]["type"], "final")
+
+    async def test_slow_inference_coalesces_audio_and_stop_into_latest_snapshot(self):
+        service = SlowService()
+        gateway, _ = self.make_gateway(service)
+        browser = FakeBrowser([
+            *[
+                {"type": "websocket.receive", "bytes": audio_frame()}
+                for _ in range(6)
+            ],
+            stop_message(),
+        ], delay=0.005)
+
+        await gateway.relay(
+            browser,
+            model="parakeet",
+            device="cpu",
+            language="en",
+        )
+
+        self.assertEqual(service.max_active_calls, 1)
+        self.assertGreaterEqual(len(service.sample_lengths), 1)
+        self.assertLessEqual(len(service.sample_lengths), 2)
+        self.assertEqual(service.sample_lengths[-1], round(0.14 * 16000))
         self.assertEqual(browser.sent[-1]["type"], "final")
 
     async def test_empty_session_has_empty_final_without_model_call(self):

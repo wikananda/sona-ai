@@ -290,6 +290,7 @@ class _ParakeetRelay:
                     window_start=window_start,
                     stable_cutoff=stable_cutoff,
                     audio_end=audio_end,
+                    final=final,
                 )
                 self.last_decoded_samples = snapshot_end
                 if event is not None:

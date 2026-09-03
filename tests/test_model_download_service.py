@@ -6,7 +6,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from sona_ai.core import model_cache_root, model_manifest_dir
+from sona_ai.core import (
+    model_cache_root,
+    model_manifest_dir,
+    setup_model_cache_environment,
+)
 from sona_ai.services.model_download_service import model_download_service
 from sona_ai.services.pipeline_profile import PipelineProfile
 
@@ -159,6 +163,17 @@ class ModelDownloadServiceTest(unittest.TestCase):
                     model_cache_root({"_sona_managed_model_id": "wav2vec2-aligner"}).resolve(),
                     (Path(temp_dir) / "wav2vec2-aligner").resolve(),
                 )
+
+    def test_model_environment_keeps_numba_cache_in_writable_model_root(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.dict(os.environ, {"SONA_HF_CACHE": temp_dir}, clear=False):
+                cache_dir = setup_model_cache_environment(model_id="parakeet")
+
+                self.assertEqual(
+                    Path(os.environ["NUMBA_CACHE_DIR"]).resolve(),
+                    (cache_dir / "numba").resolve(),
+                )
+                self.assertTrue(cache_dir.is_dir())
 
 
 if __name__ == "__main__":

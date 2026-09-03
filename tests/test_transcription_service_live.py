@@ -1,4 +1,5 @@
 import unittest
+import threading
 from unittest.mock import patch
 
 import numpy as np
@@ -86,6 +87,27 @@ class TranscriptionServiceLiveTest(unittest.TestCase):
 
         service.close()
 
+        self.assertTrue(pipeline.cleaned)
+        self.assertEqual(service._pipelines, {})
+        self.assertEqual(service._transcribers, {})
+
+    def test_close_waits_for_pipeline_creation_to_finish(self):
+        service, pipeline, _ = self.make_service()
+        closed = threading.Event()
+
+        service._pipeline_lock.acquire()
+        thread = threading.Thread(
+            target=lambda: (service.close(), closed.set()),
+            daemon=True,
+        )
+        try:
+            thread.start()
+            self.assertFalse(closed.wait(0.05))
+        finally:
+            service._pipeline_lock.release()
+
+        self.assertTrue(closed.wait(1))
+        thread.join(timeout=1)
         self.assertTrue(pipeline.cleaned)
 
 
