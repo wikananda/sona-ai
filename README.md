@@ -289,6 +289,40 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 For Vercel or a tunneled backend, set `NEXT_PUBLIC_API_BASE_URL` to the public backend URL without a trailing slash.
 
+## One-click macOS launcher
+
+After completing the backend and frontend setup once, double-click `Launch Sona.command`
+in Finder. It starts the `sona-ai` Conda backend and Next.js frontend, waits until
+both are ready, and opens `http://localhost:3000` in the default browser. Keep the
+launcher Terminal window open while using Sona; closing it or pressing Control-C
+shuts down the managed processes.
+
+On the first launch, the backend may need to download and load its configured speech
+model before the browser opens. The launcher reports progress for up to 30 minutes
+and prints the relevant log if startup fails.
+
+Double-click `Stop Sona.command` if you need to stop an existing managed session.
+Runtime logs are stored in `.sona-runtime/` and are not committed to git.
+
+Whisper on Apple MPS and Parakeet run inside the main backend. The external
+WhisperLive and Nemotron servers remain optional. To have the launcher start either
+installed sidecar too, add one or both flags to `.env`:
+
+```bash
+SONA_LAUNCH_WHISPERLIVE=1
+SONA_LAUNCH_NEMOTRON=1
+```
+
+WhisperLive requires Docker Desktop to be running. Nemotron requires the pinned
+`nemo-speech` runtime and downloaded GGUF described above. Failure to start an
+optional sidecar is logged but does not prevent the core Sona app from opening.
+
+Launcher status is also available from Terminal:
+
+```bash
+./tools/sona_launcher.sh status
+```
+
 ## Configuration
 
 The main speech pipeline is controlled by:
