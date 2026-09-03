@@ -468,6 +468,14 @@ def _download_whisper_mps(entry: ModelCatalogEntry) -> None:
         repo_id=entry.model_names[0],
         revision=config.get("model", {}).get("revision"),
         cache_dir=str(cache_dir),
+        ignore_patterns=[
+            "*.bin",
+            "*.h5",
+            "*.msgpack",
+            "*.onnx",
+            "*.tflite",
+            "model.fp32-*",
+        ],
     )
 
 

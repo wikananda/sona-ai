@@ -292,6 +292,7 @@ def save_live_recording(
     _validate_model_language(model, language)
     if live_engine not in {
         "whisper-live",
+        "whisper-mps-live",
         "parakeet-live",
         "nemotron-live",
         "compatibility",

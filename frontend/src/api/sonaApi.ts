@@ -221,7 +221,12 @@ export interface SaveLiveRecordingParams {
     language?: string;
     model: TranscriptionModel;
     device: RuntimeDevice;
-    liveEngine?: "whisper-live" | "parakeet-live" | "nemotron-live" | "compatibility";
+    liveEngine?:
+        | "whisper-live"
+        | "whisper-mps-live"
+        | "parakeet-live"
+        | "nemotron-live"
+        | "compatibility";
 }
 
 export interface RetranscribeParams {

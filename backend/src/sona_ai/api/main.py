@@ -11,6 +11,7 @@ from sona_ai.services.parakeet_live_gateway import ParakeetLiveGateway
 from sona_ai.services.nemotron_live_gateway import NemotronLiveGateway
 from sona_ai.services.recording_job_manager import RecordingJobManager
 from sona_ai.services.whisper_live_gateway import WhisperLiveGateway
+from sona_ai.services.whisper_mps_live_gateway import WhisperMpsLiveGateway
 
 from sona_ai.api.routes.projects import router as projects_router
 from sona_ai.api.routes.live_transcription import router as live_transcription_router
@@ -62,6 +63,9 @@ async def startup_event():
     )
     app.state.recording_job_manager = RecordingJobManager()
     app.state.whisper_live_gateway = WhisperLiveGateway()
+    app.state.whisper_mps_live_gateway = WhisperMpsLiveGateway(
+        app.state.transcription_service,
+    )
     app.state.nemotron_live_gateway = NemotronLiveGateway()
     app.state.parakeet_live_gateway = ParakeetLiveGateway(
         app.state.transcription_service,
@@ -81,6 +85,7 @@ async def shutdown_event():
     app.state.recording_job_manager.shutdown(wait=True)
     logger.info("Cleaning up models...")
     await app.state.whisper_live_gateway.close()
+    await app.state.whisper_mps_live_gateway.close()
     await app.state.nemotron_live_gateway.close()
     await app.state.parakeet_live_gateway.close()
     app.state.transcription_service.close()

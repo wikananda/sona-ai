@@ -8,7 +8,11 @@ import {
 const READY_TIMEOUT_MS = 130000;
 const FINAL_TIMEOUT_MS = 30000;
 const MAX_BUFFERED_BYTES = 1024 * 1024;
-export type LiveTranscriptionEngine = "whisper-live" | "parakeet-live" | "nemotron-live";
+export type LiveTranscriptionEngine =
+    | "whisper-live"
+    | "whisper-mps-live"
+    | "parakeet-live"
+    | "nemotron-live";
 
 interface LiveEventBase {
     type: string;
@@ -113,7 +117,12 @@ export async function connectLiveTranscriptionSocket(params: {
             if (message?.type === "ready") {
                 window.clearTimeout(timeout);
                 if (
-                    !["whisper-live", "parakeet-live", "nemotron-live"].includes(message.engine)
+                    ![
+                        "whisper-live",
+                        "whisper-mps-live",
+                        "parakeet-live",
+                        "nemotron-live",
+                    ].includes(message.engine)
                     || message.sample_rate !== 16000
                     || message.format !== "pcm_s16le"
                 ) {
@@ -187,7 +196,7 @@ export async function connectLiveTranscriptionSocket(params: {
                 };
                 rejectFinal = reject;
                 socket.send(JSON.stringify({ type: "stop" }));
-                const timeoutMs = readyEvent.engine === "parakeet-live"
+                const timeoutMs = ["parakeet-live", "whisper-mps-live"].includes(readyEvent.engine)
                     ? 120000
                     : readyEvent.engine === "nemotron-live"
                         ? 60000

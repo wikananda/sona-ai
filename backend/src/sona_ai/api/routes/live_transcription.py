@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from sona_ai.core import setup_logging, validate_device_available
+from sona_ai.core import resolve_device, setup_logging, validate_device_available
 from sona_ai.db.engine import SessionLocal
 from sona_ai.db.models import Project
 from sona_ai.services.whisper_live_gateway import (
@@ -47,6 +47,16 @@ async def live_transcription_socket(websocket: WebSocket, project_id: str) -> No
             await gateway.relay(
                 websocket,
                 model=start["model"],
+                language=start["language"],
+            )
+        elif resolve_device(start["device"]) == "mps":
+            gateway = getattr(websocket.app.state, "whisper_mps_live_gateway", None)
+            if gateway is None:
+                raise WhisperLiveUnavailableError("Realtime Whisper MPS is not configured.")
+            await gateway.relay(
+                websocket,
+                model=start["model"],
+                device=start["device"],
                 language=start["language"],
             )
         else:

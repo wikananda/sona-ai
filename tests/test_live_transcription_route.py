@@ -34,6 +34,7 @@ class FakeWebSocket:
         whisper_gateway,
         parakeet_gateway=None,
         nemotron_gateway=None,
+        whisper_mps_gateway=None,
     ):
         self.messages = [{
             "type": "websocket.receive",
@@ -45,6 +46,7 @@ class FakeWebSocket:
         self.app = SimpleNamespace(
             state=SimpleNamespace(
                 whisper_live_gateway=whisper_gateway,
+                whisper_mps_live_gateway=whisper_mps_gateway,
                 parakeet_live_gateway=parakeet_gateway,
                 nemotron_live_gateway=nemotron_gateway,
             ),
@@ -86,7 +88,10 @@ class LiveTranscriptionRouteTest(unittest.IsolatedAsyncioTestCase):
         websocket = FakeWebSocket(valid_start(), gateway)
         session = FakeSession()
 
-        with patch.object(live_route, "SessionLocal", return_value=session):
+        with (
+            patch.object(live_route, "SessionLocal", return_value=session),
+            patch.object(live_route, "resolve_device", return_value="cpu"),
+        ):
             await live_route.live_transcription_socket(websocket, "project-1")
 
         self.assertTrue(websocket.accepted)
@@ -95,6 +100,29 @@ class LiveTranscriptionRouteTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(gateway.calls, [{
             "model": "faster-whisper-turbo",
             "language": None,
+        }])
+
+    async def test_dispatches_whisper_to_local_mps_gateway(self):
+        whisper_gateway = FakeGateway()
+        mps_gateway = FakeGateway()
+        websocket = FakeWebSocket(
+            valid_start(device="auto", language="id"),
+            whisper_gateway,
+            whisper_mps_gateway=mps_gateway,
+        )
+        session = FakeSession()
+
+        with (
+            patch.object(live_route, "SessionLocal", return_value=session),
+            patch.object(live_route, "resolve_device", return_value="mps"),
+        ):
+            await live_route.live_transcription_socket(websocket, "project-1")
+
+        self.assertEqual(whisper_gateway.calls, [])
+        self.assertEqual(mps_gateway.calls, [{
+            "model": "faster-whisper-turbo",
+            "device": "auto",
+            "language": "id",
         }])
 
     async def test_dispatches_parakeet_with_device_and_language(self):

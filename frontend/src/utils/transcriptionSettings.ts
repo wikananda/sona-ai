@@ -130,6 +130,7 @@ export function transcriptionModelLanguageNote(
 }
 
 export function liveEngineLabel(engine: LiveTranscriptionEngine): string {
+    if (engine === "whisper-mps-live") return "Whisper (Apple GPU)";
     if (engine === "nemotron-live") return "Nemotron";
     if (engine === "parakeet-live") return "Parakeet";
     return "Whisper";

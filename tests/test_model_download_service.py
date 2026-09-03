@@ -142,6 +142,14 @@ class ModelDownloadServiceTest(unittest.TestCase):
                     cache_dir=str(
                         (Path(temp_dir) / "whisper-mps-turbo" / "transformers").resolve()
                     ),
+                    ignore_patterns=[
+                        "*.bin",
+                        "*.h5",
+                        "*.msgpack",
+                        "*.onnx",
+                        "*.tflite",
+                        "model.fp32-*",
+                    ],
                 )
 
     def test_nemotron_downloader_places_pinned_gguf_in_model_root(self):
