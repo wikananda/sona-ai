@@ -7,6 +7,7 @@ from sona_ai.core import resolve_device
 
 TRANSCRIPTION_MODEL_PROFILES = {
     "parakeet": ("parakeet", "parakeet"),
+    "nemotron-3.5": ("nemotron", "nemotron-3.5"),
     "faster-whisper-large-v3": ("faster_whisper", "faster-whisper-large-v3"),
     "faster-whisper-turbo": ("faster_whisper", "faster-whisper-turbo"),
 }

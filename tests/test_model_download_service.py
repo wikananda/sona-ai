@@ -11,7 +11,10 @@ from sona_ai.core import (
     model_manifest_dir,
     setup_model_cache_environment,
 )
-from sona_ai.services.model_download_service import model_download_service
+from sona_ai.services.model_download_service import (
+    _download_nemotron,
+    model_download_service,
+)
 from sona_ai.services.pipeline_profile import PipelineProfile
 
 
@@ -85,6 +88,49 @@ class ModelDownloadServiceTest(unittest.TestCase):
         self.assertTrue(models["faster-whisper-large-v3"]["can_uninstall"])
         self.assertTrue(models["wav2vec2-aligner"]["can_redownload"])
         self.assertTrue(models["parakeet"]["cache_path"].endswith(".models/parakeet"))
+        self.assertEqual(models["nemotron-3.5"]["environment"], "nemotron-sidecar")
+        self.assertTrue(models["nemotron-3.5"]["cache_path"].endswith(".models/nemotron-3.5"))
+
+    def test_nemotron_profile_requires_managed_gguf(self):
+        profile = PipelineProfile(
+            transcription_engine="nemotron",
+            transcription_config="nemotron-3.5",
+            alignment_enabled=False,
+            alignment_engine="none",
+            alignment_config=None,
+            diarization_enabled=False,
+            diarization_engine="community_external",
+            diarization_config="diarization-community",
+            device="cpu",
+        )
+
+        self.assertEqual(
+            model_download_service.required_model_ids_for_profile(profile),
+            ["nemotron-3.5"],
+        )
+
+    def test_nemotron_downloader_places_pinned_gguf_in_model_root(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.dict(os.environ, {"SONA_HF_CACHE": temp_dir}, clear=False):
+                entry = model_download_service._entry("nemotron-3.5")
+
+                def fake_download(*, repo_id, filename, local_dir):
+                    self.assertEqual(repo_id, "nvidia/nemotron-3.5-asr-streaming-0.6b")
+                    self.assertEqual(filename, "nemotron-3.5-asr-streaming-0.6b.q8_0.gguf")
+                    target = Path(local_dir) / filename
+                    target.write_bytes(b"gguf")
+                    return str(target)
+
+                with patch("huggingface_hub.hf_hub_download", fake_download):
+                    _download_nemotron(entry)
+
+                self.assertTrue(
+                    (
+                        Path(temp_dir)
+                        / "nemotron-3.5"
+                        / "nemotron-3.5-asr-streaming-0.6b.q8_0.gguf"
+                    ).is_file()
+                )
 
     def test_uninstall_wav2vec2_removes_manifest_and_cache_dir(self):
         with tempfile.TemporaryDirectory() as temp_dir:

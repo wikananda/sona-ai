@@ -1,4 +1,4 @@
-__all__ = ["FasterWhisperTranscriber", "ParakeetTranscriber"]
+__all__ = ["FasterWhisperTranscriber", "NemotronTranscriber", "ParakeetTranscriber"]
 
 
 def __getattr__(name):
@@ -10,4 +10,8 @@ def __getattr__(name):
         from .faster_whisper_transcriber import FasterWhisperTranscriber
 
         return FasterWhisperTranscriber
+    if name == "NemotronTranscriber":
+        from .nemotron_transcriber import NemotronTranscriber
+
+        return NemotronTranscriber
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

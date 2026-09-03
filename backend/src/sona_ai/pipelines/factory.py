@@ -73,6 +73,11 @@ def _build_transcriber(
 
         return FasterWhisperTranscriber(engine_config), engine_config
 
+    if resolved_engine == "nemotron":
+        from sona_ai.transcription import NemotronTranscriber
+
+        return NemotronTranscriber(engine_config), engine_config
+
     raise ValueError(f"Unsupported transcription engine: {resolved_engine}")
 
 

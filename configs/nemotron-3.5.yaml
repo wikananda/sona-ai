@@ -1,0 +1,9 @@
+model:
+  model_name: nvidia/nemotron-3.5-asr-streaming-0.6b
+  runtime_model: default
+  language: auto
+
+server:
+  url: http://127.0.0.1:8080
+  connect_timeout_seconds: 10
+  request_timeout_seconds: 600

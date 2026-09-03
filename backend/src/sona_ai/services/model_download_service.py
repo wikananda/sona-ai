@@ -359,6 +359,8 @@ class ModelDownloadService:
     def _transcription_model_id(self, profile: PipelineProfile) -> Optional[str]:
         if profile.transcription_config == "parakeet":
             return "parakeet"
+        if profile.transcription_config == "nemotron-3.5":
+            return "nemotron-3.5"
         if profile.transcription_config == "faster-whisper-large-v3":
             return "faster-whisper-large-v3"
         if profile.transcription_config == "faster-whisper-turbo":
@@ -452,6 +454,22 @@ def _download_faster_whisper(entry: ModelCatalogEntry) -> None:
         transcriber.cleanup_models()
 
 
+def _download_nemotron(entry: ModelCatalogEntry) -> None:
+    from huggingface_hub import hf_hub_download
+
+    from sona_ai.transcription.nemotron_transcriber import NEMOTRON_GGUF_FILENAME
+
+    cache_dir = model_cache_root(model_id=entry.id)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    downloaded_path = Path(hf_hub_download(
+        repo_id=entry.model_names[0],
+        filename=NEMOTRON_GGUF_FILENAME,
+        local_dir=str(cache_dir),
+    ))
+    if not downloaded_path.is_file() or downloaded_path.stat().st_size <= 0:
+        raise RuntimeError("Nemotron 3.5 model download did not produce a usable GGUF file.")
+
+
 def _download_wav2vec2(entry: ModelCatalogEntry) -> None:
     config = load_config(entry.config_name)
     config["_sona_managed_model_id"] = entry.id
@@ -501,6 +519,18 @@ def _run_command(cmd: list[str]) -> None:
 
 
 MODEL_CATALOG = [
+    ModelCatalogEntry(
+        id="nemotron-3.5",
+        label="Nemotron 3.5 ASR 0.6B",
+        type="transcription",
+        model_names=["nvidia/nemotron-3.5-asr-streaming-0.6b"],
+        config_name="nemotron-3.5",
+        environment="nemotron-sidecar",
+        management_note=(
+            "Downloads the q8 GGUF into .models/nemotron-3.5 for the isolated "
+            "NeMo-Speech.cpp server."
+        ),
+    ),
     ModelCatalogEntry(
         id="parakeet",
         label="Parakeet 0.6B v3",
@@ -553,6 +583,7 @@ MODEL_CATALOG = [
 ]
 
 DOWNLOADERS: dict[str, Callable[[ModelCatalogEntry], None]] = {
+    "nemotron-3.5": _download_nemotron,
     "parakeet": _download_parakeet,
     "faster-whisper-large-v3": _download_faster_whisper,
     "faster-whisper-turbo": _download_faster_whisper,

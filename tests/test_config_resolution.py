@@ -4,10 +4,21 @@ from copy import deepcopy
 from sona_ai.core import load_config
 from sona_ai.pipelines import build_speech_pipeline
 from sona_ai.services.summarization_service import SummarizationService
+from sona_ai.services.pipeline_profile import resolve_pipeline_profile
 from sona_ai.summarization.prompts import parse_adaptive_summary_response
 
 
 class ConfigResolutionTest(unittest.TestCase):
+    def test_nemotron_model_resolves_to_isolated_sidecar_engine(self):
+        profile = resolve_pipeline_profile(
+            load_config("speech"),
+            model="nemotron-3.5",
+            device="cpu",
+        )
+
+        self.assertEqual(profile.transcription_engine, "nemotron")
+        self.assertEqual(profile.transcription_config, "nemotron-3.5")
+
     def test_speech_devices_default_from_speech_config(self):
         speech_config = deepcopy(load_config("speech"))
         speech_config["transcription"] = {
