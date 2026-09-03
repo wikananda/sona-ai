@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, memo, useEffect, useRef, useState } from "react";
 import {
     Recording,
     RuntimeDevice,
@@ -30,6 +30,11 @@ import {
     TRANSCRIPTION_LANGUAGES,
     TRANSCRIPTION_MODELS,
 } from "@/src/utils/transcriptionSettings";
+import {
+    commonTokenPrefix,
+    nextVisibleTokenCount,
+    tokenizeTranscript,
+} from "@/src/utils/liveTranscriptReveal.mjs";
 
 type LiveState =
     | "idle"
@@ -90,6 +95,8 @@ export default function LiveTranscriptionPanel({
     const segmentsRef = useRef<SpeakerSegment[]>([]);
     const provisionalRef = useRef<SpeakerSegment | null>(null);
     const previewFailedRef = useRef(false);
+    const transcriptViewportRef = useRef<HTMLDivElement | null>(null);
+    const shouldAutoScrollRef = useRef(true);
 
     const [includeMicrophone, setIncludeMicrophone] = useState(true);
     const [includeSystemAudio, setIncludeSystemAudio] = useState(true);
@@ -102,6 +109,7 @@ export default function LiveTranscriptionPanel({
     const [provisional, setProvisional] = useState<SpeakerSegment | null>(null);
     const [notice, setNotice] = useState("");
     const [error, setError] = useState("");
+    const prefersReducedMotion = usePrefersReducedMotion();
 
     const selectedDevice = runtimeDevices.available.includes(device)
         ? device
@@ -111,6 +119,7 @@ export default function LiveTranscriptionPanel({
     const isSetupMode = state === "idle" || state === "requesting";
     const isActive = state !== "idle";
     const modelLanguageNote = transcriptionModelLanguageNote(model, language);
+    const provisionalText = provisional?.text ?? "";
 
     useEffect(() => {
         onActiveChange?.(isActive);
@@ -123,6 +132,16 @@ export default function LiveTranscriptionPanel({
         }, 500);
         return () => window.clearInterval(intervalId);
     }, [isRecording]);
+
+    useEffect(() => {
+        if (!shouldAutoScrollRef.current) return;
+        const frameId = window.requestAnimationFrame(() => {
+            const viewport = transcriptViewportRef.current;
+            if (!viewport) return;
+            viewport.scrollTop = viewport.scrollHeight;
+        });
+        return () => window.cancelAnimationFrame(frameId);
+    }, [provisionalText, segments.length]);
 
     useEffect(() => {
         return () => {
@@ -541,7 +560,17 @@ export default function LiveTranscriptionPanel({
                     </p>
                 )}
 
-                <div className="h-[min(520px,60vh)] overflow-y-auto rounded-md border border-zinc-200 bg-zinc-50 p-4 pr-2" aria-live="polite">
+                <div
+                    ref={transcriptViewportRef}
+                    onScroll={(event) => {
+                        const viewport = event.currentTarget;
+                        const distanceFromBottom = viewport.scrollHeight
+                            - viewport.scrollTop
+                            - viewport.clientHeight;
+                        shouldAutoScrollRef.current = distanceFromBottom < 80;
+                    }}
+                    className="h-[min(520px,60vh)] overflow-y-auto rounded-md border border-zinc-200 bg-zinc-50 p-4 pr-2"
+                >
                     {segments.length === 0 && !provisional ? (
                         <div className="flex min-h-full items-center text-sm text-zinc-500">
                             Start speaking and the live transcript will appear here.
@@ -550,14 +579,25 @@ export default function LiveTranscriptionPanel({
                         <div className="flex flex-col gap-3">
                             {segments.map((segment, index) => (
                                 <TranscriptLine
-                                    key={`${segment.start}-${segment.end}-${index}`}
+                                    key={`segment-${index}`}
                                     segment={segment}
+                                    prefersReducedMotion={prefersReducedMotion}
                                 />
                             ))}
-                            {provisional && <TranscriptLine segment={provisional} provisional />}
+                            {provisional && (
+                                <TranscriptLine
+                                    key={`segment-${segments.length}`}
+                                    segment={provisional}
+                                    provisional
+                                    prefersReducedMotion={prefersReducedMotion}
+                                />
+                            )}
                         </div>
                     )}
                 </div>
+                <span className="sr-only" aria-live="polite" aria-atomic="true">
+                    {provisionalText || segments.at(-1)?.text || ""}
+                </span>
 
                 {error && <p className="text-sm text-red-700">{error}</p>}
             </div>
@@ -594,23 +634,114 @@ export default function LiveTranscriptionPanel({
     }
 }
 
-function TranscriptLine({
+const TranscriptLine = memo(function TranscriptLine({
     segment,
     provisional = false,
+    prefersReducedMotion,
 }: {
     segment: SpeakerSegment;
     provisional?: boolean;
+    prefersReducedMotion: boolean;
 }) {
+    const visibleTokens = useRevealedTranscriptTokens(
+        segment.text,
+        prefersReducedMotion,
+    );
+
     return (
-        <div className={`text-sm ${provisional ? "opacity-55" : ""}`}>
+        <div className="text-sm">
             <span className="mr-3 font-mono text-xs text-zinc-500">
                 {formatTime(segment.start)}
             </span>
-            <span className={provisional ? "italic text-zinc-600" : "text-zinc-900"}>
-                {segment.text}
+            <span
+                className={`whitespace-pre-wrap transition-colors duration-200 ${
+                    provisional ? "italic text-zinc-400" : "text-zinc-900"
+                }`}
+            >
+                {visibleTokens.map((token, index) => (
+                    <span
+                        key={`${index}-${token}`}
+                        className={prefersReducedMotion ? undefined : "live-transcript-token"}
+                    >
+                        {token}
+                    </span>
+                ))}
+                {provisional && visibleTokens.length > 0 && (
+                    <span
+                        className={prefersReducedMotion ? "" : "live-transcript-caret"}
+                        aria-hidden="true"
+                    />
+                )}
             </span>
         </div>
     );
+}, (previous, next) => (
+    previous.segment.text === next.segment.text
+    && previous.segment.start === next.segment.start
+    && previous.segment.end === next.segment.end
+    && previous.provisional === next.provisional
+    && previous.prefersReducedMotion === next.prefersReducedMotion
+));
+
+function useRevealedTranscriptTokens(
+    text: string,
+    prefersReducedMotion: boolean,
+): string[] {
+    const previousTokensRef = useRef<string[]>([]);
+    const [visibleTokens, setVisibleTokens] = useState<string[]>([]);
+    const tokens = tokenizeTranscript(text);
+
+    useEffect(() => {
+        const nextTokens = tokenizeTranscript(text);
+        const stablePrefix = commonTokenPrefix(previousTokensRef.current, nextTokens);
+        previousTokensRef.current = nextTokens;
+
+        if (prefersReducedMotion) return;
+
+        let intervalId: number | undefined;
+        let shouldApplyCorrection = true;
+        const advance = () => {
+            const applyCorrection = shouldApplyCorrection;
+            shouldApplyCorrection = false;
+            setVisibleTokens((current) => {
+                const correctedCount = applyCorrection
+                    ? Math.min(current.length, stablePrefix)
+                    : current.length;
+                const nextCount = nextVisibleTokenCount(
+                    correctedCount,
+                    nextTokens.length,
+                );
+                if (nextCount >= nextTokens.length && intervalId !== undefined) {
+                    window.clearInterval(intervalId);
+                }
+                return nextTokens.slice(0, nextCount);
+            });
+        };
+        const startTimeoutId = window.setTimeout(() => {
+            intervalId = window.setInterval(advance, 36);
+            advance();
+        }, 0);
+        return () => {
+            window.clearTimeout(startTimeoutId);
+            if (intervalId !== undefined) window.clearInterval(intervalId);
+        };
+    }, [prefersReducedMotion, text]);
+
+    return prefersReducedMotion ? tokens : visibleTokens;
+}
+
+function usePrefersReducedMotion(): boolean {
+    const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+    useEffect(() => {
+        const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+        const update = () => setPrefersReducedMotion(query.matches);
+        update();
+        query.addEventListener("change", update);
+        return () => query.removeEventListener("change", update);
+    }, []);
+
+    return prefersReducedMotion;
 }
 
 function SourceCheckbox({
