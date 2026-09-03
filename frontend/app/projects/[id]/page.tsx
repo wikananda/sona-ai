@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import {
+    MouseEvent as ReactMouseEvent,
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
 import {
     cancelRecording,
     deleteRecording,
@@ -35,6 +41,11 @@ import BYOKSettingsModal from "@/src/components/BYOKSettingsModal";
 import MissingSpeechModelsModal from "@/src/components/MissingSpeechModelsModal";
 import RecordingDetail from "@/src/components/RecordingDetail";
 import RecordingSidebar from "@/src/components/RecordingSidebar";
+import {
+    LocalProcessingActivity,
+    useProcessingActivities,
+    useProcessingActivity,
+} from "@/src/components/ProcessingActivityProvider";
 import { useBYOKSettings } from "@/src/hooks/useBYOKSettings";
 
 const DRAFT_RECORDING_ID = "draft-recording";
@@ -46,7 +57,9 @@ interface PendingSpeechModelGate {
 
 export default function ProjectDetailPage() {
     const params = useParams<{ id: string }>();
+    const searchParams = useSearchParams();
     const projectId = params.id;
+    const requestedRecordingId = searchParams.get("recording") ?? undefined;
     const byokSettings = useBYOKSettings();
 
     const [project, setProject] = useState<Project | null>(null);
@@ -58,6 +71,8 @@ export default function ProjectDetailPage() {
     const [isLoadingRecording, setIsLoadingRecording] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [isLiveCaptureActive, setIsLiveCaptureActive] = useState(false);
+    const [isRecordingCaptureActive, setIsRecordingCaptureActive] = useState(false);
+    const [isModelManagementActive, setIsModelManagementActive] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [renamingRecordingId, setRenamingRecordingId] = useState<string>();
     const [retranscribingId, setRetranscribingId] = useState<string>();
@@ -82,6 +97,78 @@ export default function ProjectDetailPage() {
     const hasActiveRecordings = recordings.some((recording) =>
         recording.status === "pending" || recording.status === "processing"
     );
+    const hasActiveCapture = isLiveCaptureActive || isRecordingCaptureActive;
+    const hasBrowserOwnedWork = hasActiveCapture
+        || isUploading
+        || Boolean(retranscribingId)
+        || Boolean(extractingSpeakerId)
+        || Boolean(summarizingId)
+        || Boolean(updatingSummaryId)
+        || isModelManagementActive;
+    const localActivity = useMemo<LocalProcessingActivity | null>(() => {
+        if (isLiveCaptureActive) {
+            return {
+                id: `project-work-${projectId}`,
+                label: "Live transcription in progress",
+                detail: "Stay on this page until the recording is stopped and saved.",
+                projectId,
+            };
+        }
+        if (isRecordingCaptureActive) {
+            return {
+                id: `project-work-${projectId}`,
+                label: "Browser recording is not saved",
+                detail: "Leaving this page will discard the captured audio.",
+                projectId,
+            };
+        }
+        if (isUploading) {
+            return {
+                id: `project-work-${projectId}`,
+                label: "Uploading recording",
+                detail: "Keep this tab open until the upload is safely stored.",
+                projectId,
+            };
+        }
+        if (isModelManagementActive) {
+            return {
+                id: `project-work-${projectId}`,
+                label: "Downloading speech models",
+                detail: "The download continues in the background; keep this tab open to resume automatically.",
+                projectId,
+            };
+        }
+        if (summarizingId || updatingSummaryId) {
+            return {
+                id: `project-work-${projectId}`,
+                label: "Processing summary",
+                detail: "Keep this tab open until the summary request finishes.",
+                projectId,
+            };
+        }
+        if (retranscribingId || extractingSpeakerId) {
+            return {
+                id: `project-work-${projectId}`,
+                label: retranscribingId ? "Starting transcription" : "Starting speaker extraction",
+                detail: "The task will continue in the background once it is queued.",
+                projectId,
+            };
+        }
+        return null;
+    }, [
+        extractingSpeakerId,
+        isLiveCaptureActive,
+        isModelManagementActive,
+        isRecordingCaptureActive,
+        isUploading,
+        projectId,
+        retranscribingId,
+        summarizingId,
+        updatingSummaryId,
+    ]);
+    useProcessingActivity(localActivity);
+    const { hasBlockingLocalActivity, refresh: refreshProcessingActivities } =
+        useProcessingActivities();
 
     const refreshProject = useCallback(async () => {
         const data = await getProject(projectId);
@@ -93,9 +180,15 @@ export default function ProjectDetailPage() {
             if (current && data.recordings?.some((recording) => recording.id === current)) {
                 return current;
             }
+            if (
+                requestedRecordingId
+                && data.recordings?.some((recording) => recording.id === requestedRecordingId)
+            ) {
+                return requestedRecordingId;
+            }
             return data.recordings?.[0]?.id;
         });
-    }, [projectId]);
+    }, [projectId, requestedRecordingId]);
 
     const refreshSelectedRecording = useCallback(async () => {
         if (!selectedRecordingId || selectedRecordingId === DRAFT_RECORDING_ID) {
@@ -159,7 +252,7 @@ export default function ProjectDetailPage() {
     };
 
     const handleCancelDraft = () => {
-        if (isLiveCaptureActive) return;
+        if (hasActiveCapture || isUploading) return;
         const fallbackRecordingId = previousRecordingId &&
             recordings.some((recording) => recording.id === previousRecordingId)
             ? previousRecordingId
@@ -174,9 +267,10 @@ export default function ProjectDetailPage() {
     };
 
     const handleSelectRecording = (recordingId: string) => {
-        if (isLiveCaptureActive) return;
-        setDraftMode(null);
-        setPreviousRecordingId(undefined);
+        if (!hasActiveCapture && !isUploading) {
+            setDraftMode(null);
+            setPreviousRecordingId(undefined);
+        }
         setSelectedRecordingId(recordingId);
     };
 
@@ -252,7 +346,7 @@ export default function ProjectDetailPage() {
                 });
                 firstRecording = firstRecording ?? recording;
             }
-            await refreshProject();
+            await Promise.all([refreshProject(), refreshProcessingActivities()]);
             if (firstRecording) {
                 setDraftMode(null);
                 setPreviousRecordingId(undefined);
@@ -273,7 +367,7 @@ export default function ProjectDetailPage() {
         setPreviousRecordingId(undefined);
         setSelectedRecordingId(recording.id);
         setSelectedRecording(recording);
-        await refreshProject();
+        await Promise.all([refreshProject(), refreshProcessingActivities()]);
     };
 
     const handleDeleteRecording = async (recordingId: string) => {
@@ -286,7 +380,7 @@ export default function ProjectDetailPage() {
                 setSelectedRecording(null);
                 setSelectedRecordingId(undefined);
             }
-            await refreshProject();
+            await Promise.all([refreshProject(), refreshProcessingActivities()]);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to delete recording");
         }
@@ -343,7 +437,7 @@ export default function ProjectDetailPage() {
         try {
             const recording = await retranscribeRecording(recordingId, settings);
             setSelectedRecording(recording);
-            await refreshProject();
+            await Promise.all([refreshProject(), refreshProcessingActivities()]);
             return true;
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to re-transcribe recording");
@@ -380,7 +474,7 @@ export default function ProjectDetailPage() {
             setSelectedRecording((current) =>
                 current?.id === recordingId ? recording : current,
             );
-            await refreshProject();
+            await Promise.all([refreshProject(), refreshProcessingActivities()]);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to cancel recording");
             throw err;
@@ -433,7 +527,7 @@ export default function ProjectDetailPage() {
         try {
             const recording = await extractRecordingSpeakers(recordingId, params);
             setSelectedRecording(recording);
-            await refreshProject();
+            await Promise.all([refreshProject(), refreshProcessingActivities()]);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to extract speakers");
             throw err;
@@ -501,7 +595,17 @@ export default function ProjectDetailPage() {
             <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-5 py-6">
                 <header className="flex flex-wrap items-start justify-between gap-4">
                     <div className="flex flex-col gap-3">
-                        <Link href="/" className="text-sm font-medium text-zinc-600 hover:text-zinc-950 cursor-pointer">
+                        <Link
+                            href="/"
+                            onClick={(event) => {
+                                if (!hasBlockingLocalActivity || isModifiedNavigation(event)) return;
+                                const shouldLeave = window.confirm(
+                                    "A recording, upload, or other task still depends on this page. Leaving now may discard unsaved audio or interrupt the request. Leave anyway?",
+                                );
+                                if (!shouldLeave) event.preventDefault();
+                            }}
+                            className="text-sm font-medium text-zinc-600 hover:text-zinc-950 cursor-pointer"
+                        >
                             Back to projects
                         </Link>
                         <div>
@@ -526,6 +630,23 @@ export default function ProjectDetailPage() {
                     </div>
                 )}
 
+                {hasBrowserOwnedWork && !isDraftSelected && draftMode && (
+                    <button
+                        type="button"
+                        onClick={handleSelectDraft}
+                        className="flex w-full items-center justify-between gap-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm text-amber-950"
+                    >
+                        <span>
+                            {isLiveCaptureActive
+                                ? "Live transcription is still recording in the background of this view."
+                                : isRecordingCaptureActive
+                                    ? "Your browser recording is still here and has not been saved yet."
+                                    : "A recording task is still finishing in the new recording view."}
+                        </span>
+                        <span className="shrink-0 font-semibold">Return</span>
+                    </button>
+                )}
+
                 <div className="grid overflow-hidden rounded-lg border border-zinc-200 bg-white lg:grid-cols-[360px_1fr]">
                     <RecordingSidebar
                         recordings={recordings}
@@ -538,23 +659,36 @@ export default function ProjectDetailPage() {
                         onDelete={handleDeleteRecording}
                         onRename={handleRenameRecording}
                         renamingId={renamingRecordingId}
-                        isUploading={isUploading || isLiveCaptureActive}
+                        isUploading={isUploading || hasActiveCapture}
+                        draftActivityLabel={
+                            isLiveCaptureActive
+                                ? "Live transcription running"
+                                : isRecordingCaptureActive
+                                    ? "Unsaved browser recording"
+                                    : isUploading
+                                        ? "Uploading recording"
+                                        : undefined
+                        }
                     />
-                    {isDraftSelected && draftMode ? (
-                        <AddRecordingPanel
-                            key="draft-recording"
-                            projectId={projectId}
-                            mode={draftMode}
-                            onModeChange={setDraftMode}
-                            onCancel={handleCancelDraft}
-                            onUpload={handleUpload}
-                            onBeforeLiveStart={handleLiveStartRequest}
-                            onLiveSaved={handleLiveRecordingSaved}
-                            onLiveActiveChange={setIsLiveCaptureActive}
-                            isUploading={isUploading}
-                            runtimeDevices={runtimeDevices}
-                        />
-                    ) : (
+                    <div className={isDraftSelected && draftMode ? "block" : "hidden"}>
+                        {draftMode && (
+                            <AddRecordingPanel
+                                key="draft-recording"
+                                projectId={projectId}
+                                mode={draftMode}
+                                onModeChange={setDraftMode}
+                                onCancel={handleCancelDraft}
+                                onUpload={handleUpload}
+                                onBeforeLiveStart={handleLiveStartRequest}
+                                onLiveSaved={handleLiveRecordingSaved}
+                                onLiveActiveChange={setIsLiveCaptureActive}
+                                onRecordingActiveChange={setIsRecordingCaptureActive}
+                                isUploading={isUploading}
+                                runtimeDevices={runtimeDevices}
+                            />
+                        )}
+                    </div>
+                    <div className={isDraftSelected && draftMode ? "hidden" : "block"}>
                         <RecordingDetail
                             key={selectedRecording?.id ?? "empty-recording"}
                             recording={selectedRecording}
@@ -577,7 +711,7 @@ export default function ProjectDetailPage() {
                             byokModelPresets={byokSettings.validModelPresets}
                             onOpenSettings={() => setIsSettingsOpen(true)}
                         />
-                    )}
+                    </div>
                 </div>
             </div>
             {isSettingsOpen && (
@@ -594,6 +728,7 @@ export default function ProjectDetailPage() {
             {pendingSpeechModelGate && (
                 <MissingSpeechModelsModal
                     models={pendingSpeechModelGate.models}
+                    onActivityChange={setIsModelManagementActive}
                     onInstalled={() => {
                         pendingSpeechModelGate.resolve(true);
                         setPendingSpeechModelGate(null);
@@ -606,4 +741,12 @@ export default function ProjectDetailPage() {
             )}
         </main>
     );
+}
+
+function isModifiedNavigation(event: ReactMouseEvent<HTMLAnchorElement>): boolean {
+    return event.button !== 0
+        || event.metaKey
+        || event.ctrlKey
+        || event.shiftKey
+        || event.altKey;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     ModelJob,
     RuntimeModel,
@@ -12,6 +12,7 @@ interface Props {
     models: RuntimeModel[];
     onInstalled: () => void;
     onCancel: () => void;
+    onActivityChange?: (active: boolean) => void;
 }
 
 type LocalStatus = "missing" | "downloading" | "installed" | "failed";
@@ -20,12 +21,21 @@ export default function MissingSpeechModelsModal({
     models,
     onInstalled,
     onCancel,
+    onActivityChange,
 }: Props) {
     const [statuses, setStatuses] = useState<Record<string, LocalStatus>>(() =>
         Object.fromEntries(models.map((model) => [model.id, "missing"])),
     );
     const [error, setError] = useState<string | null>(null);
     const [isDownloading, setIsDownloading] = useState(false);
+
+    useEffect(() => {
+        onActivityChange?.(isDownloading);
+    }, [isDownloading, onActivityChange]);
+
+    useEffect(() => {
+        return () => onActivityChange?.(false);
+    }, [onActivityChange]);
 
     const blockedModels = useMemo(
         () => models.filter((model) => model.requires_hf_token && !model.hf_token_available),

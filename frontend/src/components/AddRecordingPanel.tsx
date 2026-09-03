@@ -34,6 +34,7 @@ interface Props {
     }) => Promise<boolean>;
     onLiveSaved: (recording: Recording) => Promise<void>;
     onLiveActiveChange: (active: boolean) => void;
+    onRecordingActiveChange: (active: boolean) => void;
     isUploading: boolean;
     runtimeDevices: RuntimeDevices;
 }
@@ -53,15 +54,21 @@ export default function AddRecordingPanel({
     onBeforeLiveStart,
     onLiveSaved,
     onLiveActiveChange,
+    onRecordingActiveChange,
     isUploading,
     runtimeDevices,
 }: Props) {
     const [isLiveActive, setIsLiveActive] = useState(false);
-    const controlsDisabled = isUploading || isLiveActive;
+    const [isRecordingActive, setIsRecordingActive] = useState(false);
+    const controlsDisabled = isUploading || isLiveActive || isRecordingActive;
     const handleLiveActiveChange = useCallback((active: boolean) => {
         setIsLiveActive(active);
         onLiveActiveChange(active);
     }, [onLiveActiveChange]);
+    const handleRecordingActiveChange = useCallback((active: boolean) => {
+        setIsRecordingActive(active);
+        onRecordingActiveChange(active);
+    }, [onRecordingActiveChange]);
 
     return (
         <section className="min-h-[520px] bg-white">
@@ -115,6 +122,7 @@ export default function AddRecordingPanel({
                         onUpload={onUpload}
                         isUploading={isUploading}
                         runtimeDevices={runtimeDevices}
+                        onActiveChange={handleRecordingActiveChange}
                     />
                 ) : (
                     <LiveTranscriptionPanel

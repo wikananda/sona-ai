@@ -18,6 +18,7 @@ interface Props {
     }) => Promise<boolean>;
     isUploading: boolean;
     runtimeDevices: RuntimeDevices;
+    onActiveChange?: (active: boolean) => void;
 }
 
 const MIME_TYPES = [
@@ -39,6 +40,7 @@ export default function BrowserAudioRecorder({
     onUpload,
     isUploading,
     runtimeDevices,
+    onActiveChange,
 }: Props) {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -52,6 +54,15 @@ export default function BrowserAudioRecorder({
     const [recordedFile, setRecordedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState("");
     const [error, setError] = useState("");
+    const isActive = recorderState !== "idle" || recordedFile !== null;
+
+    useEffect(() => {
+        onActiveChange?.(isActive);
+    }, [isActive, onActiveChange]);
+
+    useEffect(() => {
+        return () => onActiveChange?.(false);
+    }, [onActiveChange]);
 
     useEffect(() => {
         if (recorderState !== "recording") return;

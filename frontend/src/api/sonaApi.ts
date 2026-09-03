@@ -168,6 +168,10 @@ export interface Recording {
     summary?: RecordingSummary | null;
 }
 
+export interface ProcessingRecording extends Recording {
+    project_name: string;
+}
+
 export interface RecordingChatMessage {
     role: RecordingChatRole;
     content: string;
@@ -400,6 +404,10 @@ export async function saveLiveRecording(
 
 export async function getRecording(recordingId: string): Promise<Recording> {
     return requestJson(`/recordings/${recordingId}`);
+}
+
+export async function listProcessingRecordings(): Promise<ProcessingRecording[]> {
+    return requestJson("/processing/recordings");
 }
 
 export async function deleteRecording(recordingId: string): Promise<void> {

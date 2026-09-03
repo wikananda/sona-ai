@@ -18,6 +18,7 @@ interface Props {
     onRename: (recordingId: string, name: string) => Promise<void>;
     renamingId?: string;
     isUploading: boolean;
+    draftActivityLabel?: string;
 }
 
 export default function RecordingSidebar({
@@ -32,6 +33,7 @@ export default function RecordingSidebar({
     onRename,
     renamingId,
     isUploading,
+    draftActivityLabel,
 }: Props) {
     const [editingId, setEditingId] = useState<string>();
     const [draftName, setDraftName] = useState("");
@@ -95,11 +97,11 @@ export default function RecordingSidebar({
                                     New recording
                                 </p>
                                 <p className="mt-1 text-xs text-zinc-500">
-                                    Draft, not saved yet
+                                    {draftActivityLabel ?? "Draft, not saved yet"}
                                 </p>
                             </div>
                             <span className="rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-600">
-                                Draft
+                                {draftActivityLabel ? "Active" : "Draft"}
                             </span>
                         </div>
                     </button>
