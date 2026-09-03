@@ -13,6 +13,7 @@ import {
 } from "@/src/api/sonaApi";
 import {
     connectLiveTranscriptionSocket,
+    LiveTranscriptionEngine,
     LiveTranscriptionSocket,
     LiveTranscriptEvent,
 } from "@/src/api/liveTranscriptionSocket";
@@ -33,7 +34,7 @@ type LiveState =
     | "stopping"
     | "saving"
     | "save-error";
-type LiveTransport = "legacy" | "whisper-stream";
+type LiveTransport = "legacy" | "stream";
 
 interface Props {
     projectId: string;
@@ -75,6 +76,7 @@ export default function LiveTranscriptionPanel({
     const recordingAudioContextRef = useRef<AudioContext | null>(null);
     const pcmCaptureRef = useRef<LivePcmCapture | null>(null);
     const liveSocketRef = useRef<LiveTranscriptionSocket | null>(null);
+    const liveEngineRef = useRef<LiveTranscriptionEngine | null>(null);
     const transportRef = useRef<LiveTransport>("legacy");
     const chunksRef = useRef<Blob[]>([]);
     const chunkIndexRef = useRef(0);
@@ -174,9 +176,7 @@ export default function LiveTranscriptionPanel({
             mediaRecorderRef.current = recorder;
             finalMimeTypeRef.current = recorder.mimeType || mimeType || "audio/webm";
 
-            if (model !== "parakeet") {
-                await prepareWhisperStreaming(capture.recordingStream);
-            }
+            await prepareStreaming(capture.recordingStream);
 
             recorder.addEventListener("dataavailable", (event) => {
                 if (event.data.size <= 0) return;
@@ -200,7 +200,7 @@ export default function LiveTranscriptionPanel({
         }
     };
 
-    const prepareWhisperStreaming = async (recordingStream: MediaStream) => {
+    const prepareStreaming = async (recordingStream: MediaStream) => {
         try {
             const socket = await connectLiveTranscriptionSocket({
                 projectId,
@@ -211,6 +211,7 @@ export default function LiveTranscriptionPanel({
                 onError: activateLegacyFallback,
             });
             liveSocketRef.current = socket;
+            liveEngineRef.current = socket.engine;
             pcmCaptureRef.current = await startLivePcmCapture(recordingStream, (frame) => {
                 if (!liveSocketRef.current?.sendAudio(frame)) {
                     activateLegacyFallback(
@@ -218,12 +219,16 @@ export default function LiveTranscriptionPanel({
                     );
                 }
             });
-            transportRef.current = "whisper-stream";
-            setNotice("Realtime Whisper connected. Speech will appear as it is committed.");
+            transportRef.current = "stream";
+            const engineName = socket.engine === "parakeet-live" ? "Parakeet" : "Whisper";
+            setNotice(`Realtime ${engineName} connected. Speech will appear as it is committed.`);
         } catch (err) {
             await cleanupRealtime();
             transportRef.current = "legacy";
-            const message = err instanceof Error ? err.message : "Realtime Whisper is unavailable.";
+            liveEngineRef.current = null;
+            const message = err instanceof Error
+                ? err.message
+                : "Realtime transcription is unavailable.";
             setNotice(`${message} Using compatibility transcription while recording continues.`);
         }
     };
@@ -238,8 +243,9 @@ export default function LiveTranscriptionPanel({
     };
 
     const activateLegacyFallback = (message: string) => {
-        if (transportRef.current !== "whisper-stream") return;
+        if (transportRef.current !== "stream") return;
         transportRef.current = "legacy";
+        liveEngineRef.current = null;
         previewFailedRef.current = true;
         setNotice(`${message} The original recording is still safe.`);
         liveSocketRef.current?.abort();
@@ -259,7 +265,7 @@ export default function LiveTranscriptionPanel({
         if (!recorder || recorder.state === "inactive") return;
 
         setState("stopping");
-        if (transportRef.current === "whisper-stream") {
+        if (transportRef.current === "stream") {
             processingQueueRef.current = processingQueueRef.current.then(async () => {
                 await pcmCaptureRef.current?.finish();
                 pcmCaptureRef.current = null;
@@ -348,9 +354,7 @@ export default function LiveTranscriptionPanel({
                     language,
                     model,
                     device: selectedDevice,
-                    liveEngine: transportRef.current === "whisper-stream"
-                        ? "whisper-live"
-                        : "compatibility",
+                    liveEngine: liveEngineRef.current ?? "compatibility",
                 })
                 : await uploadProjectRecording({
                     projectId,
@@ -387,7 +391,7 @@ export default function LiveTranscriptionPanel({
                 <div className="border-b border-zinc-200 px-4 py-3">
                     <h2 className="text-sm font-semibold text-zinc-900">Live transcription</h2>
                     <p className="mt-1 text-sm text-zinc-500">
-                        Whisper streams continuously; Parakeet uses compatibility chunks.
+                        Whisper and Parakeet stream continuously while preserving the original audio.
                     </p>
                 </div>
 
@@ -484,8 +488,10 @@ export default function LiveTranscriptionPanel({
                     <div>
                         <h2 className="text-sm font-semibold text-zinc-900">Live transcription</h2>
                         <p className="mt-1 text-sm text-zinc-500">
-                            {transportRef.current === "whisper-stream"
-                                ? "Streaming low-latency Whisper preview"
+                            {transportRef.current === "stream"
+                                ? `Streaming low-latency ${
+                                    liveEngineRef.current === "parakeet-live" ? "Parakeet" : "Whisper"
+                                } preview`
                                 : "Compatibility transcription preview"}
                         </p>
                     </div>
@@ -558,6 +564,7 @@ export default function LiveTranscriptionPanel({
         segmentsRef.current = [];
         provisionalRef.current = null;
         transportRef.current = "legacy";
+        liveEngineRef.current = null;
         previewFailedRef.current = false;
         setSegments([]);
         setProvisional(null);

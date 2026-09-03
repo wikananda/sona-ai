@@ -216,7 +216,7 @@ export interface SaveLiveRecordingParams {
     language?: string;
     model: TranscriptionModel;
     device: RuntimeDevice;
-    liveEngine?: "whisper-live" | "compatibility";
+    liveEngine?: "whisper-live" | "parakeet-live" | "compatibility";
 }
 
 export interface RetranscribeParams {

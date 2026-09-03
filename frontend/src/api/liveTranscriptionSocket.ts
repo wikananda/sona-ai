@@ -8,6 +8,7 @@ import {
 const READY_TIMEOUT_MS = 130000;
 const FINAL_TIMEOUT_MS = 30000;
 const MAX_BUFFERED_BYTES = 1024 * 1024;
+export type LiveTranscriptionEngine = "whisper-live" | "parakeet-live";
 
 interface LiveEventBase {
     type: string;
@@ -36,7 +37,7 @@ export interface LiveFinalEvent extends LiveEventBase {
 interface LiveReadyEvent extends LiveEventBase {
     type: "ready";
     session_id: string;
-    engine: string;
+    engine: LiveTranscriptionEngine;
     model: string;
     sample_rate: number;
     format: string;
@@ -52,6 +53,7 @@ interface LiveErrorEvent extends LiveEventBase {
 type ServerEvent = LiveTranscriptEvent | LiveFinalEvent | LiveReadyEvent | LiveErrorEvent;
 
 export interface LiveTranscriptionSocket {
+    engine: LiveTranscriptionEngine;
     sendAudio: (frame: ArrayBuffer) => boolean;
     finish: () => Promise<LiveFinalEvent>;
     abort: () => void;
@@ -80,7 +82,7 @@ export async function connectLiveTranscriptionSocket(params: {
     const readyEvent = await new Promise<LiveReadyEvent>((resolve, reject) => {
         const timeout = window.setTimeout(() => {
             socket.close();
-            reject(new Error("Timed out while preparing realtime Whisper."));
+            reject(new Error("Timed out while preparing realtime transcription."));
         }, READY_TIMEOUT_MS);
 
         socket.addEventListener("open", () => {
@@ -100,16 +102,25 @@ export async function connectLiveTranscriptionSocket(params: {
         });
         socket.addEventListener("message", handleMessage);
         socket.addEventListener("error", () => {
-            if (!ready) reject(new Error("Could not connect to realtime Whisper."));
+            if (!ready) reject(new Error("Could not connect to realtime transcription."));
         });
         socket.addEventListener("close", () => {
-            if (!ready) reject(new Error("Realtime Whisper closed before it was ready."));
+            if (!ready) reject(new Error("Realtime transcription closed before it was ready."));
         });
 
         function handleMessage(event: MessageEvent) {
             const message = parseServerEvent(event.data);
             if (message?.type === "ready") {
                 window.clearTimeout(timeout);
+                if (
+                    !["whisper-live", "parakeet-live"].includes(message.engine)
+                    || message.sample_rate !== 16000
+                    || message.format !== "pcm_s16le"
+                ) {
+                    socket.close();
+                    reject(new Error("Realtime server returned incompatible audio settings."));
+                    return;
+                }
                 ready = true;
                 resolve(message);
             } else if (message?.type === "error") {
@@ -118,8 +129,6 @@ export async function connectLiveTranscriptionSocket(params: {
             }
         }
     });
-    void readyEvent;
-
     socket.addEventListener("message", (event) => {
         const message = parseServerEvent(event.data);
         if (!message) return;
@@ -141,18 +150,19 @@ export async function connectLiveTranscriptionSocket(params: {
     });
     socket.addEventListener("close", () => {
         if (!intentionalClose && !finalEvent) {
-            const error = new Error("Realtime Whisper disconnected. Recording is continuing.");
+            const error = new Error("Realtime transcription disconnected. Recording is continuing.");
             params.onError(error.message);
             rejectFinal?.(error);
         }
     });
     socket.addEventListener("error", () => {
         if (ready && !intentionalClose) {
-            params.onError("Realtime Whisper connection failed. Recording is continuing.");
+            params.onError("Realtime transcription connection failed. Recording is continuing.");
         }
     });
 
     return {
+        engine: readyEvent.engine,
         sendAudio(frame) {
             if (socket.readyState !== WebSocket.OPEN || intentionalClose) return false;
             if (socket.bufferedAmount > MAX_BUFFERED_BYTES) {
@@ -167,7 +177,7 @@ export async function connectLiveTranscriptionSocket(params: {
         finish() {
             if (finalEvent) return Promise.resolve(finalEvent);
             if (socket.readyState !== WebSocket.OPEN) {
-                return Promise.reject(new Error("Realtime Whisper is no longer connected."));
+                return Promise.reject(new Error("Realtime transcription is no longer connected."));
             }
             return new Promise<LiveFinalEvent>((resolve, reject) => {
                 resolveFinal = (event) => {
@@ -177,11 +187,14 @@ export async function connectLiveTranscriptionSocket(params: {
                 };
                 rejectFinal = reject;
                 socket.send(JSON.stringify({ type: "stop" }));
+                const timeoutMs = readyEvent.engine === "parakeet-live"
+                    ? 120000
+                    : FINAL_TIMEOUT_MS;
                 finalTimeout = window.setTimeout(() => {
                     intentionalClose = true;
                     socket.close();
                     reject(new Error("Timed out finalizing the realtime transcript."));
-                }, FINAL_TIMEOUT_MS);
+                }, timeoutMs);
             });
         },
         abort() {
