@@ -6,6 +6,7 @@ from sona_ai.core import runtime_devices
 from sona_ai.api.schemas.runtime import TranscriptionPreflightRequest
 from sona_ai.services.model_download_service import model_download_service
 from sona_ai.transcription.nemotron_languages import resolve_nemotron_language
+from sona_ai.transcription.parakeet_languages import resolve_parakeet_language
 
 
 router = APIRouter()
@@ -70,8 +71,11 @@ def transcription_preflight(
     request: Request,
 ):
     try:
-        if body.model.lower().strip() == "nemotron-3.5":
+        normalized_model = body.model.lower().strip()
+        if normalized_model == "nemotron-3.5":
             resolve_nemotron_language(body.language)
+        elif normalized_model == "parakeet":
+            resolve_parakeet_language(body.language)
         profile = request.app.state.transcription_service.resolve_profile(
             model=body.model,
             device=body.device,

@@ -45,6 +45,7 @@ from sona_ai.storage import (
 )
 from sona_ai.transcription.live_timestamps import segment_live_timestamps
 from sona_ai.transcription.nemotron_languages import resolve_nemotron_language
+from sona_ai.transcription.parakeet_languages import resolve_parakeet_language
 
 
 logger = setup_logging()
@@ -1118,10 +1119,11 @@ def _normalize_language(language: Optional[str]) -> Optional[str]:
 
 
 def _validate_model_language(model: str, language: Optional[str]) -> None:
-    if model != "nemotron-3.5":
-        return
     try:
-        resolve_nemotron_language(language)
+        if model == "nemotron-3.5":
+            resolve_nemotron_language(language)
+        elif model == "parakeet":
+            resolve_parakeet_language(language)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

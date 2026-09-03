@@ -140,6 +140,11 @@ class WholeFileUploadRegressionTest(unittest.TestCase):
         with self.assertRaisesRegex(HTTPException, "does not support"):
             projects._validate_model_language("nemotron-3.5", "id")
 
+    def test_parakeet_upload_accepts_greek_and_rejects_indonesian(self):
+        projects._validate_model_language("parakeet", "el")
+        with self.assertRaisesRegex(HTTPException, "does not support"):
+            projects._validate_model_language("parakeet", "id")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,6 +7,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sona_ai.core import resolve_device, setup_logging, validate_device_available
 from sona_ai.db.engine import SessionLocal
 from sona_ai.db.models import Project
+from sona_ai.transcription.nemotron_languages import resolve_nemotron_language
+from sona_ai.transcription.parakeet_languages import resolve_parakeet_language
 from sona_ai.services.whisper_live_gateway import (
     WHISPER_LIVE_MODELS,
     WhisperLiveCapacityError,
@@ -137,6 +139,13 @@ def _validate_start(body: Any) -> dict[str, Any]:
         raise WhisperLiveInputError(str(exc)) from exc
 
     language = _normalize_language(body.get("language"))
+    try:
+        if model == "nemotron-3.5":
+            resolve_nemotron_language(language)
+        elif model == "parakeet":
+            resolve_parakeet_language(language)
+    except ValueError as exc:
+        raise WhisperLiveInputError(str(exc)) from exc
     audio = body.get("audio")
     if not isinstance(audio, dict):
         raise WhisperLiveInputError("Live audio settings are required.")

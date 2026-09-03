@@ -212,6 +212,18 @@ class LiveTranscriptionRouteTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(settings["model"], "faster-whisper-large-v3")
         self.assertEqual(settings["language"], "id")
 
+    def test_rejects_unsupported_nvidia_languages_before_streaming(self):
+        for model in ("parakeet", "nemotron-3.5"):
+            with self.subTest(model=model):
+                with self.assertRaisesRegex(WhisperLiveInputError, "does not support"):
+                    live_route._validate_start(valid_start(model=model, language="id"))
+
+        settings = live_route._validate_start(valid_start(
+            model="parakeet",
+            language="el",
+        ))
+        self.assertEqual(settings["language"], "el")
+
 
 if __name__ == "__main__":
     unittest.main()

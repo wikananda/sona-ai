@@ -1,5 +1,30 @@
 model:
     model_name: "nvidia/parakeet-tdt-0.6b-v3"
-    language: "en"
-    supported_languages: ["en"]
+    language: null
+    supported_languages:
+        - "bg"
+        - "hr"
+        - "cs"
+        - "da"
+        - "nl"
+        - "en"
+        - "et"
+        - "fi"
+        - "fr"
+        - "de"
+        - "el"
+        - "hu"
+        - "it"
+        - "lv"
+        - "lt"
+        - "mt"
+        - "pl"
+        - "pt"
+        - "ro"
+        - "sk"
+        - "sl"
+        - "es"
+        - "sv"
+        - "ru"
+        - "uk"
     batch_size: 1

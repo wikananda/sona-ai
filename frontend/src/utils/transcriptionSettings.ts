@@ -1,5 +1,12 @@
 import { RuntimeDevice, TranscriptionModel } from "@/src/api/sonaApi";
 import type { LiveTranscriptionEngine } from "@/src/api/liveTranscriptionSocket";
+import {
+    compatibleTranscriptionModel,
+    modelSupportsLanguage,
+    transcriptionLanguageName as languageName,
+    TRANSCRIPTION_LANGUAGE_DATA,
+    unsupportedLanguageReason as incompatibilityReason,
+} from "@/src/utils/transcriptionCapabilities.mjs";
 
 export interface TranscriptionSettings {
     language?: string;
@@ -9,79 +16,40 @@ export interface TranscriptionSettings {
     maxSpeakers?: number | "";
 }
 
-export const TRANSCRIPTION_LANGUAGES = [
-    { label: "Auto detect", value: "auto" },
-    { label: "Arabic", value: "ar" },
-    { label: "Bulgarian", value: "bg" },
-    { label: "Chinese (Simplified)", value: "zh" },
-    { label: "Croatian", value: "hr" },
-    { label: "Czech", value: "cs" },
-    { label: "Danish", value: "da" },
-    { label: "Dutch", value: "nl" },
-    { label: "English", value: "en" },
-    { label: "Estonian", value: "et" },
-    { label: "Finnish", value: "fi" },
-    { label: "French", value: "fr" },
-    { label: "German", value: "de" },
-    { label: "Hindi", value: "hi" },
-    { label: "Hungarian", value: "hu" },
-    { label: "Indonesian", value: "id" },
-    { label: "Italian", value: "it" },
-    { label: "Japanese", value: "ja" },
-    { label: "Korean", value: "ko" },
-    { label: "Norwegian Bokmal", value: "nb" },
-    { label: "Polish", value: "pl" },
-    { label: "Portuguese", value: "pt" },
-    { label: "Romanian", value: "ro" },
-    { label: "Russian", value: "ru" },
-    { label: "Slovak", value: "sk" },
-    { label: "Spanish", value: "es" },
-    { label: "Swedish", value: "sv" },
-    { label: "Turkish", value: "tr" },
-    { label: "Ukrainian", value: "uk" },
-    { label: "Vietnamese", value: "vi" },
-];
+export interface TranscriptionLanguage {
+    value: string;
+    label: string;
+    englishName?: string;
+    aliases?: readonly string[];
+}
 
-const NEMOTRON_LANGUAGES = new Set([
-    "auto",
-    "ar",
-    "bg",
-    "cs",
-    "da",
-    "de",
-    "en",
-    "es",
-    "et",
-    "fi",
-    "fr",
-    "hi",
-    "hr",
-    "hu",
-    "it",
-    "ja",
-    "ko",
-    "nb",
-    "nl",
-    "pl",
-    "pt",
-    "ro",
-    "ru",
-    "sk",
-    "sv",
-    "tr",
-    "uk",
-    "vi",
-    "zh",
-]);
+export const TRANSCRIPTION_LANGUAGES = TRANSCRIPTION_LANGUAGE_DATA as readonly TranscriptionLanguage[];
 
 export const TRANSCRIPTION_MODELS: {
     label: string;
     value: TranscriptionModel;
+    description: string;
 }[] = [
-    { label: "Parakeet", value: "parakeet" },
-    { label: "Nemotron 3.5 ASR", value: "nemotron-3.5" },
-    { label: "Whisper Large-v3", value: "faster-whisper-large-v3" },
-    { label: "Whisper Large-v3 Turbo", value: "faster-whisper-turbo" },
+    {
+        label: "Parakeet",
+        value: "parakeet",
+        description: "Fast multilingual ASR · 25 languages",
+    },
+    {
+        label: "Nemotron 3.5 ASR",
+        value: "nemotron-3.5",
+        description: "Native streaming ASR · 28 languages",
+    },
+    {
+        label: "Whisper Large-v3",
+        value: "faster-whisper-large-v3",
+        description: "Highest Whisper accuracy · 100 languages",
+    },
+    {
+        label: "Whisper Large-v3 Turbo",
+        value: "faster-whisper-turbo",
+        description: "Faster Whisper inference · 100 languages",
+    },
 ];
 
 export function isTranscriptionModel(value: string): value is TranscriptionModel {
@@ -92,41 +60,36 @@ export function isModelLanguageCompatible(
     model: TranscriptionModel,
     language: string,
 ): boolean {
-    const normalizedLanguage = language.toLowerCase().trim();
-    if (model === "parakeet") {
-        return normalizedLanguage === "auto" || normalizedLanguage === "en";
-    }
-    if (model === "nemotron-3.5") {
-        return NEMOTRON_LANGUAGES.has(normalizedLanguage);
-    }
-    return true;
+    return modelSupportsLanguage(model, language);
 }
 
 export function compatibleModelForLanguage(
     model: TranscriptionModel,
     language: string,
 ): TranscriptionModel {
-    return isModelLanguageCompatible(model, language)
-        ? model
-        : "faster-whisper-turbo";
+    return compatibleTranscriptionModel(model, language) as TranscriptionModel;
+}
+
+export function transcriptionLanguageName(language: string): string {
+    return languageName(language);
+}
+
+export function unsupportedLanguageReason(
+    model: TranscriptionModel,
+    language: string,
+): string {
+    return incompatibilityReason(model, language);
 }
 
 export function transcriptionModelLanguageNote(
     model: TranscriptionModel,
     language: string,
 ): string {
-    if (model === "nemotron-3.5") {
-        return language === "auto"
-            ? "Nemotron can auto-detect its supported locales, but an explicit language is more reliable."
-            : "Nemotron uses the local NeMo-Speech.cpp sidecar for batch and realtime transcription.";
+    const selectedLanguage = transcriptionLanguageName(language);
+    if (language === "auto") {
+        return `${TRANSCRIPTION_MODELS.find((item) => item.value === model)?.label ?? "This model"} will detect the spoken language automatically.`;
     }
-    if (language === "id") {
-        return "Indonesian uses Whisper; Nemotron 3.5 and Parakeet do not support it."
-    }
-    if (!["auto", "en"].includes(language)) {
-        return "Parakeet is currently available for English only in Sona."
-    }
-    return "";
+    return `${TRANSCRIPTION_MODELS.find((item) => item.value === model)?.label ?? "This model"} supports ${selectedLanguage}.`;
 }
 
 export function liveEngineLabel(engine: LiveTranscriptionEngine): string {

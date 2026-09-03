@@ -6,6 +6,10 @@ import numpy as np
 import torch
 
 from sona_ai.core import Timer, model_cache_root, setup_logging, setup_model_cache_environment
+from sona_ai.transcription.parakeet_languages import (
+    PARAKEET_LANGUAGES,
+    resolve_parakeet_language,
+)
 from sona_ai.transcription.schemas import TranscriptionResult
 
 
@@ -19,7 +23,9 @@ class ParakeetTranscriber:
         self.model_name = self.config["model"]["model_name"]
         self.device = self._resolve_device(self.config["model"].get("device", "auto"))
         self.language = self.config["model"].get("language")
-        self.supported_languages = set(self.config["model"].get("supported_languages", ["en"]))
+        self.supported_languages = set(
+            self.config["model"].get("supported_languages", PARAKEET_LANGUAGES)
+        )
         self.batch_size = self.config["model"].get("batch_size")
         self.cache_dir = self._cache_dir()
 
@@ -63,8 +69,7 @@ class ParakeetTranscriber:
             raise ReferenceError("Parakeet transcription model is not initialized.")
 
         self._patch_numpy_sctypes()
-        resolved_language = language or self.language
-        self._validate_language(resolved_language)
+        resolved_language = self._resolve_language(language)
 
         logger.info("Running Parakeet transcription...")
         with Timer("Parakeet transcription"):
@@ -90,11 +95,13 @@ class ParakeetTranscriber:
         if not np.isfinite(audio).all():
             raise ValueError("Parakeet live audio contains non-finite samples.")
         if audio.size == 0:
-            return TranscriptionResult(segments=[], language=language or self.language)
+            return TranscriptionResult(
+                segments=[],
+                language=self._resolve_language(language),
+            )
 
         self._patch_numpy_sctypes()
-        resolved_language = language or self.language
-        self._validate_language(resolved_language)
+        resolved_language = self._resolve_language(language)
         hypotheses = self._transcribe_with_timestamps(audio, is_sample_array=True)
         return TranscriptionResult.from_parakeet_hypothesis(
             self._first_hypothesis(hypotheses),
@@ -137,16 +144,16 @@ class ParakeetTranscriber:
 
         raise ValueError("Parakeet did not return a transcription hypothesis.")
 
-    def _validate_language(self, language: Optional[str]):
-        if not language or not self.supported_languages:
-            return
-
-        if language not in self.supported_languages:
+    def _resolve_language(self, language: Optional[str]) -> Optional[str]:
+        requested_language = language if language is not None else self.language
+        resolved_language = resolve_parakeet_language(requested_language)
+        if resolved_language and resolved_language not in self.supported_languages:
             supported = ", ".join(sorted(self.supported_languages))
             raise ValueError(
-                f"{self.model_name} does not support language={language!r}. "
+                f"{self.model_name} does not support language={requested_language!r}. "
                 f"Supported languages: {supported}."
             )
+        return resolved_language
 
     def _resolve_device(self, device: str) -> str:
         if device == "auto":
