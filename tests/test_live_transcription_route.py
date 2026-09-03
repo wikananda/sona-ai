@@ -28,7 +28,13 @@ class FakeGateway:
 
 
 class FakeWebSocket:
-    def __init__(self, start, whisper_gateway, parakeet_gateway=None):
+    def __init__(
+        self,
+        start,
+        whisper_gateway,
+        parakeet_gateway=None,
+        nemotron_gateway=None,
+    ):
         self.messages = [{
             "type": "websocket.receive",
             "text": json.dumps(start),
@@ -40,6 +46,7 @@ class FakeWebSocket:
             state=SimpleNamespace(
                 whisper_live_gateway=whisper_gateway,
                 parakeet_live_gateway=parakeet_gateway,
+                nemotron_live_gateway=nemotron_gateway,
             ),
         )
 
@@ -108,6 +115,29 @@ class LiveTranscriptionRouteTest(unittest.IsolatedAsyncioTestCase):
             "model": "parakeet",
             "device": "cpu",
             "language": "en",
+        }])
+        self.assertEqual(websocket.closed_with, 1000)
+
+    async def test_dispatches_nemotron_without_python_device(self):
+        whisper_gateway = FakeGateway()
+        parakeet_gateway = FakeGateway()
+        nemotron_gateway = FakeGateway()
+        websocket = FakeWebSocket(
+            valid_start(model="nemotron-3.5", device="cpu", language="fr"),
+            whisper_gateway,
+            parakeet_gateway,
+            nemotron_gateway,
+        )
+        session = FakeSession()
+
+        with patch.object(live_route, "SessionLocal", return_value=session):
+            await live_route.live_transcription_socket(websocket, "project-1")
+
+        self.assertEqual(whisper_gateway.calls, [])
+        self.assertEqual(parakeet_gateway.calls, [])
+        self.assertEqual(nemotron_gateway.calls, [{
+            "model": "nemotron-3.5",
+            "language": "fr",
         }])
         self.assertEqual(websocket.closed_with, 1000)
 

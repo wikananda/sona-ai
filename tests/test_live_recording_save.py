@@ -136,6 +136,36 @@ class LiveRecordingSaveTest(unittest.TestCase):
         runtime = result["transcript"]["model_config"]["runtime"]
         self.assertEqual(runtime["live_engine"], "parakeet-live")
 
+    def test_accepts_nemotron_live_engine_metadata(self):
+        service = FakeTranscriptionService()
+        db = FakeSession()
+        upload = SimpleNamespace(
+            filename="meeting.webm",
+            content_type="audio/webm",
+            file=io.BytesIO(b"original audio"),
+        )
+        saved = SimpleNamespace(
+            stored_path="data/projects/p/r.webm",
+            mime_type="audio/webm",
+            file_size_bytes=14,
+        )
+
+        with patch.object(projects, "save_upload", return_value=saved):
+            result = projects.save_live_recording(
+                "project-1",
+                self.make_request(service),
+                file=upload,
+                segments_json="[]",
+                language="en",
+                model="nemotron-3.5",
+                device="cpu",
+                live_engine="nemotron-live",
+                db=db,
+            )
+
+        runtime = result["transcript"]["model_config"]["runtime"]
+        self.assertEqual(runtime["live_engine"], "nemotron-live")
+
     def test_parser_clamps_invalid_word_values(self):
         segments = projects._parse_live_segments(json.dumps([{
             "text": "Safe",

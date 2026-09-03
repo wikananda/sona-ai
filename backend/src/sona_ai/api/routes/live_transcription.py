@@ -20,7 +20,7 @@ logger = setup_logging()
 router = APIRouter()
 START_TIMEOUT_SECONDS = 15.0
 MAX_START_MESSAGE_BYTES = 16 * 1024
-STREAMING_MODELS = {*WHISPER_LIVE_MODELS, "parakeet"}
+STREAMING_MODELS = {*WHISPER_LIVE_MODELS, "parakeet", "nemotron-3.5"}
 
 
 @router.websocket("/projects/{project_id}/live-transcription/ws")
@@ -38,6 +38,15 @@ async def live_transcription_socket(websocket: WebSocket, project_id: str) -> No
                 websocket,
                 model=start["model"],
                 device=start["device"],
+                language=start["language"],
+            )
+        elif start["model"] == "nemotron-3.5":
+            gateway = getattr(websocket.app.state, "nemotron_live_gateway", None)
+            if gateway is None:
+                raise WhisperLiveUnavailableError("Realtime Nemotron is not configured.")
+            await gateway.relay(
+                websocket,
+                model=start["model"],
                 language=start["language"],
             )
         else:

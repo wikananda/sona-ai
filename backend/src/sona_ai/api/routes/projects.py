@@ -254,7 +254,12 @@ def save_live_recording(
     model = _normalize_model(model)
     device = _normalize_device(device)
     language = _normalize_language(language)
-    if live_engine not in {"whisper-live", "parakeet-live", "compatibility"}:
+    if live_engine not in {
+        "whisper-live",
+        "parakeet-live",
+        "nemotron-live",
+        "compatibility",
+    }:
         raise HTTPException(status_code=400, detail="Unsupported live transcription engine")
     segments = _parse_live_segments(segments_json)
     profile = request.app.state.transcription_service.resolve_profile(
