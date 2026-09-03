@@ -457,17 +457,27 @@ def _download_faster_whisper(entry: ModelCatalogEntry) -> None:
 def _download_nemotron(entry: ModelCatalogEntry) -> None:
     from huggingface_hub import hf_hub_download
 
-    from sona_ai.transcription.nemotron_transcriber import NEMOTRON_GGUF_FILENAME
+    from sona_ai.transcription.nemotron_transcriber import (
+        NEMOTRON_GGUF_FILENAME,
+        NEMOTRON_GGUF_SIZE_BYTES,
+        NEMOTRON_MODEL_REVISION,
+    )
 
     cache_dir = model_cache_root(model_id=entry.id)
     cache_dir.mkdir(parents=True, exist_ok=True)
     downloaded_path = Path(hf_hub_download(
         repo_id=entry.model_names[0],
         filename=NEMOTRON_GGUF_FILENAME,
+        revision=NEMOTRON_MODEL_REVISION,
         local_dir=str(cache_dir),
     ))
-    if not downloaded_path.is_file() or downloaded_path.stat().st_size <= 0:
-        raise RuntimeError("Nemotron 3.5 model download did not produce a usable GGUF file.")
+    if (
+        not downloaded_path.is_file()
+        or downloaded_path.stat().st_size != NEMOTRON_GGUF_SIZE_BYTES
+    ):
+        raise RuntimeError(
+            "Nemotron 3.5 model download did not produce the expected GGUF file."
+        )
 
 
 def _download_wav2vec2(entry: ModelCatalogEntry) -> None:
@@ -527,8 +537,8 @@ MODEL_CATALOG = [
         config_name="nemotron-3.5",
         environment="nemotron-sidecar",
         management_note=(
-            "Downloads the q8 GGUF into .models/nemotron-3.5 for the isolated "
-            "NeMo-Speech.cpp server."
+            "Downloads the revision-pinned q8 GGUF into .models/nemotron-3.5 "
+            "for the isolated NeMo-Speech.cpp server."
         ),
     ),
     ModelCatalogEntry(

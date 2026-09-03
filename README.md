@@ -163,7 +163,7 @@ export PATH="$HOME/.local/bin:$PATH"
 nemo-speech --version
 ```
 
-Download **Nemotron 3.5 ASR 0.6B** from Sona's model manager. Sona stores the pinned q8 GGUF at `.models/nemotron-3.5/nemotron-3.5-asr-streaming-0.6b.q8_0.gguf`. Then start the loopback-only sidecar:
+Download **Nemotron 3.5 ASR 0.6B** from Sona's model manager. Sona stores the revision-pinned q8 GGUF at `.models/nemotron-3.5/nemotron-3.5-asr-streaming-0.6b.q8_0.gguf` and verifies its expected size. Then start the loopback-only sidecar:
 
 ```bash
 ./tools/nemotron/run_server.sh

@@ -114,14 +114,24 @@ class ModelDownloadServiceTest(unittest.TestCase):
             with patch.dict(os.environ, {"SONA_HF_CACHE": temp_dir}, clear=False):
                 entry = model_download_service._entry("nemotron-3.5")
 
-                def fake_download(*, repo_id, filename, local_dir):
+                def fake_download(*, repo_id, filename, revision, local_dir):
                     self.assertEqual(repo_id, "nvidia/nemotron-3.5-asr-streaming-0.6b")
                     self.assertEqual(filename, "nemotron-3.5-asr-streaming-0.6b.q8_0.gguf")
+                    self.assertEqual(
+                        revision,
+                        "1c8deaecc64b91f034d73e08dd8b64625eb3395d",
+                    )
                     target = Path(local_dir) / filename
                     target.write_bytes(b"gguf")
                     return str(target)
 
-                with patch("huggingface_hub.hf_hub_download", fake_download):
+                with (
+                    patch("huggingface_hub.hf_hub_download", fake_download),
+                    patch(
+                        "sona_ai.transcription.nemotron_transcriber.NEMOTRON_GGUF_SIZE_BYTES",
+                        4,
+                    ),
+                ):
                     _download_nemotron(entry)
 
                 self.assertTrue(

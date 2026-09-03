@@ -17,6 +17,8 @@ logger = setup_logging()
 
 NEMOTRON_MODEL_REPO = "nvidia/nemotron-3.5-asr-streaming-0.6b"
 NEMOTRON_GGUF_FILENAME = "nemotron-3.5-asr-streaming-0.6b.q8_0.gguf"
+NEMOTRON_MODEL_REVISION = "1c8deaecc64b91f034d73e08dd8b64625eb3395d"
+NEMOTRON_GGUF_SIZE_BYTES = 741_548_352
 
 ClientFactory = Callable[..., httpx.Client]
 

@@ -13,6 +13,18 @@ if ! command -v "$runtime_bin" >/dev/null 2>&1; then
     exit 1
 fi
 
+runtime_version=$("$runtime_bin" --version 2>/dev/null || true)
+case "$runtime_version" in
+    *"0.1.0"*) ;;
+    *)
+        if [ "${SONA_NEMOTRON_ALLOW_UNTESTED_RUNTIME:-0}" != "1" ]; then
+            echo "error: Sona tested NeMo-Speech.cpp v0.1.0; found: ${runtime_version:-unknown}" >&2
+            echo "Set SONA_NEMOTRON_ALLOW_UNTESTED_RUNTIME=1 to use this runtime anyway." >&2
+            exit 1
+        fi
+        ;;
+esac
+
 if [ ! -f "$model_path" ]; then
     echo "error: Nemotron GGUF was not found at: $model_path" >&2
     echo "Download Nemotron 3.5 from Sona's model manager, then retry." >&2
