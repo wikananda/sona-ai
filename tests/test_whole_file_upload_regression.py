@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from fastapi import HTTPException
+
 from sona_ai.api.routes import projects
 from sona_ai.services.recording_worker import run_transcription
 
@@ -93,6 +95,50 @@ class WholeFileUploadRegressionTest(unittest.TestCase):
         self.assertEqual(args[0], result["id"])
         self.assertFalse(args[-1])
         self.assertEqual(kwargs, {})
+
+    def test_nemotron_upload_preserves_original_and_uses_normal_worker(self):
+        service = FakeTranscriptionService()
+        request = SimpleNamespace(
+            app=SimpleNamespace(
+                state=SimpleNamespace(transcription_service=service),
+            ),
+        )
+        upload = SimpleNamespace(
+            filename="whole-meeting.webm",
+            content_type="audio/webm",
+            file=io.BytesIO(b"complete original recording"),
+        )
+        saved = SimpleNamespace(
+            stored_path="data/projects/project-1/recording.webm",
+            mime_type="audio/webm",
+            file_size_bytes=27,
+        )
+        background_tasks = FakeBackgroundTasks()
+        db = FakeSession()
+
+        with patch.object(projects, "save_upload", return_value=saved) as save_upload:
+            result = projects.upload_project_recording(
+                "project-1",
+                request,
+                background_tasks,
+                file=upload,
+                language="en",
+                model="nemotron-3.5",
+                device="cpu",
+                min_speakers=None,
+                max_speakers=None,
+                extract_speakers=False,
+                db=db,
+            )
+
+        save_upload.assert_called_once()
+        self.assertEqual(result["stored_path"], saved.stored_path)
+        self.assertEqual(result["model"], "nemotron-3.5")
+        self.assertEqual(background_tasks.calls[0][0], run_transcription)
+
+    def test_nemotron_upload_rejects_indonesian_before_saving(self):
+        with self.assertRaisesRegex(HTTPException, "does not support"):
+            projects._validate_model_language("nemotron-3.5", "id")
 
 
 if __name__ == "__main__":

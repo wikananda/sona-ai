@@ -44,6 +44,7 @@ from sona_ai.storage import (
     save_upload_as_wav,
 )
 from sona_ai.transcription.live_timestamps import segment_live_timestamps
+from sona_ai.transcription.nemotron_languages import resolve_nemotron_language
 
 
 logger = setup_logging()
@@ -136,6 +137,7 @@ def upload_project_recording(
     model = _normalize_model(model)
     device = _normalize_device(device)
     language = _normalize_language(language)
+    _validate_model_language(model, language)
     _validate_speaker_settings(extract_speakers, min_speakers, max_speakers)
     profile = request.app.state.transcription_service.resolve_profile(
         model=model,
@@ -207,6 +209,7 @@ async def transcribe_live_chunk(
     model = _normalize_model(model)
     device = _normalize_device(device)
     language = _normalize_language(language)
+    _validate_model_language(model, language)
     if chunk_index < 0:
         raise HTTPException(status_code=400, detail="chunk_index must be at least 0")
     if chunk_start < 0:
@@ -254,6 +257,7 @@ def save_live_recording(
     model = _normalize_model(model)
     device = _normalize_device(device)
     language = _normalize_language(language)
+    _validate_model_language(model, language)
     if live_engine not in {
         "whisper-live",
         "parakeet-live",
@@ -515,6 +519,7 @@ def retranscribe_recording(
         recording.device = _normalize_device(body.device or recording.device)
         recording.min_speakers = body.min_speakers
         recording.max_speakers = body.max_speakers
+    _validate_model_language(recording.model, recording.language_hint)
     _validate_speaker_settings(
         extract_speakers,
         recording.min_speakers,
@@ -1033,6 +1038,15 @@ def _normalize_language(language: Optional[str]) -> Optional[str]:
     if not language or language.lower() in {"auto", "none"}:
         return None
     return language
+
+
+def _validate_model_language(model: str, language: Optional[str]) -> None:
+    if model != "nemotron-3.5":
+        return
+    try:
+        resolve_nemotron_language(language)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def _validate_speakers(

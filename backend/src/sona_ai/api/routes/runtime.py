@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from sona_ai.core import runtime_devices
 from sona_ai.api.schemas.runtime import TranscriptionPreflightRequest
 from sona_ai.services.model_download_service import model_download_service
+from sona_ai.transcription.nemotron_languages import resolve_nemotron_language
 
 
 router = APIRouter()
@@ -69,6 +70,8 @@ def transcription_preflight(
     request: Request,
 ):
     try:
+        if body.model.lower().strip() == "nemotron-3.5":
+            resolve_nemotron_language(body.language)
         profile = request.app.state.transcription_service.resolve_profile(
             model=body.model,
             device=body.device,

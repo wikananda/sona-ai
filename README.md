@@ -12,7 +12,7 @@ The default product direction is not interview-specific. Sona is meant for priva
 - Upload audio, record in the browser, or run basic live transcription.
 - Browser recording can capture microphone audio, system audio, or both.
 - Local storage by default for audio, transcripts, summaries, and chat data.
-- Transcription engines include Parakeet and Faster-Whisper large-v3/turbo.
+- Transcription engines include Nemotron 3.5 ASR, Parakeet, and Faster-Whisper large-v3/turbo.
 - Optional Wav2Vec2 alignment through an external WhisperX-based aligner environment.
 - Optional speaker diarization through an external pyannote Community-1 environment.
 - Speaker extraction can run during transcription or later.
@@ -149,6 +149,45 @@ If the backend runs in another container, set `SONA_WHISPER_LIVE_URL` to the sid
 Whisper uses low-latency WebSocket streaming when the sidecar is available. If it is not available or disconnects, the browser keeps the original MediaRecorder audio and falls back to compatibility transcription. If the preview is incomplete, Sona submits that same original file through the normal whole-file background transcription flow.
 
 Whole-file uploads do not use WhisperLive and are unchanged: they are saved first, then processed by Sona's normal transcription worker.
+
+## Nemotron 3.5 ASR (batch and realtime)
+
+Nemotron uses NVIDIA's official NeMo-Speech.cpp runtime as an isolated local sidecar. Sona uses the same loaded model for whole-file HTTP transcription and native cache-aware realtime WebSocket transcription, so the existing Python NeMo and Transformers versions do not need to change.
+
+Install the pinned NeMo-Speech.cpp `v0.1.0` release on Linux or macOS. Its installer verifies the selected native archive against NVIDIA's published SHA-256 file and selects Metal on Apple Silicon, CUDA when available, or CPU otherwise:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NVIDIA/NeMo-Speech.cpp/v0.1.0/scripts/install.sh | \
+  sh -s -- --version 0.1.0 --binary-only
+export PATH="$HOME/.local/bin:$PATH"
+nemo-speech --version
+```
+
+Download **Nemotron 3.5 ASR 0.6B** from Sona's model manager. Sona stores the pinned q8 GGUF at `.models/nemotron-3.5/nemotron-3.5-asr-streaming-0.6b.q8_0.gguf`. Then start the loopback-only sidecar:
+
+```bash
+./tools/nemotron/run_server.sh
+```
+
+The backend defaults to:
+
+```bash
+SONA_NEMOTRON_URL=http://127.0.0.1:8080
+SONA_NEMOTRON_LIVE_URL=ws://127.0.0.1:8080/v1/realtime
+SONA_NEMOTRON_LIVE_MAX_SESSIONS=1
+```
+
+To protect a non-loopback deployment, export the same `SONA_NEMOTRON_API_KEY` before starting both the sidecar and Sona. Keep the default loopback binding for a local installation.
+
+The published checkpoint supports 32 transcription-ready locales covering Arabic, Bulgarian, Chinese, Croatian, Czech, Danish, Dutch, English, Estonian, Finnish, French, German, Hindi, Hungarian, Italian, Japanese, Korean, Norwegian Bokmal, Polish, Portuguese, Romanian, Russian, Slovak, Spanish, Swedish, Turkish, Ukrainian, and Vietnamese. Specifying the language is more reliable than auto-detection. Indonesian is not supported; choose Whisper for Indonesian audio.
+
+Both live and whole-file flows preserve the original recording. If the sidecar is unavailable during live capture, Sona keeps recording and moves to compatibility mode; the compatibility upload still requires the same Nemotron sidecar when Nemotron remains selected.
+
+An opt-in end-to-end smoke test exercises both APIs against a running sidecar:
+
+```bash
+PYTHONPATH=backend/src conda run -n sona-ai python tests/smoke_nemotron.py /tmp/english.pcm
+```
 
 ## Realtime Parakeet
 
