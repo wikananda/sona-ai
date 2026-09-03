@@ -45,6 +45,18 @@ class FakePipeline:
         }
 
 
+class OomThenSuccessPipeline(FakePipeline):
+    def __init__(self):
+        super().__init__()
+        self.batch_sizes = []
+
+    def __call__(self, audio, **kwargs):
+        self.batch_sizes.append(kwargs["batch_size"])
+        if len(self.batch_sizes) == 1:
+            raise RuntimeError("MPS backend out of memory")
+        return super().__call__(audio, **kwargs)
+
+
 class WhisperMpsTranscriberTest(unittest.TestCase):
     def test_load_pins_revision_and_verifies_pipeline_device(self):
         transcriber = WhisperMpsTranscriber(transcriber_config())
@@ -88,7 +100,7 @@ class WhisperMpsTranscriberTest(unittest.TestCase):
     def test_live_samples_use_single_batch_and_16khz_input(self):
         transcriber = WhisperMpsTranscriber(transcriber_config())
         transcriber.pipeline = FakePipeline()
-        samples = np.zeros(1600, dtype=np.float64)
+        samples = np.full(1600, 0.1, dtype=np.float64)
 
         transcriber.transcribe_samples(samples)
 
@@ -97,6 +109,26 @@ class WhisperMpsTranscriberTest(unittest.TestCase):
         self.assertEqual(audio["sampling_rate"], 16000)
         self.assertEqual(audio["array"].dtype, np.float32)
         self.assertTrue(audio["array"].flags.c_contiguous)
+
+    def test_live_silence_does_not_invoke_whisper(self):
+        transcriber = WhisperMpsTranscriber(transcriber_config())
+        transcriber.pipeline = FakePipeline()
+
+        result = transcriber.transcribe_samples(np.zeros(1600, dtype=np.float32), language="en")
+
+        self.assertEqual(result.segments, [])
+        self.assertEqual(result.language, "en")
+        self.assertEqual(transcriber.pipeline.calls, [])
+
+    def test_whole_file_retries_mps_out_of_memory_with_one_batch(self):
+        transcriber = WhisperMpsTranscriber(transcriber_config())
+        pipeline = OomThenSuccessPipeline()
+        transcriber.pipeline = pipeline
+
+        with patch("torch.mps.empty_cache"):
+            transcriber.transcribe("meeting.wav")
+
+        self.assertEqual(pipeline.batch_sizes, [4, 1])
 
     def test_live_samples_reject_non_finite_audio(self):
         transcriber = WhisperMpsTranscriber(transcriber_config())

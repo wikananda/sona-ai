@@ -150,6 +150,41 @@ Whisper uses low-latency WebSocket streaming when the sidecar is available. If i
 
 Whole-file uploads do not use WhisperLive and are unchanged: they are saved first, then processed by Sona's normal transcription worker.
 
+### Whisper on Apple GPU
+
+On Apple Silicon, selecting `Auto device` or `MPS` routes both uploaded files
+and realtime Whisper sessions through PyTorch's Metal Performance Shaders
+backend. Sona verifies that the loaded pipeline reports `mps` before it sends
+the realtime ready event. Selecting `CPU` keeps the existing Faster-Whisper
+and WhisperLive paths, so Apple GPU support does not remove the stable CPU
+fallback.
+
+The model manager lists separate Apple GPU weights because Hugging Face
+Transformers and Faster-Whisper use incompatible model formats. Turbo is the
+recommended realtime model. Sona uses batch size 1 and a bounded overlapping
+window for live inference; uploaded files use batch size 4 for throughput.
+The first preview normally appears after four seconds of audio, followed by a
+revision every two seconds. The defaults can be tuned with:
+
+```bash
+SONA_WHISPER_MPS_LIVE_MAX_SESSIONS=1
+SONA_WHISPER_MPS_LIVE_CHUNK_SECONDS=2
+SONA_WHISPER_MPS_LIVE_LEFT_CONTEXT_SECONDS=12
+SONA_WHISPER_MPS_LIVE_RIGHT_CONTEXT_SECONDS=2
+```
+
+Do not raise the session limit on a 24 GB Mac without measuring unified-memory
+pressure. If MPS loading, inference, or live pacing fails, Sona preserves the
+original MediaRecorder audio and uses the existing compatibility flow.
+
+Run the hardware smoke test on real English or Indonesian speech before
+changing the timing defaults:
+
+```bash
+PYTHONPATH=backend/src conda run -n sona-ai python \
+  tests/smoke_whisper_mps.py data/raw/audio/audio.mp3 --language id
+```
+
 ## Nemotron 3.5 ASR (batch and realtime)
 
 Nemotron uses NVIDIA's official NeMo-Speech.cpp runtime as an isolated local sidecar. Sona uses the same loaded model for whole-file HTTP transcription and native cache-aware realtime WebSocket transcription, so the existing Python NeMo and Transformers versions do not need to change.

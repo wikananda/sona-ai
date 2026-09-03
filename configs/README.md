@@ -10,6 +10,8 @@ name, for example `load_config("speech")` resolves to `configs/speech.yaml`.
 - `parakeet.yaml`: NVIDIA Parakeet ASR.
 - `faster-whisper-large-v3.yaml`: Faster-Whisper Large-v3 ASR.
 - `faster-whisper-turbo.yaml`: Faster-Whisper Turbo ASR.
+- `whisper-mps-large-v3.yaml`: PyTorch Whisper Large-v3 on Apple MPS.
+- `whisper-mps-turbo.yaml`: PyTorch Whisper Turbo on Apple MPS.
 - `wav2vec2.yaml`: external WhisperX-backed Wav2Vec2 alignment.
 - `diarization-community.yaml`: external pyannote Community-1 diarization.
 

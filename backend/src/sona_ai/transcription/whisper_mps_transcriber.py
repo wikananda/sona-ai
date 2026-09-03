@@ -35,6 +35,10 @@ class WhisperMpsTranscriber:
         self.word_timestamps = bool(model_config.get("word_timestamps", True))
         self.attn_implementation = model_config.get("attn_implementation", "sdpa")
         self.warmup_seconds = max(0.0, float(model_config.get("warmup_seconds", 1.0)))
+        self.live_silence_rms_threshold = max(
+            0.0,
+            float(model_config.get("live_silence_rms_threshold", 0.0005)),
+        )
         self.cache_dir = self._cache_dir()
 
     def load_models(self) -> None:
@@ -83,7 +87,7 @@ class WhisperMpsTranscriber:
                 dtype=dtype,
             )
             pipeline_device = getattr(inference_pipeline, "device", None)
-            if getattr(pipeline_device, "type", str(pipeline_device)) != "mps":
+            if _device_type(pipeline_device) != "mps":
                 raise RuntimeError("Whisper pipeline did not initialize on the MPS device.")
             self.pipeline = inference_pipeline
             self._warm_up()
@@ -114,6 +118,8 @@ class WhisperMpsTranscriber:
             raise ValueError("Live Whisper audio must be a one-dimensional sample array.")
         if not np.isfinite(normalized_samples).all():
             raise ValueError("Live Whisper audio contains non-finite samples.")
+        if normalized_samples.size == 0 or _rms(normalized_samples) <= self.live_silence_rms_threshold:
+            return TranscriptionResult(segments=[], language=language or self.language)
         audio = {
             "array": np.ascontiguousarray(normalized_samples),
             "sampling_rate": SAMPLE_RATE,
@@ -140,14 +146,25 @@ class WhisperMpsTranscriber:
             generate_kwargs["language"] = resolved_language
 
         logger.info("Running Whisper transcription on Apple MPS...")
+        inference_kwargs = {
+            "chunk_length_s": self.chunk_length_s,
+            "batch_size": batch_size,
+            "return_timestamps": "word" if self.word_timestamps else True,
+            "generate_kwargs": generate_kwargs,
+        }
         with Timer("Whisper MPS transcription"):
-            output = self.pipeline(
-                audio,
-                chunk_length_s=self.chunk_length_s,
-                batch_size=batch_size,
-                return_timestamps="word" if self.word_timestamps else True,
-                generate_kwargs=generate_kwargs,
-            )
+            try:
+                output = self.pipeline(audio, **inference_kwargs)
+            except RuntimeError as exc:
+                if batch_size <= 1 or "out of memory" not in str(exc).lower():
+                    raise
+                logger.warning(
+                    "Whisper MPS batch size %s exhausted unified memory; retrying with 1.",
+                    batch_size,
+                )
+                torch.mps.empty_cache()
+                inference_kwargs["batch_size"] = 1
+                output = self.pipeline(audio, **inference_kwargs)
 
         if not isinstance(output, dict):
             raise RuntimeError("Whisper MPS returned an unexpected result.")
@@ -279,3 +296,11 @@ def _finite_time(value: Any) -> Optional[float]:
     if not math.isfinite(number) or number < 0:
         return None
     return number
+
+
+def _rms(samples: np.ndarray) -> float:
+    return float(np.sqrt(np.mean(np.square(samples, dtype=np.float64))))
+
+
+def _device_type(device: Any) -> str:
+    return str(getattr(device, "type", device)).split(":", 1)[0]
