@@ -15,6 +15,7 @@ export interface SpeakerSegment {
 export type RecordingStatus = "pending" | "processing" | "done" | "failed" | "canceled";
 export type TranscriptionModel =
     | "parakeet"
+    | "nemotron-3.5"
     | "faster-whisper-large-v3"
     | "faster-whisper-turbo";
 export type SummaryMode = "local" | "byok";
@@ -216,7 +217,7 @@ export interface SaveLiveRecordingParams {
     language?: string;
     model: TranscriptionModel;
     device: RuntimeDevice;
-    liveEngine?: "whisper-live" | "parakeet-live" | "compatibility";
+    liveEngine?: "whisper-live" | "parakeet-live" | "nemotron-live" | "compatibility";
 }
 
 export interface RetranscribeParams {

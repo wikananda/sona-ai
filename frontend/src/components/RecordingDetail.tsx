@@ -24,9 +24,12 @@ import RecordingChatPanel from "@/src/components/RecordingChatPanel";
 import SummaryPanel from "@/src/components/SummaryPanel";
 import TranscriptPanel from "@/src/components/TranscriptPanel";
 import {
+    compatibleModelForLanguage,
     deviceLabel,
+    isModelLanguageCompatible,
     isTranscriptionModel,
     numberOrEmpty,
+    transcriptionModelLanguageNote,
     TRANSCRIPTION_LANGUAGES,
     TRANSCRIPTION_MODELS,
 } from "@/src/utils/transcriptionSettings";
@@ -138,6 +141,10 @@ export default function RecordingDetail({
         ? summaryDevice
         : runtimeDevices.default;
     const [summaryInstruction, setSummaryInstruction] = useState("");
+    const retranscribeModelLanguageNote = transcriptionModelLanguageNote(
+        retranscribeModel,
+        retranscribeLanguage,
+    );
 
     if (isLoading && !recording) {
         return <div className="p-6 text-sm text-zinc-500">Loading recording...</div>;
@@ -260,6 +267,10 @@ export default function RecordingDetail({
         const selectedDevice = runtimeDevices.available.includes(retranscribeDevice)
             ? retranscribeDevice
             : runtimeDevices.default;
+        if (!isModelLanguageCompatible(retranscribeModel, retranscribeLanguage)) {
+            setRetranscribeError("Choose a transcription model that supports this language.");
+            return;
+        }
         if (
             retranscribeExtractSpeakers &&
             (retranscribeMinSpeakers === "" || retranscribeMaxSpeakers === "")
@@ -556,7 +567,14 @@ export default function RecordingDetail({
                                 </span>
                                 <select
                                     value={retranscribeLanguage}
-                                    onChange={(event) => setRetranscribeLanguage(event.target.value)}
+                                    onChange={(event) => {
+                                        const nextLanguage = event.target.value;
+                                        setRetranscribeLanguage(nextLanguage);
+                                        setRetranscribeModel((current) => compatibleModelForLanguage(
+                                            current,
+                                            nextLanguage,
+                                        ));
+                                    }}
                                     disabled={isRetranscribing}
                                     className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
@@ -581,11 +599,23 @@ export default function RecordingDetail({
                                     className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {TRANSCRIPTION_MODELS.map((item) => (
-                                        <option key={item.value} value={item.value}>
+                                        <option
+                                            key={item.value}
+                                            value={item.value}
+                                            disabled={!isModelLanguageCompatible(
+                                                item.value,
+                                                retranscribeLanguage,
+                                            )}
+                                        >
                                             {item.label}
                                         </option>
                                     ))}
                                 </select>
+                                {retranscribeModelLanguageNote && (
+                                    <span className="text-xs text-zinc-500">
+                                        {retranscribeModelLanguageNote}
+                                    </span>
+                                )}
                             </label>
 
                             <label className="flex flex-col gap-1">

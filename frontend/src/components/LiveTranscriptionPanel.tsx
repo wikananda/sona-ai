@@ -22,7 +22,11 @@ import {
     startLivePcmCapture,
 } from "@/src/audio/livePcmCapture";
 import {
+    compatibleModelForLanguage,
     deviceLabel,
+    isModelLanguageCompatible,
+    liveEngineLabel,
+    transcriptionModelLanguageNote,
     TRANSCRIPTION_LANGUAGES,
     TRANSCRIPTION_MODELS,
 } from "@/src/utils/transcriptionSettings";
@@ -105,14 +109,8 @@ export default function LiveTranscriptionPanel({
     const isBusy = state === "requesting" || state === "stopping" || state === "saving";
     const isRecording = state === "recording";
     const isSetupMode = state === "idle" || state === "requesting";
-    const hasNonEnglishLanguage = !["auto", "en"].includes(language);
     const isActive = state !== "idle";
-
-    useEffect(() => {
-        if (hasNonEnglishLanguage && model === "parakeet") {
-            setModel("faster-whisper-turbo");
-        }
-    }, [hasNonEnglishLanguage, model]);
+    const modelLanguageNote = transcriptionModelLanguageNote(model, language);
 
     useEffect(() => {
         onActiveChange?.(isActive);
@@ -220,7 +218,7 @@ export default function LiveTranscriptionPanel({
                 }
             });
             transportRef.current = "stream";
-            const engineName = socket.engine === "parakeet-live" ? "Parakeet" : "Whisper";
+            const engineName = liveEngineLabel(socket.engine);
             setNotice(`Realtime ${engineName} connected. Speech will appear as it is committed.`);
         } catch (err) {
             await cleanupRealtime();
@@ -418,7 +416,14 @@ export default function LiveTranscriptionPanel({
                         <span className="text-xs font-medium text-zinc-500">Language</span>
                         <select
                             value={language}
-                            onChange={(event) => setLanguage(event.target.value)}
+                            onChange={(event) => {
+                                const nextLanguage = event.target.value;
+                                setLanguage(nextLanguage);
+                                setModel((current) => compatibleModelForLanguage(
+                                    current,
+                                    nextLanguage,
+                                ));
+                            }}
                             disabled={state !== "idle"}
                             className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none hover:cursor-pointer focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                         >
@@ -440,15 +445,15 @@ export default function LiveTranscriptionPanel({
                                 <option
                                     key={item.value}
                                     value={item.value}
-                                    disabled={hasNonEnglishLanguage && item.value === "parakeet"}
+                                    disabled={!isModelLanguageCompatible(item.value, language)}
                                 >
                                     {item.label}
                                 </option>
                             ))}
                         </select>
-                        {hasNonEnglishLanguage && (
+                        {modelLanguageNote && (
                             <span className="text-xs text-zinc-500">
-                                Parakeet currently supports English only.
+                                {modelLanguageNote}
                             </span>
                         )}
                     </label>
@@ -490,7 +495,9 @@ export default function LiveTranscriptionPanel({
                         <p className="mt-1 text-sm text-zinc-500">
                             {transportRef.current === "stream"
                                 ? `Streaming low-latency ${
-                                    liveEngineRef.current === "parakeet-live" ? "Parakeet" : "Whisper"
+                                    liveEngineRef.current
+                                        ? liveEngineLabel(liveEngineRef.current)
+                                        : "realtime"
                                 } preview`
                                 : "Compatibility transcription preview"}
                         </p>

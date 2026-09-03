@@ -3,8 +3,11 @@
 import { FormEvent, useState } from "react";
 import { RuntimeDevice, RuntimeDevices, TranscriptionModel } from "@/src/api/sonaApi";
 import {
+    compatibleModelForLanguage,
     deviceLabel,
+    isModelLanguageCompatible,
     numberOrEmpty,
+    transcriptionModelLanguageNote,
     TRANSCRIPTION_LANGUAGES,
     TRANSCRIPTION_MODELS,
 } from "@/src/utils/transcriptionSettings";
@@ -44,6 +47,7 @@ export default function RecordingSettingsForm({
     const selectedDevice = runtimeDevices.available.includes(device)
         ? device
         : runtimeDevices.default;
+    const modelLanguageNote = transcriptionModelLanguageNote(model, language);
 
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
@@ -70,7 +74,14 @@ export default function RecordingSettingsForm({
                 <span className="text-xs font-medium text-zinc-500">Language</span>
                 <select
                     value={language}
-                    onChange={(event) => setLanguage(event.target.value)}
+                    onChange={(event) => {
+                        const nextLanguage = event.target.value;
+                        setLanguage(nextLanguage);
+                        setModel((current) => compatibleModelForLanguage(
+                            current,
+                            nextLanguage,
+                        ));
+                    }}
                     disabled={isUploading}
                     className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none hover:cursor-pointer focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -91,11 +102,18 @@ export default function RecordingSettingsForm({
                     className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none hover:cursor-pointer focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {TRANSCRIPTION_MODELS.map((item) => (
-                        <option key={item.value} value={item.value}>
+                        <option
+                            key={item.value}
+                            value={item.value}
+                            disabled={!isModelLanguageCompatible(item.value, language)}
+                        >
                             {item.label}
                         </option>
                     ))}
                 </select>
+                {modelLanguageNote && (
+                    <span className="text-xs text-zinc-500">{modelLanguageNote}</span>
+                )}
             </label>
 
             <label className="flex flex-col gap-1">
