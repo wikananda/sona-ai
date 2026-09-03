@@ -174,7 +174,13 @@ export function modelSupportsLanguage(model, language) {
  * @param {string} language
  */
 export function compatibleTranscriptionModel(model, language) {
-    return modelSupportsLanguage(model, language) ? model : "faster-whisper-turbo";
+    if (modelSupportsLanguage(model, language)) return model;
+    return [
+        "faster-whisper-turbo",
+        "faster-whisper-large-v3",
+        "nemotron-3.5",
+        "parakeet",
+    ].find((candidate) => modelSupportsLanguage(candidate, language)) ?? model;
 }
 
 /**

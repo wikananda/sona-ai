@@ -53,8 +53,24 @@ test("every declared language is accepted by exactly its declared models", () =>
     }
 });
 
+test("fallback selection always remains compatible for every catalog language", () => {
+    for (const language of TRANSCRIPTION_LANGUAGE_DATA) {
+        for (const model of ["parakeet", "nemotron-3.5", ...WHISPER_MODELS]) {
+            const fallback = compatibleTranscriptionModel(model, language.value);
+            assert.equal(
+                modelSupportsLanguage(fallback, language.value),
+                true,
+                `${model}/${language.value} fell back to incompatible ${fallback}`,
+            );
+        }
+    }
+});
+
 test("Bahasa Indonesia disables NVIDIA models and falls back to Whisper", () => {
+    const indonesian = TRANSCRIPTION_LANGUAGE_DATA.find((language) => language.value === "id");
     assert.equal(transcriptionLanguageName("id"), "Bahasa Indonesia");
+    assert.equal(indonesian?.englishName, "Indonesian");
+    assert.ok(indonesian?.aliases?.includes("Bahasa"));
     assert.equal(modelSupportsLanguage("parakeet", "id"), false);
     assert.equal(modelSupportsLanguage("nemotron-3.5", "id"), false);
     assert.equal(modelSupportsLanguage("faster-whisper-large-v3", "id"), true);
@@ -75,6 +91,7 @@ test("normalizes regional locale values without conflating Norwegian variants", 
     assert.equal(modelSupportsLanguage("nemotron-3.5", "nb-NO"), true);
     assert.equal(modelSupportsLanguage("faster-whisper-turbo", "nb-NO"), false);
     assert.equal(modelSupportsLanguage("faster-whisper-turbo", "no-NO"), true);
+    assert.equal(compatibleTranscriptionModel("parakeet", "nb"), "nemotron-3.5");
 });
 
 test("Nemotron adaptation-only languages stay disabled until fine-tuned", () => {

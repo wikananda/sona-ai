@@ -23,15 +23,13 @@ import RecordingStatusBadge from "@/src/components/RecordingStatusBadge";
 import RecordingChatPanel from "@/src/components/RecordingChatPanel";
 import SummaryPanel from "@/src/components/SummaryPanel";
 import TranscriptPanel from "@/src/components/TranscriptPanel";
+import TranscriptionModelLanguageFields from "@/src/components/TranscriptionModelLanguageFields";
 import {
     compatibleModelForLanguage,
     deviceLabel,
     isModelLanguageCompatible,
     isTranscriptionModel,
     numberOrEmpty,
-    transcriptionModelLanguageNote,
-    TRANSCRIPTION_LANGUAGES,
-    TRANSCRIPTION_MODELS,
 } from "@/src/utils/transcriptionSettings";
 
 type DetailTab = "transcript" | "summary" | "chat";
@@ -141,11 +139,6 @@ export default function RecordingDetail({
         ? summaryDevice
         : runtimeDevices.default;
     const [summaryInstruction, setSummaryInstruction] = useState("");
-    const retranscribeModelLanguageNote = transcriptionModelLanguageNote(
-        retranscribeModel,
-        retranscribeLanguage,
-    );
-
     if (isLoading && !recording) {
         return <div className="p-6 text-sm text-zinc-500">Loading recording...</div>;
     }
@@ -229,10 +222,12 @@ export default function RecordingDetail({
             ? recording.device
             : runtimeDevices.default;
 
-        setRetranscribeLanguage(recording.language_hint ?? "auto");
-        setRetranscribeModel(
-            isTranscriptionModel(recording.model) ? recording.model : "parakeet",
-        );
+        const savedLanguage = recording.language_hint ?? "auto";
+        const savedModel = isTranscriptionModel(recording.model)
+            ? recording.model
+            : "parakeet";
+        setRetranscribeLanguage(savedLanguage);
+        setRetranscribeModel(compatibleModelForLanguage(savedModel, savedLanguage));
         setRetranscribeDevice(recordingDevice);
         setRetranscribeMinSpeakers(recording.min_speakers ?? "");
         setRetranscribeMaxSpeakers(recording.max_speakers ?? "");
@@ -561,62 +556,14 @@ export default function RecordingDetail({
                         </div>
 
                         <div className="mt-5 grid gap-4 md:grid-cols-2">
-                            <label className="flex flex-col gap-1">
-                                <span className="text-xs font-medium text-zinc-500">
-                                    Language
-                                </span>
-                                <select
-                                    value={retranscribeLanguage}
-                                    onChange={(event) => {
-                                        const nextLanguage = event.target.value;
-                                        setRetranscribeLanguage(nextLanguage);
-                                        setRetranscribeModel((current) => compatibleModelForLanguage(
-                                            current,
-                                            nextLanguage,
-                                        ));
-                                    }}
-                                    disabled={isRetranscribing}
-                                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    {TRANSCRIPTION_LANGUAGES.map((item) => (
-                                        <option key={item.value} value={item.value}>
-                                            {item.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-
-                            <label className="flex flex-col gap-1">
-                                <span className="text-xs font-medium text-zinc-500">
-                                    Model
-                                </span>
-                                <select
-                                    value={retranscribeModel}
-                                    onChange={(event) => setRetranscribeModel(
-                                        event.target.value as TranscriptionModel,
-                                    )}
-                                    disabled={isRetranscribing}
-                                    className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    {TRANSCRIPTION_MODELS.map((item) => (
-                                        <option
-                                            key={item.value}
-                                            value={item.value}
-                                            disabled={!isModelLanguageCompatible(
-                                                item.value,
-                                                retranscribeLanguage,
-                                            )}
-                                        >
-                                            {item.label}
-                                        </option>
-                                    ))}
-                                </select>
-                                {retranscribeModelLanguageNote && (
-                                    <span className="text-xs text-zinc-500">
-                                        {retranscribeModelLanguageNote}
-                                    </span>
-                                )}
-                            </label>
+                            <TranscriptionModelLanguageFields
+                                language={retranscribeLanguage}
+                                model={retranscribeModel}
+                                onLanguageChange={setRetranscribeLanguage}
+                                onModelChange={setRetranscribeModel}
+                                disabled={isRetranscribing}
+                                className="grid gap-4 md:col-span-2 md:grid-cols-2"
+                            />
 
                             <label className="flex flex-col gap-1">
                                 <span className="text-xs font-medium text-zinc-500">

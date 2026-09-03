@@ -43,12 +43,12 @@ export const TRANSCRIPTION_MODELS: {
     {
         label: "Whisper Large-v3",
         value: "faster-whisper-large-v3",
-        description: "Highest Whisper accuracy · 100 languages",
+        description: "Best accuracy · MPS or Faster-Whisper · 100 languages",
     },
     {
         label: "Whisper Large-v3 Turbo",
         value: "faster-whisper-turbo",
-        description: "Faster Whisper inference · 100 languages",
+        description: "Faster inference · MPS or Faster-Whisper · 100 languages",
     },
 ];
 
@@ -86,6 +86,9 @@ export function transcriptionModelLanguageNote(
     language: string,
 ): string {
     const selectedLanguage = transcriptionLanguageName(language);
+    if (!isModelLanguageCompatible(model, language)) {
+        return unsupportedLanguageReason(model, language);
+    }
     if (language === "auto") {
         return `${TRANSCRIPTION_MODELS.find((item) => item.value === model)?.label ?? "This model"} will detect the spoken language automatically.`;
     }

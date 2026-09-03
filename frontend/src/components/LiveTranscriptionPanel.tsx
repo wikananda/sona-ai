@@ -22,14 +22,11 @@ import {
     startLivePcmCapture,
 } from "@/src/audio/livePcmCapture";
 import {
-    compatibleModelForLanguage,
     deviceLabel,
     isModelLanguageCompatible,
     liveEngineLabel,
-    transcriptionModelLanguageNote,
-    TRANSCRIPTION_LANGUAGES,
-    TRANSCRIPTION_MODELS,
 } from "@/src/utils/transcriptionSettings";
+import TranscriptionModelLanguageFields from "@/src/components/TranscriptionModelLanguageFields";
 import {
     commonTokenPrefix,
     nextVisibleTokenCount,
@@ -118,7 +115,6 @@ export default function LiveTranscriptionPanel({
     const isRecording = state === "recording";
     const isSetupMode = state === "idle" || state === "requesting";
     const isActive = state !== "idle";
-    const modelLanguageNote = transcriptionModelLanguageNote(model, language);
     const provisionalText = provisional?.text ?? "";
 
     useEffect(() => {
@@ -159,6 +155,10 @@ export default function LiveTranscriptionPanel({
         }
         if (!includeMicrophone && !includeSystemAudio) {
             setError("Choose microphone, system audio, or both.");
+            return;
+        }
+        if (!isModelLanguageCompatible(model, language)) {
+            setError("Choose a transcription model that supports this language.");
             return;
         }
 
@@ -408,7 +408,7 @@ export default function LiveTranscriptionPanel({
                 <div className="border-b border-zinc-200 px-4 py-3">
                     <h2 className="text-sm font-semibold text-zinc-900">Live transcription</h2>
                     <p className="mt-1 text-sm text-zinc-500">
-                        Whisper and Parakeet stream continuously while preserving the original audio.
+                        Whisper, Parakeet, and Nemotron stream while preserving the original audio.
                     </p>
                 </div>
 
@@ -431,51 +431,13 @@ export default function LiveTranscriptionPanel({
                         />
                     </div>
 
-                    <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-zinc-500">Language</span>
-                        <select
-                            value={language}
-                            onChange={(event) => {
-                                const nextLanguage = event.target.value;
-                                setLanguage(nextLanguage);
-                                setModel((current) => compatibleModelForLanguage(
-                                    current,
-                                    nextLanguage,
-                                ));
-                            }}
-                            disabled={state !== "idle"}
-                            className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none hover:cursor-pointer focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {TRANSCRIPTION_LANGUAGES.map((item) => (
-                                <option key={item.value} value={item.value}>{item.label}</option>
-                            ))}
-                        </select>
-                    </label>
-
-                    <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-zinc-500">Model</span>
-                        <select
-                            value={model}
-                            onChange={(event) => setModel(event.target.value as TranscriptionModel)}
-                            disabled={state !== "idle"}
-                            className="min-h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none hover:cursor-pointer focus:border-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {TRANSCRIPTION_MODELS.map((item) => (
-                                <option
-                                    key={item.value}
-                                    value={item.value}
-                                    disabled={!isModelLanguageCompatible(item.value, language)}
-                                >
-                                    {item.label}
-                                </option>
-                            ))}
-                        </select>
-                        {modelLanguageNote && (
-                            <span className="text-xs text-zinc-500">
-                                {modelLanguageNote}
-                            </span>
-                        )}
-                    </label>
+                    <TranscriptionModelLanguageFields
+                        language={language}
+                        model={model}
+                        onLanguageChange={setLanguage}
+                        onModelChange={setModel}
+                        disabled={state !== "idle"}
+                    />
 
                     <label className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-zinc-500">Device</span>
