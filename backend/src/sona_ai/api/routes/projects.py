@@ -51,6 +51,22 @@ logger = setup_logging()
 router = APIRouter()
 
 
+def _enqueue_recording_job(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    recording_id: str,
+    job_id: str,
+    target,
+    *args,
+) -> None:
+    manager = getattr(request.app.state, "recording_job_manager", None)
+    if manager is not None:
+        manager.submit(recording_id, job_id, target, *args)
+        return
+    # Keep direct route invocation and lightweight embedded deployments working.
+    background_tasks.add_task(target, *args)
+
+
 @router.post("/projects")
 def create_project(body: ProjectCreate, db: Session = Depends(get_db)):
     name = body.name.strip()
@@ -100,11 +116,23 @@ def get_project(project_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/projects/{project_id}")
-def delete_project(project_id: str, db: Session = Depends(get_db)):
-    project = db.get(Project, project_id)
+def delete_project(
+    project_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    project = db.scalar(
+        select(Project)
+        .where(Project.id == project_id)
+        .options(selectinload(Project.recordings))
+    )
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    manager = getattr(request.app.state, "recording_job_manager", None)
+    if manager is not None:
+        for recording in project.recordings:
+            manager.cancel(recording.processing_job_id)
     db.delete(project)
     db.commit()
 
@@ -181,7 +209,11 @@ def upload_project_recording(
                 logger.warning("Failed to clean up uploaded audio: %s", cleanup_exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    background_tasks.add_task(
+    _enqueue_recording_job(
+        request,
+        background_tasks,
+        recording.id,
+        job_id,
         run_transcription,
         recording.id,
         job_id,
@@ -327,6 +359,27 @@ def save_live_recording(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return _serialize_recording(recording, include_transcript=True)
+
+
+@router.get("/processing/recordings")
+def list_processing_recordings(db: Session = Depends(get_db)):
+    rows = db.execute(
+        select(Recording, Project.name)
+        .join(Project, Project.id == Recording.project_id)
+        .where(Recording.status.in_([
+            RecordingStatus.PENDING,
+            RecordingStatus.PROCESSING,
+        ]))
+        .order_by(Recording.created_at.asc())
+    ).all()
+    return [
+        {
+            **_serialize_recording(recording, include_transcript=False),
+            "project_name": project_name,
+        }
+        for recording, project_name in rows
+    ]
+
 
 @router.patch("/recordings/{recording_id}")
 def rename_recording(
@@ -545,7 +598,11 @@ def retranscribe_recording(
     db.commit()
     db.refresh(recording)
 
-    background_tasks.add_task(
+    _enqueue_recording_job(
+        request,
+        background_tasks,
+        recording.id,
+        job_id,
         run_transcription,
         recording.id,
         job_id,
@@ -604,7 +661,11 @@ def extract_recording_speakers(
     db.commit()
     db.refresh(recording)
 
-    background_tasks.add_task(
+    _enqueue_recording_job(
+        request,
+        background_tasks,
+        recording.id,
+        job_id,
         run_speaker_extraction,
         recording.id,
         job_id,
@@ -614,7 +675,11 @@ def extract_recording_speakers(
 
 
 @router.post("/recordings/{recording_id}/cancel")
-def cancel_recording(recording_id: str, db: Session = Depends(get_db)):
+def cancel_recording(
+    recording_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
     recording = db.scalar(
         select(Recording)
         .where(Recording.id == recording_id)
@@ -631,12 +696,16 @@ def cancel_recording(recording_id: str, db: Session = Depends(get_db)):
             detail="Recording is not currently processing",
         )
 
+    job_id = recording.processing_job_id
     recording.status = RecordingStatus.CANCELED
     recording.processing_stage = "canceled"
     recording.processing_job_id = None
     recording.error = None
     db.commit()
     db.refresh(recording)
+    manager = getattr(request.app.state, "recording_job_manager", None)
+    if manager is not None:
+        manager.cancel(job_id)
     return _serialize_recording(recording, include_transcript=True)
 
 
@@ -747,12 +816,19 @@ def update_transcript_segment(
 
 
 @router.delete("/recordings/{recording_id}")
-def delete_recording(recording_id: str, db: Session = Depends(get_db)):
+def delete_recording(
+    recording_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
     recording = db.get(Recording, recording_id)
     if recording is None:
         raise HTTPException(status_code=404, detail="Recording not found")
 
     stored_path = recording.stored_path
+    manager = getattr(request.app.state, "recording_job_manager", None)
+    if manager is not None:
+        manager.cancel(recording.processing_job_id)
     db.delete(recording)
     db.commit()
 

@@ -9,6 +9,7 @@ from sona_ai.pipelines import build_speech_pipeline
 from sona_ai.services import SummarizationService, TranscriptionService
 from sona_ai.services.parakeet_live_gateway import ParakeetLiveGateway
 from sona_ai.services.nemotron_live_gateway import NemotronLiveGateway
+from sona_ai.services.recording_job_manager import RecordingJobManager
 from sona_ai.services.whisper_live_gateway import WhisperLiveGateway
 
 from sona_ai.api.routes.projects import router as projects_router
@@ -59,6 +60,7 @@ async def startup_event():
         default_model=speech_config.get("transcription", {}).get("engine", "parakeet"),
         default_device=speech_config.get("transcription", {}).get("device", "auto"),
     )
+    app.state.recording_job_manager = RecordingJobManager()
     app.state.whisper_live_gateway = WhisperLiveGateway()
     app.state.nemotron_live_gateway = NemotronLiveGateway()
     app.state.parakeet_live_gateway = ParakeetLiveGateway(
@@ -76,6 +78,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("Shutting down...")
+    app.state.recording_job_manager.shutdown(wait=True)
     logger.info("Cleaning up models...")
     await app.state.whisper_live_gateway.close()
     await app.state.nemotron_live_gateway.close()
@@ -90,7 +93,10 @@ def _mark_interrupted_recordings_failed():
     try:
         recordings = (
             db.query(Recording)
-            .filter(Recording.status == RecordingStatus.PROCESSING)
+            .filter(Recording.status.in_([
+                RecordingStatus.PENDING,
+                RecordingStatus.PROCESSING,
+            ]))
             .all()
         )
         for recording in recordings:

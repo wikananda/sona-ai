@@ -1,4 +1,5 @@
 import json
+import threading
 import uuid
 
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ def run_transcription(
     job_id: str,
     transcription_service: TranscriptionService,
     extract_speakers: bool = True,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     logger.info("Recording worker started for recording_id=%s", recording_id)
     db = SessionLocal()
@@ -27,7 +29,7 @@ def run_transcription(
         if recording is None:
             logger.warning("Recording worker skipped missing recording_id=%s", recording_id)
             return
-        if _is_canceled_or_stale(recording, job_id):
+        if _is_canceled_or_stale(recording, job_id, cancel_event):
             logger.info("Recording worker skipped canceled/stale recording_id=%s", recording_id)
             return
 
@@ -47,7 +49,7 @@ def run_transcription(
             job_id=job_id,
         )
         transcription_audio = _ensure_transcription_audio(recording)
-        _raise_if_canceled_or_stale(db, recording.id, job_id)
+        _raise_if_canceled_or_stale(db, recording.id, job_id, cancel_event)
         logger.info(
             "Recording %s marked processing: file=%s model=%s device=%s language=%s",
             recording.id,
@@ -72,9 +74,15 @@ def run_transcription(
             min_speakers=recording.min_speakers,
             max_speakers=recording.max_speakers,
             extract_speakers=extract_speakers,
-            progress_callback=_progress_callback(db, recording.id, job_id, total_steps),
+            progress_callback=_progress_callback(
+                db,
+                recording.id,
+                job_id,
+                total_steps,
+                cancel_event,
+            ),
         )
-        _raise_if_canceled_or_stale(db, recording.id, job_id)
+        _raise_if_canceled_or_stale(db, recording.id, job_id, cancel_event)
 
         transcript_segments = sanitize_for_json(
             result.get("result_raw") or result.get("transcript", [])
@@ -96,7 +104,7 @@ def run_transcription(
             db.delete(recording.transcript)
             db.flush()
 
-        _raise_if_canceled_or_stale(db, recording.id, job_id)
+        _raise_if_canceled_or_stale(db, recording.id, job_id, cancel_event)
         db.add(transcript)
         recording.status = RecordingStatus.DONE
         recording.processing_stage = "done"
@@ -121,6 +129,7 @@ def run_speaker_extraction(
     recording_id: str,
     job_id: str,
     transcription_service: TranscriptionService,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     logger.info("Speaker extraction worker started for recording_id=%s", recording_id)
     db = SessionLocal()
@@ -129,7 +138,7 @@ def run_speaker_extraction(
         if recording is None:
             logger.warning("Speaker extraction skipped missing recording_id=%s", recording_id)
             return
-        if _is_canceled_or_stale(recording, job_id):
+        if _is_canceled_or_stale(recording, job_id, cancel_event):
             logger.info("Speaker extraction skipped canceled/stale recording_id=%s", recording_id)
             return
         if recording.transcript is None:
@@ -151,7 +160,7 @@ def run_speaker_extraction(
             job_id=job_id,
         )
         transcription_audio = _ensure_transcription_audio(recording)
-        _raise_if_canceled_or_stale(db, recording.id, job_id)
+        _raise_if_canceled_or_stale(db, recording.id, job_id, cancel_event)
         segments = json.loads(recording.transcript.segments_json)
         transcription = TranscriptionResult(
             segments=[
@@ -185,9 +194,15 @@ def run_speaker_extraction(
             device=recording.device,
             min_speakers=recording.min_speakers,
             max_speakers=recording.max_speakers,
-            progress_callback=_progress_callback(db, recording.id, job_id, total_steps),
+            progress_callback=_progress_callback(
+                db,
+                recording.id,
+                job_id,
+                total_steps,
+                cancel_event,
+            ),
         )
-        _raise_if_canceled_or_stale(db, recording.id, job_id)
+        _raise_if_canceled_or_stale(db, recording.id, job_id, cancel_event)
         assigned_segments = sanitize_for_json(
             result.get("result_raw") or result.get("transcript", [])
         )
@@ -213,7 +228,7 @@ def run_speaker_extraction(
             recording.summary = None
             db.delete(summary)
 
-        _raise_if_canceled_or_stale(db, recording.id, job_id)
+        _raise_if_canceled_or_stale(db, recording.id, job_id, cancel_event)
         recording.status = RecordingStatus.DONE
         recording.processing_stage = "done"
         recording.processing_job_id = None
@@ -265,7 +280,13 @@ def _set_status(
     db.refresh(recording)
 
 
-def _progress_callback(db: Session, recording_id: str, job_id: str, total_steps: int):
+def _progress_callback(
+    db: Session,
+    recording_id: str,
+    job_id: str,
+    total_steps: int,
+    cancel_event: threading.Event | None = None,
+):
     completed_steps = {"value": 0}
 
     def update(stage: str, finished: bool) -> None:
@@ -275,7 +296,7 @@ def _progress_callback(db: Session, recording_id: str, job_id: str, total_steps:
         recording = db.get(Recording, recording_id)
         if recording is None:
             return
-        if _is_canceled_or_stale(recording, job_id):
+        if _is_canceled_or_stale(recording, job_id, cancel_event):
             raise RecordingCanceled()
 
         recording.processing_stage = stage
@@ -304,14 +325,25 @@ class RecordingCanceled(Exception):
     pass
 
 
-def _raise_if_canceled_or_stale(db: Session, recording_id: str, job_id: str) -> None:
+def _raise_if_canceled_or_stale(
+    db: Session,
+    recording_id: str,
+    job_id: str,
+    cancel_event: threading.Event | None = None,
+) -> None:
     recording = db.get(Recording, recording_id)
-    if recording is None or _is_canceled_or_stale(recording, job_id):
+    if recording is None or _is_canceled_or_stale(recording, job_id, cancel_event):
         raise RecordingCanceled()
 
 
-def _is_canceled_or_stale(recording: Recording, job_id: str) -> bool:
+def _is_canceled_or_stale(
+    recording: Recording,
+    job_id: str,
+    cancel_event: threading.Event | None = None,
+) -> bool:
     return (
+        (cancel_event is not None and cancel_event.is_set())
+        or
         recording.status == RecordingStatus.CANCELED
         or recording.processing_job_id != job_id
     )
