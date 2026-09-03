@@ -412,8 +412,9 @@ start_sona() {
     if [ -f "$project_root/.env" ]; then
         (
             cd "$project_root" || exit 1
+            export HF_HUB_DISABLE_XET="${HF_HUB_DISABLE_XET:-1}"
             exec "$conda_bin" run --no-capture-output -n "$conda_environment" \
-                dotenv -f "$project_root/.env" run -- \
+                dotenv -f "$project_root/.env" run --override -- \
                 uvicorn sona_ai.api.main:app \
                 --app-dir "$project_root/backend/src" \
                 --host 127.0.0.1 \
@@ -422,6 +423,7 @@ start_sona() {
     else
         (
             cd "$project_root" || exit 1
+            export HF_HUB_DISABLE_XET="${HF_HUB_DISABLE_XET:-1}"
             exec "$conda_bin" run --no-capture-output -n "$conda_environment" \
                 uvicorn sona_ai.api.main:app \
                 --app-dir "$project_root/backend/src" \

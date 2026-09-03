@@ -299,7 +299,9 @@ shuts down the managed processes.
 
 On the first launch, the backend may need to download and load its configured speech
 model before the browser opens. The launcher reports progress for up to 30 minutes
-and prints the relevant log if startup fails.
+and prints the relevant log if startup fails. It defaults to Hugging Face's standard
+HTTP download path because Xet transfers can stall on some networks; set
+`HF_HUB_DISABLE_XET=0` in `.env` if you prefer to enable Xet.
 
 Double-click `Stop Sona.command` if you need to stop an existing managed session.
 Runtime logs are stored in `.sona-runtime/` and are not committed to git.
