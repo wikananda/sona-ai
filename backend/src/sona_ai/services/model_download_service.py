@@ -365,6 +365,10 @@ class ModelDownloadService:
             return "faster-whisper-large-v3"
         if profile.transcription_config == "faster-whisper-turbo":
             return "faster-whisper-turbo"
+        if profile.transcription_config == "whisper-mps-large-v3":
+            return "whisper-mps-large-v3"
+        if profile.transcription_config == "whisper-mps-turbo":
+            return "whisper-mps-turbo"
         return None
 
     def _cache_path(self, entry: ModelCatalogEntry) -> Path:
@@ -452,6 +456,19 @@ def _download_faster_whisper(entry: ModelCatalogEntry) -> None:
         transcriber.load_models()
     finally:
         transcriber.cleanup_models()
+
+
+def _download_whisper_mps(entry: ModelCatalogEntry) -> None:
+    from huggingface_hub import snapshot_download
+
+    config = load_config(entry.config_name)
+    cache_dir = model_cache_root(model_id=entry.id) / (entry.runtime_cache_subdir or "transformers")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_download(
+        repo_id=entry.model_names[0],
+        revision=config.get("model", {}).get("revision"),
+        cache_dir=str(cache_dir),
+    )
 
 
 def _download_nemotron(entry: ModelCatalogEntry) -> None:
@@ -569,6 +586,26 @@ MODEL_CATALOG = [
         runtime_cache_subdir="faster-whisper",
     ),
     ModelCatalogEntry(
+        id="whisper-mps-large-v3",
+        label="Whisper large-v3 for Apple GPU",
+        type="transcription",
+        model_names=["openai/whisper-large-v3"],
+        config_name="whisper-mps-large-v3",
+        environment="sona-ai",
+        runtime_cache_subdir="transformers",
+        management_note="PyTorch MPS weights used only on Apple Silicon GPUs.",
+    ),
+    ModelCatalogEntry(
+        id="whisper-mps-turbo",
+        label="Whisper large-v3 Turbo for Apple GPU",
+        type="transcription",
+        model_names=["openai/whisper-large-v3-turbo"],
+        config_name="whisper-mps-turbo",
+        environment="sona-ai",
+        runtime_cache_subdir="transformers",
+        management_note="PyTorch MPS weights used only on Apple Silicon GPUs.",
+    ),
+    ModelCatalogEntry(
         id="wav2vec2-aligner",
         label="Wav2Vec2 aligner",
         type="alignment",
@@ -597,6 +634,8 @@ DOWNLOADERS: dict[str, Callable[[ModelCatalogEntry], None]] = {
     "parakeet": _download_parakeet,
     "faster-whisper-large-v3": _download_faster_whisper,
     "faster-whisper-turbo": _download_faster_whisper,
+    "whisper-mps-large-v3": _download_whisper_mps,
+    "whisper-mps-turbo": _download_whisper_mps,
     "wav2vec2-aligner": _download_wav2vec2,
     "pyannote-community": _download_pyannote,
 }

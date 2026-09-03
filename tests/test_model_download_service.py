@@ -13,6 +13,7 @@ from sona_ai.core import (
 )
 from sona_ai.services.model_download_service import (
     _download_nemotron,
+    _download_whisper_mps,
     model_download_service,
 )
 from sona_ai.services.pipeline_profile import PipelineProfile
@@ -108,6 +109,40 @@ class ModelDownloadServiceTest(unittest.TestCase):
             model_download_service.required_model_ids_for_profile(profile),
             ["nemotron-3.5"],
         )
+
+    def test_mps_profile_requires_distinct_transformers_weights(self):
+        profile = PipelineProfile(
+            transcription_engine="whisper_mps",
+            transcription_config="whisper-mps-turbo",
+            alignment_enabled=False,
+            alignment_engine="none",
+            alignment_config=None,
+            diarization_enabled=False,
+            diarization_engine="community_external",
+            diarization_config="diarization-community",
+            device="mps",
+        )
+
+        self.assertEqual(
+            model_download_service.required_model_ids_for_profile(profile),
+            ["whisper-mps-turbo"],
+        )
+
+    def test_mps_downloader_uses_pinned_transformers_revision(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.dict(os.environ, {"SONA_HF_CACHE": temp_dir}, clear=False):
+                entry = model_download_service._entry("whisper-mps-turbo")
+
+                with patch("huggingface_hub.snapshot_download") as download:
+                    _download_whisper_mps(entry)
+
+                download.assert_called_once_with(
+                    repo_id="openai/whisper-large-v3-turbo",
+                    revision="41f01f3fe87f28c78e2fbf8b568835947dd65ed9",
+                    cache_dir=str(
+                        (Path(temp_dir) / "whisper-mps-turbo" / "transformers").resolve()
+                    ),
+                )
 
     def test_nemotron_downloader_places_pinned_gguf_in_model_root(self):
         with tempfile.TemporaryDirectory() as temp_dir:

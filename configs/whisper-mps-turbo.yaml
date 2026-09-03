@@ -1,0 +1,13 @@
+model:
+    model_name: "openai/whisper-large-v3-turbo"
+    revision: "41f01f3fe87f28c78e2fbf8b568835947dd65ed9"
+    language: null
+    device: "mps"
+    dtype: "float16"
+    task: "transcribe"
+    batch_size: 4
+    live_batch_size: 1
+    chunk_length_s: 30
+    word_timestamps: true
+    attn_implementation: "sdpa"
+    warmup_seconds: 1.0

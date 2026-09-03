@@ -12,6 +12,11 @@ TRANSCRIPTION_MODEL_PROFILES = {
     "faster-whisper-turbo": ("faster_whisper", "faster-whisper-turbo"),
 }
 
+WHISPER_MPS_CONFIGS = {
+    "faster-whisper-large-v3": "whisper-mps-large-v3",
+    "faster-whisper-turbo": "whisper-mps-turbo",
+}
+
 
 @dataclass(frozen=True)
 class PipelineProfile:
@@ -83,6 +88,10 @@ def resolve_pipeline_profile(
     else:
         transcription_engine = requested_model
         transcription_config = transcription.get("config", transcription_engine)
+
+    if requested_model in WHISPER_MPS_CONFIGS and resolve_device(device) == "mps":
+        transcription_engine = "whisper_mps"
+        transcription_config = WHISPER_MPS_CONFIGS[requested_model]
 
     if alignment_enabled is None:
         resolved_alignment_enabled = bool(alignment.get("enabled", False))

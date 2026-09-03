@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from sona_ai.services.pipeline_profile import resolve_pipeline_profile
 from sona_ai.transcription.faster_whisper_transcriber import FasterWhisperTranscriber
@@ -75,6 +76,23 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
 
         self.assertEqual(profile.transcription_engine, "faster_whisper")
         self.assertEqual(profile.transcription_config, "faster-whisper-large-v3")
+
+    @patch("sona_ai.services.pipeline_profile.resolve_device", return_value="mps")
+    def test_model_profile_routes_apple_gpu_to_mps_whisper(self, _resolve_device):
+        speech_config = {
+            "transcription": {"engine": "parakeet", "config": "parakeet"},
+            "alignment": {"enabled": False, "engine": "none"},
+            "diarization": {"enabled": False, "engine": "community_external"},
+        }
+
+        profile = resolve_pipeline_profile(
+            speech_config,
+            model="faster-whisper-turbo",
+            device="auto",
+        )
+
+        self.assertEqual(profile.transcription_engine, "whisper_mps")
+        self.assertEqual(profile.transcription_config, "whisper-mps-turbo")
 
     def test_live_profile_can_disable_alignment_and_diarization(self):
         speech_config = {

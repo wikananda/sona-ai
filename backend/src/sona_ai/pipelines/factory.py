@@ -73,6 +73,11 @@ def _build_transcriber(
 
         return FasterWhisperTranscriber(engine_config), engine_config
 
+    if resolved_engine == "whisper_mps":
+        from sona_ai.transcription import WhisperMpsTranscriber
+
+        return WhisperMpsTranscriber(engine_config), engine_config
+
     if resolved_engine == "nemotron":
         from sona_ai.transcription import NemotronTranscriber
 
